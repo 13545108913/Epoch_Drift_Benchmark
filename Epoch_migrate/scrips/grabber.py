@@ -10,7 +10,7 @@ from datetime import datetime
 # --- 配置 ---
 # (!!) 修改为您的 *源* GitLab (v14) 实例的 URL 和 ADMIN TOKEN
 V14_URL = 'http://localhost:8023' 
-V14_ADMIN_TOKEN = os.getenv('V14_ADMIN_TOKEN') # glpat-XmjTr6uk2_XbWzitBzB5
+V14_ADMIN_TOKEN = os.getenv('V14_ADMIN_TOKEN')
 # --- 
 
 OUTPUT_FILE = 'gitlab_data.json'
