@@ -13,7 +13,7 @@ from http import HTTPStatus # 导入 HTTPStatus
 # --- 1. 配置 ---
 # (!!) 强烈建议使用环境变量来配置 (!!)
 TARGET_URL='http://localhost:8012'
-TARGET_ADMIN_TOKEN='YOUR_V12_OR_V13_ADMIN_TOKEN'
+TARGET_ADMIN_TOKEN=os.getenv('GITLAB_TARGET_TOKEN') 
 DEFAULT_PASSWORD='a_very_secure_password_123!'
 
 # TARGET_URL = os.getenv('GITLAB_TARGET_URL', 'http://localhost:8012') 

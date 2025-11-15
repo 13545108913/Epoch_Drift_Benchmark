@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
 import gitlab
 import json
 import sys
@@ -9,7 +10,7 @@ from datetime import datetime
 # --- 配置 ---
 # (!!) 修改为您的 *源* GitLab (v14) 实例的 URL 和 ADMIN TOKEN
 V14_URL = 'http://localhost:8023' 
-V14_ADMIN_TOKEN = 'glpat-XmjTr6uk2_XbWzitBzB5' # (!!) 确保这个 Token 在这里
+V14_ADMIN_TOKEN = os.getenv('V14_ADMIN_TOKEN') # glpat-XmjTr6uk2_XbWzitBzB5
 # --- 
 
 OUTPUT_FILE = 'gitlab_data.json'

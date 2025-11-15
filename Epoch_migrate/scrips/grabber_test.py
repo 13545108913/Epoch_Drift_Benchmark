@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
 import gitlab
 import json
 import sys
@@ -8,7 +9,7 @@ from datetime import datetime
 
 # --- 配置 ---
 V14_URL = 'http://localhost:8023' 
-V14_ADMIN_TOKEN = 'glpat-XmjTr6uk2_XbWzitBzB5'
+V14_ADMIN_TOKEN = os.getenv('V14_ADMIN_TOKEN')
 # --- 
 
 OUTPUT_FILE = f'gitlab_data_TEST_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
