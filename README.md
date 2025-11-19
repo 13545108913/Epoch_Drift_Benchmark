@@ -53,8 +53,8 @@ docker-compose -f docker-compose.v12.yml down --volumes
 
 ### 设置外部URL
 ```bash
-docker exec gitlab-v12 sed -i "s|^external_url.*|external_url 'http://localhost:8023'|" /etc/gitlab/gitlab.rb
-docker exec gitlab-v12 gitlab-ctl reconfigure
+docker exec gitlab-v13.0 sed -i "s|^external_url.*|external_url 'http://172.26.116.102:8080'|" /etc/gitlab/gitlab.rb
+docker exec gitlab-v13.0 gitlab-ctl reconfigure
 ```
 
 ### 账户密码
@@ -70,7 +70,7 @@ $env:BASE_URL="http://localhost"
 $env:WA_SHOPPING="http://localhost:7770/"
 $env:WA_SHOPPING_ADMIN="http://localhost:7780/admin"
 $env:WA_REDDIT="http://localhost:9999"
-$env:WA_GITLAB="http://localhost:8023"
+$env:WA_GITLAB="http://localhost:8080"
 $env:WA_WIKIPEDIA="http://localhost:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
 $env:WA_MAP="http://localhost:3000"
 $env:WA_HOMEPAGE="http://localhost:4399"
@@ -78,14 +78,14 @@ $env:WA_HOMEPAGE="http://localhost:4399"
 $env:SHOPPING="http://localhost:7770/"
 $env:SHOPPING_ADMIN="http://localhost:7780/admin"
 $env:REDDIT="http://localhost:9999"
-$env:GITLAB="http://localhost:8023"
+$env:GITLAB="http://localhost:8080"
 $env:WIKIPEDIA="http://localhost:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
 $env:MAP="http://localhost:3000"
 $env:HOMEPAGE="http://localhost:4399"
 
 
-$env:WA_GITLAB_V1="http://localhost:8023"
-$env:WA_GITLAB_V2="http://localhost:8023"
+$env:WA_GITLAB_V1="http://localhost:8080"
+$env:WA_GITLAB_V2="http://localhost:8080"
 ```
 
 ```bash
