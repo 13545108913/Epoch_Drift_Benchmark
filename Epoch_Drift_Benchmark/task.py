@@ -49,7 +49,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
         task_id: Optional[int] = None,
         intent_template_id: Optional[int] = None,
         site_version: str = "v1",
-        with_drift: bool = False,
+        with_drift: bool = True,
         with_na_hint: bool = False,
         with_homepage_hint: bool = False,
     ) -> None:
@@ -82,7 +82,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
 
         import os
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        json_file_path = os.path.join(current_dir, 'test.raw.json')
+        json_file_path = os.path.join(current_dir, 'gitlab_tasks_final.json')
         with open(json_file_path, "r", encoding="utf-8") as f:
             all_configs_str = f.read()
 
