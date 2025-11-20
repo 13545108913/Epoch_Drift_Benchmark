@@ -1,0 +1,415 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import gitlab
+import json
+import sys
+from datetime import datetime
+
+# --- 配置 ---
+# (!!) 修改为您的 *源* GitLab (v14) 实例的 URL 和 ADMIN TOKEN
+V14_URL = 'http://10.22.35.100:8023' 
+V14_ADMIN_TOKEN = 'glpat-p4hoV7_pysTddVZgWVnL' # (!!) 确保这个 Token 在这里
+# --- 
+
+OUTPUT_FILE = f'gitlab_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+
+def safe_get(obj, attr, default=None):
+    """安全获取对象属性，处理空值"""
+    try:
+        value = getattr(obj, attr, default)
+        return value if value is not None else default
+    except:
+        return default
+
+def safe_dict_get(dictionary, key, default=None):
+    """安全获取字典值，处理空值"""
+    try:
+        value = dictionary.get(key, default)
+        return value if value is not None else default
+    except:
+        return default
+
+# --- 抓取器函数 ---
+
+def get_labels(project):
+    """获取项目标签"""
+    try:
+        labels = project.labels.list(all=True)
+        return [
+            {
+                "id": safe_get(label, 'id'),
+                "name": safe_get(label, 'name', ''),
+                "color": safe_get(label, 'color', ''),
+                "description": safe_get(label, 'description', '')
+            }
+            for label in labels
+        ]
+    except Exception as e:
+        print(f" [标签错误: {e}]", end="")
+        return []
+
+def get_milestones(project):
+    """获取项目里程碑"""
+    try:
+        milestones = project.milestones.list(all=True)
+        return [
+            {
+                "id": safe_get(milestone, 'id'),
+                "title": safe_get(milestone, 'title', ''),
+                "description": safe_get(milestone, 'description', ''),
+                "state": safe_get(milestone, 'state', 'active'),
+                "due_date": safe_get(milestone, 'due_date', ''),
+                "start_date": safe_get(milestone, 'start_date', '')
+            }
+            for milestone in milestones
+        ]
+    except Exception as e:
+        print(f" [里程碑错误: {e}]", end="")
+        return []
+
+def get_members(project):
+    """
+    (新) 获取项目成员及其角色
+    满足需求 4: 解决“原始角色丢失”问题
+    """
+    try:
+        members = project.members.list(all=True)
+        return [
+            {
+                "id": safe_get(member, 'id'),
+                "username": safe_get(member, 'username', ''),
+                "name": safe_get(member, 'name', ''),
+                "access_level": safe_get(member, 'access_level', 0) 
+                # 50=Owner, 40=Maintainer, 30=Developer, 20=Reporter, 10=Guest
+            }
+            for member in members
+        ]
+    except Exception as e:
+        print(f" [成员错误: {e}]", end="")
+        return []
+
+def get_pipelines(project):
+    """获取CI/CD流水线"""
+    try:
+        pipelines = project.pipelines.list(all=True, per_page=50) # 限制数量
+        pipeline_data = []
+        
+        for pipeline in pipelines:
+            jobs = []
+            try:
+                # 为了获取 jobs, 我们仍然需要 N+1 查询
+                full_pipeline = project.pipelines.get(safe_get(pipeline, 'id'))
+                pipeline_jobs = full_pipeline.jobs.list(all=True)
+                for job in pipeline_jobs:
+                    jobs.append({
+                        "id": safe_get(job, 'id'),
+                        "name": safe_get(job, 'name', ''),
+                        "stage": safe_get(job, 'stage', ''),
+                        "status": safe_get(job, 'status', ''),
+                    })
+            except Exception as job_error:
+                print(f" [任务错误: {job_error}]", end="")
+            
+            pipeline_data.append({
+                "id": safe_get(pipeline, 'id'),
+                "status": safe_get(pipeline, 'status', ''),
+                "ref": safe_get(pipeline, 'ref', ''),
+                "sha": safe_get(pipeline, 'sha', ''),
+                "jobs": jobs
+            })
+        
+        return pipeline_data
+    except Exception as e:
+        print(f" [流水线错误: {e}]", end="")
+        return []
+
+def get_wiki_pages(project):
+    """获取Wiki页面"""
+    try:
+        if not safe_get(project, 'wiki_enabled', False):
+            return []
+            
+        wiki_pages = project.wikis.list(all=True)
+        wiki_data = []
+        
+        for wiki_page in wiki_pages:
+            try:
+                full_page = project.wikis.get(safe_get(wiki_page, 'slug'))
+                wiki_data.append({
+                    "slug": safe_get(full_page, 'slug', ''),
+                    "title": safe_get(full_page, 'title', ''),
+                    "format": safe_get(full_page, 'format', 'markdown'),
+                    "content": safe_get(full_page, 'content', ''),
+                })
+            except Exception as page_error:
+                print(f" [Wiki页面错误: {page_error}]", end="")
+                continue
+        
+        return wiki_data
+    except Exception as e:
+        print(f" [Wiki错误: {e}]", end="")
+        return []
+
+# --- 主函数 ---
+
+def main():
+    try:
+        # (!!) 启用自动重试以提高健壮性
+        gl = gitlab.Gitlab(V14_URL, private_token=V14_ADMIN_TOKEN, retry_transient_errors=True)
+        gl.auth()
+        
+        current_user = gl.user
+        print(f"✅ 成功连接到源 GitLab (v14): {V14_URL}")
+        print(f"✅ 当前用户: {safe_get(current_user, 'username', 'Unknown')}")
+        
+    except Exception as e:
+        print(f"❌ 连接到 v14 实例失败: {e}")
+        sys.exit(1)
+
+    data = {
+        "export_info": {
+            "source_url": V14_URL,
+            "export_time": datetime.now().isoformat(),
+            "gitlab_version": None
+        },
+        "users": [],
+        "groups": [], # (新) 满足需求 2
+        "projects": []
+    }
+
+    # 获取GitLab版本信息
+    try:
+        data["export_info"]["gitlab_version"] = gl.version()
+    except:
+        pass
+
+    # --- 抓取用户 ---
+    print("\n📋 抓取用户...")
+    try:
+        users = gl.users.list(all=True)
+        # 排除被屏蔽的用户和 root (root 在目标实例中已存在)
+        active_users = [u for u in users if safe_get(u, 'state') == 'active' and safe_get(u, 'username') != 'root']
+        
+        for user in active_users:
+            data['users'].append({
+                "id": safe_get(user, 'id'),
+                "username": safe_get(user, 'username', 'unknown_username'),
+                "name": safe_get(user, 'name', ''),
+                "email": safe_get(user, 'email', ''),
+                "state": safe_get(user, 'state', 'unknown')
+            })
+        print(f"  ✅ 抓取了 {len(data['users'])} 个活动用户")
+        
+    except Exception as e:
+        print(f"❌ 抓取用户时出错: {e}")
+
+    # --- (新) 抓取组 (Groups) ---
+    # 满足需求 2: 解决"Group 命名空间"问题
+    print("\n🏢 抓取组 (Groups)...")
+    try:
+        groups = gl.groups.list(all=True)
+        for group in groups:
+            data['groups'].append({
+                "id": safe_get(group, 'id'),
+                "name": safe_get(group, 'name', ''),
+                "path": safe_get(group, 'path', ''),
+                "full_path": safe_get(group, 'full_path', ''),
+                "description": safe_get(group, 'description', ''),
+                "visibility": safe_get(group, 'visibility', 'private'),
+                "parent_id": safe_get(group, 'parent_id')
+            })
+        print(f"  ✅ 抓取了 {len(data['groups'])} 个组")
+    except Exception as e:
+        print(f"❌ 抓取组时出错: {e}")
+
+
+    # --- 抓取项目 ---
+    print("\n📦 抓取项目...")
+    try:
+        projects = gl.projects.list(all=True)
+        print(f"  📊 发现了 {len(projects)} 个项目，开始深度抓取...")
+
+        for i, project in enumerate(projects):
+            print(f"\n[{i+1}/{len(projects)}] 正在处理项目: {safe_get(project, 'name_with_namespace', 'Unknown Project')}")
+            
+            try:
+                full_project = gl.projects.get(project.id, lazy=False)
+                
+                # (新) 满足需求 3: 解决"Git Clone 认证"问题
+                # 我们将构造一个包含 admin token 的 URL，供 seeder.py 使用
+                authed_source_url = full_project.http_url_to_repo.replace('http://', f'http://oauth2:{V14_ADMIN_TOKEN}@')
+                
+                # (新) 满足需求 2: 解决"Group 命名空间"问题
+                # 我们存储 namespace 的类型和路径
+                namespace_info = safe_get(full_project, 'namespace', {})
+                namespace_kind = safe_dict_get(namespace_info, 'kind', 'user') # 默认为 'user'
+                namespace_full_path = safe_dict_get(namespace_info, 'full_path', 'unknown_namespace')
+
+                project_data = {
+                    "id": safe_get(full_project, 'id'),
+                    "name": safe_get(full_project, 'name', 'unknown_project'),
+                    "path": safe_get(full_project, 'path', 'unknown_path'),
+                    
+                    # (新) 命名空间信息
+                    "namespace_kind": namespace_kind,
+                    "namespace_full_path": namespace_full_path,
+                    
+                    "visibility": safe_get(full_project, 'visibility', 'private'),
+                    "description": safe_get(full_project, 'description', ''),
+                    "web_url": safe_get(full_project, 'web_url', ''),
+                    
+                    # (新) 认证 URL
+                    "authed_http_url_to_repo": authed_source_url, 
+                    
+                    "http_url_to_repo": safe_get(full_project, 'http_url_to_repo', ''),
+                    "ssh_url_to_repo": safe_get(full_project, 'ssh_url_to_repo', ''),
+                    "created_at": safe_get(full_project, 'created_at', ''),
+                    "last_activity_at": safe_get(full_project, 'last_activity_at', ''),
+                    "star_count": safe_get(full_project, 'star_count', 0),
+                    "forks_count": safe_get(full_project, 'forks_count', 0),
+                    "wiki_enabled": safe_get(full_project, 'wiki_enabled', False),
+                    "issues_enabled": safe_get(full_project, 'issues_enabled', False),
+                    "merge_requests_enabled": safe_get(full_project, 'merge_requests_enabled', False),
+                    "snippets_enabled": safe_get(full_project, 'snippets_enabled', False),
+                    
+                    "labels": [],
+                    "milestones": [],
+                    "members": [], # (新) 满足需求 4
+                    "pipelines": [],
+                    "wiki_pages": [],
+                    "issues": [],
+                    "merge_requests": []
+                }
+
+                # 抓取 Labels (满足需求 1)
+                print(f"  🏷️  抓取 Labels...", end="")
+                project_data['labels'] = get_labels(full_project)
+                print(f" {len(project_data['labels'])} 个")
+
+                # 抓取 Milestones (满足需求 1)
+                print(f"  🎯 抓取 Milestones...", end="")
+                project_data['milestones'] = get_milestones(full_project)
+                print(f" {len(project_data['milestones'])} 个")
+                
+                # (新) 抓取 Members (满足需求 4)
+                print(f"  👥 抓取 Members...", end="")
+                project_data['members'] = get_members(full_project)
+                print(f" {len(project_data['members'])} 个")
+
+                # 抓取 CI/CD Pipelines
+                print(f"  🔧 抓取 CI/CD Pipelines...", end="")
+                project_data['pipelines'] = get_pipelines(full_project)
+                print(f" {len(project_data['pipelines'])} 个")
+
+                # 抓取 Wiki Pages (满足需求 1)
+                print(f"  📚 抓取 Wiki Pages...", end="")
+                project_data['wiki_pages'] = get_wiki_pages(full_project)
+                print(f" {len(project_data['wiki_pages'])} 个")
+
+                # 抓取 Issues
+                print(f"  📝 抓取 Issues...", end="")
+                try:
+                    issues = full_project.issues.list(all=True)
+                    for issue in issues:
+                        author_info = safe_get(issue, 'author', {})
+                        author_username = safe_dict_get(author_info, 'username', 'unknown_author')
+                        
+                        assignees = safe_get(issue, 'assignees', [])
+                        assignee_usernames = [safe_dict_get(a, 'username') for a in assignees if safe_dict_get(a, 'username')]
+                        
+                        issue_data = {
+                            "iid": safe_get(issue, 'iid'),
+                            "title": safe_get(issue, 'title', 'Untitled Issue'),
+                            "description": safe_get(issue, 'description', ''),
+                            "state": safe_get(issue, 'state', 'opened'),
+                            "author_username": author_username,
+                            "assignee_usernames": assignee_usernames,
+                            "labels": [label for label in safe_get(issue, 'labels', [])],
+                            "milestone": safe_dict_get(safe_get(issue, 'milestone', {}), 'title', ''),
+                            "created_at": safe_get(issue, 'created_at', ''), # (新) 保留创建时间
+                            "comments": []
+                        }
+                        
+                        try:
+                            for note in issue.notes.list(all=True):
+                                if not safe_get(note, 'system', False):
+                                    note_author = safe_dict_get(safe_get(note, 'author', {}), 'username', 'unknown_author')
+                                    issue_data['comments'].append({
+                                        "author_username": note_author,
+                                        "body": safe_get(note, 'body', ''),
+                                        "created_at": safe_get(note, 'created_at', '') # (新) 保留创建时间
+                                    })
+                        except Exception as note_error:
+                            print(f" [评论抓取错误: {note_error}]", end="")
+                        
+                        project_data['issues'].append(issue_data)
+                    print(f" {len(issues)} 个")
+                except Exception as e:
+                    print(f" ❌ Issues抓取失败: {e}")
+
+                # 抓取 Merge Requests
+                print(f"  🔄 抓取 Merge Requests...", end="")
+                try:
+                    mrs = full_project.mergerequests.list(all=True)
+                    for mr in mrs:
+                        mr_author_username = safe_dict_get(safe_get(mr, 'author', {}), 'username', 'unknown_author')
+                        
+                        mr_data = {
+                            "iid": safe_get(mr, 'iid'),
+                            "title": safe_get(mr, 'title', 'Untitled MR'),
+                            "description": safe_get(mr, 'description', ''),
+                            "state": safe_get(mr, 'state', 'opened'),
+                            "source_branch": safe_get(mr, 'source_branch', ''),
+                            "target_branch": safe_get(mr, 'target_branch', ''),
+                            "author_username": mr_author_username,
+                            "labels": [label for label in safe_get(mr, 'labels', [])],
+                            "milestone": safe_dict_get(safe_get(mr, 'milestone', {}), 'title', ''),
+                            "created_at": safe_get(mr, 'created_at', ''), # (新) 保留创建时间
+                            "comments": []
+                        }
+
+                        try:
+                            for note in mr.notes.list(all=True):
+                                if not safe_get(note, 'system', False):
+                                    note_author = safe_dict_get(safe_get(note, 'author', {}), 'username', 'unknown_author')
+                                    mr_data['comments'].append({
+                                        "author_username": note_author,
+                                        "body": safe_get(note, 'body', ''),
+                                        "created_at": safe_get(note, 'created_at', '') # (新) 保留创建时间
+                                    })
+                        except Exception as note_error:
+                            print(f" [评论抓取错误: {note_error}]", end="")
+                        
+                        project_data['merge_requests'].append(mr_data)
+                    print(f" {len(mrs)} 个")
+                except Exception as e:
+                    print(f" ❌ MRs抓取失败: {e}")
+
+                data['projects'].append(project_data)
+                print(f"  ✅ 项目 '{safe_get(project, 'name', 'Unknown')}' 处理完成")
+
+            except Exception as e:
+                print(f"  ❌ 处理项目 {safe_get(project, 'name', 'Unknown')} 时失败: {e}")
+                continue
+
+    except Exception as e:
+        print(f"❌ 抓取项目列表时出错: {e}")
+
+    # --- 写入文件 ---
+    try:
+        with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        
+        print(f"\n🎉 导出完成！")
+        print(f"📊 统计信息:")
+        print(f"  - 用户: {len(data['users'])} 个")
+        print(f"  - 组: {len(data['groups'])} 个")
+        print(f"  - 项目: {len(data['projects'])} 个")
+        print(f"💾 数据已保存到: {OUTPUT_FILE}")
+        
+    except Exception as e:
+        print(f"❌ 写入文件失败: {e}")
+
+if __name__ == "__main__":
+    main()
