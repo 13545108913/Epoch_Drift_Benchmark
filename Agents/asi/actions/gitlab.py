@@ -212,3 +212,181 @@ def confirm_member_addition(add_button_id: str):
         confirm_member_addition('512')
     """
     click(add_button_id)  # Click Add to project button
+
+def search_repository(search_bar_id: str | int, repo_name: str):
+    """Search for a repository in the search bar.
+    
+    Args:
+        search_bar_id: The ID of the search bar element
+        repo_name: The name of the repository to search for
+        
+    Returns:
+        None
+        
+    Examples:
+        search_repository('156', 'umano/AndroidSlidingUpPanel')
+        search_repository('156', 'microsoft/vscode')
+    """
+    click(search_bar_id)
+    fill(search_bar_id, repo_name)
+    keyboard_press("Enter")
+
+def navigate_to_issues(issues_link_id: str):
+    """Navigate to the issues dashboard.
+    
+    Args:
+        issues_link_id: The ID of the Issues link
+        
+    Returns:
+        None
+        
+    Examples:
+        navigate_to_issues('155')
+        navigate_to_issues('issues_tab')
+    """
+    click(issues_link_id)
+
+def search_issues(issues_search_id: str | int, search_query: str):
+    """Search for issues using the issues search bar.
+    
+    Args:
+        issues_search_id: The ID of the issues search bar
+        search_query: The search query for filtering issues
+        
+    Returns:
+        None
+        
+    Examples:
+        search_issues('360', 'umano/AndroidSlidingUpPanel')
+        search_issues('360', 'label:BUG')
+    """
+    click(issues_search_id)
+    fill(issues_search_id, search_query)
+    keyboard_press("Enter")
+
+def search_and_select_repository(search_bar_id: str, repo_name: str):
+    """Search for a repository and select it from search results.
+    
+    Args:
+        search_bar_id: The ID of the search bar element
+        repo_name: The name of the repository to search for
+        
+    Returns:
+        None
+        
+    Examples:
+        search_and_select_repository('156', 'Super_Awesome_Robot')
+    """
+    click(search_bar_id)
+    fill(search_bar_id, repo_name)
+    press(search_bar_id, 'Enter')
+    click('341')  # Repository link (assuming consistent ID across examples)
+
+def get_top_contributor():
+    """Get the top contributor from the contributors page.
+    
+    Args:
+        None
+        
+    Returns:
+        str: The name of the top contributor
+        
+    Examples:
+        get_top_contributor()
+    """
+    # The top contributor is always the first one listed on the contributors page
+    top_contributor = page.locator(".contributor-name").first.text_content()
+    commit_count = page.locator(".contributor-commits").first.text_content()
+    return f"{top_contributor} has made the most contributions with {commit_count} commits."
+
+def search_and_select_repo(search_box_id: str, repo_name: str):
+    """Search for a repository and select the first result.
+    
+    Args:
+        search_box_id: The ID of the search box element
+        repo_name: The name of the repository to search for
+        
+    Returns:
+        None
+        
+    Examples:
+        search_and_select_repo('156', 'csvkit')
+        search_and_select_repo('156', 'pandas')
+    """
+    click(search_box_id)
+    fill(search_box_id, repo_name)
+    keyboard_press("Enter")
+    click("341")  # Assuming '341' is the first repo result link ID
+
+def navigate_to_contributors():
+    """Navigate from repository page to contributors statistics page.
+    
+    Args:
+        None
+        
+    Returns:
+        None
+        
+    Examples:
+        navigate_to_contributors()
+    """
+    click("419")  # Click Analytics link
+    scroll(0, 300)
+    click("302")  # Click Repository section
+    click("335")  # Click Contributors link
+
+def search_repositories(search_box_id: str | int, search_term: str):
+    """Search for repositories using the search box.
+    
+    Args:
+        search_box_id: The ID of the search box element
+        search_term: The term to search for
+        
+    Returns:
+        None
+        
+    Examples:
+        search_repositories('156', 'facebook')
+        search_repositories('search_box', 'microsoft')
+    """
+    click(search_box_id)
+    fill(search_box_id, search_term)
+    keyboard_press("Enter")
+
+def navigate_to_new_issue(project_id: str, issues_id: str, new_issue_id: str):
+    """Navigate from project page to new issue creation page.
+    
+    Args:
+        project_id: The ID of the project link
+        issues_id: The ID of the Issues tab/link
+        new_issue_id: The ID of the New Issue button/link
+        
+    Returns:
+        None
+        
+    Examples:
+        navigate_to_new_issue('868', '347', '624')
+    """
+    click(project_id)  # Click project link
+    click(issues_id)  # Click Issues tab
+    click(new_issue_id)  # Click New Issue button
+
+def create_issue(title_id: str, description_id: str, create_button_id: str, title_text: str, description_text: str):
+    """Fill in and submit a new issue form.
+    
+    Args:
+        title_id: The ID of the title input field
+        description_id: The ID of the description input field
+        create_button_id: The ID of the create/submit button
+        title_text: The title for the new issue
+        description_text: The description for the new issue
+        
+    Returns:
+        None
+        
+    Examples:
+        create_issue('592', '666', '841', 'Bug Report', 'Detailed description of the bug')
+    """
+    fill(title_id, title_text)  # Fill issue title
+    fill(description_id, description_text)  # Fill issue description
+    click(create_button_id)  # Click create button
