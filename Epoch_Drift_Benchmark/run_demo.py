@@ -9,6 +9,7 @@ from agent import DemoAgentArgs
 from browsergym.experiments import EnvArgs, ExpArgs, get_exp_result
 import config, task
 
+from .init import register_myBenchmark
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -79,18 +80,8 @@ https://github.com/ServiceNow/AgentLab"""
     )
 
     args = parse_args()
-
-    ALL_MYBENCHMARK_TASK_IDS = []
-
     # register all WebArena benchmark
-    for task_id in config.TASK_IDS:
-        gym_id = f"myBenchmark.{task_id}"
-        register_task(
-            gym_id,
-            task.GenericMyBenchmarkTask,
-            task_kwargs={"task_id": task_id, "site_version": "v1"},
-        )
-        ALL_MYBENCHMARK_TASK_IDS.append(gym_id)
+    register_myBenchmark()
 
     # setting up agent config
     agent_args = DemoAgentArgs(

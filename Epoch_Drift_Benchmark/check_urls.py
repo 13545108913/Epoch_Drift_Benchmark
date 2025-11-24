@@ -3,15 +3,24 @@ import requests
 import time
 import os
 import argparse
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
+
+# 尝试导入 BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    print("[错误] 缺少必要库 'beautifulsoup4'。")
+    print("请运行: pip install beautifulsoup4")
+    exit(1)
 
 # --- 默认配置 ---
 DEFAULT_INPUT_FILE = 'gitlab_tasks_processed_edit.json'
 DEFAULT_BASE_URL = 'http://172.26.116.102:8080'
 PLACEHOLDER = '__GITLAB__'
-REQUEST_TIMEOUT = 5  # 秒
-MAX_WORKERS = 10     # 并发线程数
+REQUEST_TIMEOUT = 10  # 增加超时时间以应对大页面
+MAX_WORKERS = 10     
 
 NOT_FOUND_PHRASES = [
     "404 page not found",
@@ -19,28 +28,28 @@ NOT_FOUND_PHRASES = [
     "404 not found",
     "couldn't find page",
     "the page you're looking for could not be found",
-    "sign in",
     "you need to sign in"
 ]
 
-# 全局缓存，避免重复读取同一个 storage_state 文件
+# 全局缓存
 session_cache = {}
 
 def load_session_from_storage_state(storage_path):
-    """
-    加载并缓存 Session。如果路径已在缓存中，直接返回缓存的 Session。
-    """
+    """加载并缓存 Session"""
     if not storage_path:
         return None
-
-    # 检查缓存
     if storage_path in session_cache:
         return session_cache[storage_path]
 
     if not os.path.exists(storage_path):
-        print(f"[警告] 找不到认证文件: {storage_path}")
-        session_cache[storage_path] = None # 标记为无效，避免重复尝试加载
-        return None
+        # 尝试相对于当前脚本的路径
+        rel_path = os.path.join(os.path.dirname(__file__), storage_path)
+        if os.path.exists(rel_path):
+            storage_path = rel_path
+        else:
+            print(f"[警告] 找不到认证文件: {storage_path}")
+            session_cache[storage_path] = None
+            return None
 
     try:
         with open(storage_path, 'r', encoding='utf-8') as f:
@@ -48,33 +57,46 @@ def load_session_from_storage_state(storage_path):
         
         cookies_list = storage_data.get('cookies')
         if not cookies_list:
-            print(f"[错误] {storage_path} 中缺少 cookies")
             session_cache[storage_path] = None
             return None
         
         cookie_dict = {cookie['name']: cookie['value'] for cookie in cookies_list}
-        
         session = requests.Session()
         session.cookies.update(cookie_dict)
-        
-        # 存入缓存
         session_cache[storage_path] = session
         return session
-        
     except Exception as e:
         print(f"[异常] 加载 {storage_path} 失败: {e}")
         session_cache[storage_path] = None
         return None
 
-def check_single_url(task_id, url_type, url, storage_path):
+def extract_css_selector(locator_js):
     """
-    单个 URL 检测逻辑，用于线程池调用。
-    返回结构化的结果字典。
+    从 JS locator 字符串中提取 CSS 选择器。
+    支持:
+    - document.querySelector('selector')
+    - document.querySelectorAll("selector")
+    """
+    if not locator_js:
+        return None
+    
+    # 匹配 document.querySelector(All)? ('或") (内容) ('或")
+    # 使用非贪婪匹配 (.*?)
+    pattern = r"document\.querySelectorAll?\s*\(\s*['\"](.*?)['\"]\s*\)"
+    match = re.search(pattern, locator_js)
+    if match:
+        return match.group(1)
+    return None
+
+def check_single_url(task_id, url_type, url, storage_path, locator=None):
+    """
+    检测单个 URL 的可访问性，如果提供了 locator，则额外检测其在页面中的唯一性。
     """
     result = {
         "task_id": task_id,
         "url_type": url_type,
         "url": url,
+        "locator": locator,
         "status": "UNKNOWN",
         "message": "",
         "is_error": False
@@ -85,198 +107,200 @@ def check_single_url(task_id, url_type, url, storage_path):
         result["message"] = "URL为空"
         return result
 
-    # 获取 Session (带缓存)
     session = load_session_from_storage_state(storage_path)
     if not session:
-        result["status"] = "ERROR"
-        result["message"] = "登录会话 (Session) 无效或文件丢失"
+        result["status"] = "SESSION_ERR"
+        result["message"] = "登录会话无效或文件缺失"
         result["is_error"] = True
         return result
 
     try:
         response = session.get(url, timeout=REQUEST_TIMEOUT, allow_redirects=True)
         
-        if response.status_code < 400:
-            page_content = response.text.lower()
-            found_error_phrase = False
-            
-            for phrase in NOT_FOUND_PHRASES:
-                if phrase in page_content:
-                    found_error_phrase = True
-                    if "sign in" in phrase or "you need to sign in" in phrase:
-                        result["status"] = "AUTH_FAIL"
-                        result["message"] = f"重定向到登录页 (Code: {response.status_code}) - Cookie 可能失效"
-                    else:
-                        result["status"] = "CONTENT_ERR"
-                        result["message"] = f"页面包含错误关键字 (Code: {response.status_code})"
-                    break
-            
-            if found_error_phrase:
-                result["is_error"] = True
-            else:
-                result["status"] = "OK"
-                result["message"] = f"正常 (Code: {response.status_code})"
-
-        elif response.status_code == 404:
-            result["status"] = "404"
-            result["message"] = "404 Not Found"
-            result["is_error"] = True
-        elif response.status_code == 403:
-            result["status"] = "403"
-            result["message"] = "403 Forbidden (无权限)"
-            result["is_error"] = True
-        else:
+        # --- 1. HTTP 状态检测 ---
+        if response.status_code >= 400:
             result["status"] = f"HTTP_{response.status_code}"
-            result["message"] = f"HTTP 错误状态码: {response.status_code}"
+            result["message"] = f"不可访问 (Status: {response.status_code})"
             result["is_error"] = True
+            return result
 
-    except requests.exceptions.ConnectionError:
-        result["status"] = "CONN_ERR"
-        result["message"] = "连接失败 - 无法连接到服务器"
-        result["is_error"] = True
-    except requests.exceptions.Timeout:
-        result["status"] = "TIMEOUT"
-        result["message"] = f"请求超时 (> {REQUEST_TIMEOUT}s)"
+        # --- 2. 页面内容关键字检测 ---
+        page_content_lower = response.text.lower()
+        for phrase in NOT_FOUND_PHRASES:
+            if phrase in page_content_lower:
+                if "sign in" in phrase:
+                    result["status"] = "AUTH_FAIL"
+                    result["message"] = f"重定向到登录页 (可能Cookie失效)"
+                else:
+                    result["status"] = "CONTENT_ERR"
+                    result["message"] = f"页面包含错误提示: '{phrase}'"
+                result["is_error"] = True
+                return result
+        
+        # 基础 URL 检查通过
+        result["status"] = "OK"
+        result["message"] = f"可访问 (Code: {response.status_code})"
+
+        # --- 3. Locator 唯一性检测 (如果存在) ---
+        if locator:
+            # 跳过 func: 类型的 locator (需要 Python eval，静态脚本不支持)
+            if locator.strip().startswith("func:"):
+                result["message"] += " | [Locator跳过] 暂不支持检测 'func:' 类型"
+                return result
+
+            css_selector = extract_css_selector(locator)
+            
+            if css_selector:
+                try:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    elements = soup.select(css_selector)
+                    count = len(elements)
+                    
+                    if count == 0:
+                        result["status"] = "LOCATOR_NOT_FOUND"
+                        result["message"] += f" | [Locator错误] 未找到元素 (0 matches): {css_selector}"
+                        result["is_error"] = True
+                    elif count == 1:
+                        result["message"] += f" | [Locator正常] 唯一定位成功"
+                    else:
+                        result["status"] = "LOCATOR_NOT_UNIQUE"
+                        result["message"] += f" | [Locator错误] 定位不唯一 (发现 {count} 个): {css_selector}"
+                        result["is_error"] = True
+                except Exception as e:
+                    result["status"] = "LOCATOR_PARSE_ERR"
+                    result["message"] += f" | [Locator异常] BeautifulSoup解析失败: {e}"
+                    result["is_error"] = True
+            else:
+                # 无法解析 CSS 选择器 (可能是复杂的 JS 逻辑)
+                # 这种情况下标记为警告而不是错误，因为可能是 BeautifulSoup 无法处理但 Playwright 可以处理的 JS
+                result["status"] = "LOCATOR_UNKNOWN_FMT"
+                result["message"] += f" | [Locator警告] 无法提取CSS选择器，无法静态检测: {locator[:30]}..."
+                # 视需求决定是否算作 Error，这里暂时算作 Warning (is_error=False)
+
+    except requests.exceptions.RequestException as e:
+        result["status"] = "REQ_ERR"
+        result["message"] = f"请求异常: {str(e)}"
         result["is_error"] = True
     except Exception as e:
-        result["status"] = "EXCEPTION"
-        result["message"] = f"未知错误: {str(e)}"
+        result["status"] = "SYS_ERR"
+        result["message"] = f"系统错误: {str(e)}"
         result["is_error"] = True
 
     return result
 
 def main():
-    parser = argparse.ArgumentParser(description='GitLab URL 批量检测工具')
-    parser.add_argument('-f', '--file', default=DEFAULT_INPUT_FILE, help='输入的 JSON 文件路径')
-    parser.add_argument('-u', '--url', default=DEFAULT_BASE_URL, help='GitLab 基础 URL (替换 __GITLAB__)')
-    parser.add_argument('-w', '--workers', type=int, default=MAX_WORKERS, help='并发线程数')
+    parser = argparse.ArgumentParser(description='GitLab URL & Locator 检测工具')
+    parser.add_argument('-f', '--file', default=DEFAULT_INPUT_FILE, help='JSON 任务文件')
+    parser.add_argument('-u', '--url', default=DEFAULT_BASE_URL, help='GitLab Base URL')
+    parser.add_argument('-w', '--workers', type=int, default=MAX_WORKERS, help='并发数')
     args = parser.parse_args()
 
-    input_file = args.file
-    base_url = args.url
-    
-    # 1. 加载任务
     try:
-        with open(input_file, 'r', encoding='utf-8') as f:
+        with open(args.file, 'r', encoding='utf-8') as f:
             tasks = json.load(f)
     except Exception as e:
-        print(f"[致命错误] 无法读取任务文件: {e}")
+        print(f"[致命错误] 读取文件失败: {e}")
         return
 
-    print(f"--- 开始检测 ---")
-    print(f"文件: {input_file}")
-    print(f"目标: {base_url}")
-    print(f"任务数: {len(tasks)}")
-    print(f"并发数: {args.workers}")
-    print("-" * 30)
-
-    # 2. 准备检测队列
-    futures = []
-    error_results = [] # 提前初始化错误列表，用于存放静态检查错误
-    total_checks = 0
+    print(f"--- 开始检测: {len(tasks)} 个任务 ---")
+    print(f"目标 Base URL: {args.url}")
     
+    futures = []
+    error_results = []
+    total_checks = 0
+
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         for task in tasks:
             task_id = task.get('task_id')
             storage_path = task.get('storage_state')
 
-            # 准备 URL 列表
-            urls_to_check = []
-            
-            # --- 1. Start URL ---
-            start_url = task.get('start_url')
-            if start_url and isinstance(start_url, str):
-                final_url = start_url.replace(PLACEHOLDER, base_url)
-                urls_to_check.append(("start_url", final_url))
+            # 收集需要检测的项目 (type, url, locator)
+            items_to_check = []
 
-            # --- 2. Reference URL (需要保存以便 program_html 使用) ---
+            # 1. Start URL
+            if task.get('start_url'):
+                u = task['start_url'].replace(PLACEHOLDER, args.url)
+                items_to_check.append(("start_url", u, None))
+
+            # 2. Reference URL (用于后续 'last' 引用)
+            ref_url_final = None
             ref_url_raw = task.get('eval', {}).get('reference_url')
-            final_ref_url = None
-            if ref_url_raw and isinstance(ref_url_raw, str):
-                final_ref_url = ref_url_raw.replace(PLACEHOLDER, base_url)
-                urls_to_check.append(("reference_url", final_ref_url))
+            if ref_url_raw:
+                ref_url_final = ref_url_raw.replace(PLACEHOLDER, args.url)
+                items_to_check.append(("reference_url", ref_url_final, None))
 
-            # --- 3. Program HTML 检查 ---
-            program_html = task.get('eval', {}).get('program_html')
-            if program_html and isinstance(program_html, list):
-                for idx, item in enumerate(program_html):
-                    # 3.1 检测 locator 是否有效 (静态检查)
-                    locator = item.get('locator')
-                    if not locator or not isinstance(locator, str) or not locator.strip():
-                        pass
+            # 3. Program HTML
+            prog_html = task.get('eval', {}).get('program_html', [])
+            if prog_html:
+                for idx, item in enumerate(prog_html):
+                    p_url = item.get('url')
+                    p_locator = item.get('locator')
+                    target_url = None
 
-                    # 3.2 检测 program_html URL
-                    p_url_raw = item.get('url')
-                    target_p_url = None
-                    
-                    if p_url_raw == 'last':
-                        # 如果是 last，则使用之前解析好的 final_ref_url
-                        if final_ref_url:
-                            target_p_url = final_ref_url
+                    # 处理 URL
+                    if p_url == "last":
+                        if ref_url_final:
+                            target_url = ref_url_final
                         else:
-                            # 如果指定了 last 但没有 reference_url，记录错误
-                            err_res = {
+                            # 错误: 引用了 last 但没有 reference_url
+                            err = {
                                 "task_id": task_id,
-                                "url_type": f"program_html[{idx}].url",
+                                "url_type": f"program_html[{idx}]",
                                 "url": "last",
-                                "status": "MISSING_REF",
-                                "message": "URL为'last'，但 Reference URL 为空",
+                                "status": "CFG_ERR",
+                                "message": "URL设为 'last' 但 reference_url 为空",
                                 "is_error": True
                             }
-                            error_results.append(err_res)
-                            print(f"[Task {task_id}] {err_res['url_type']} -> {err_res['status']}: {err_res['message']}")
+                            error_results.append(err)
+                            print(f"[Task {task_id}] Config Error: {err['message']}")
+                            continue
+                    elif p_url and p_url.startswith("func:"):
+                        # 尝试简单处理 func，虽然 requests 无法执行代码，
+                        # 但如果它只是简单的字符串替换，我们可以尝试解析
+                        # 例如: func: "http://..." + "__page__" (这种情况很难静态处理)
+                        # 这里我们只做记录，暂不检测 func 类型的 URL
+                        pass 
+                    elif p_url:
+                        target_url = p_url.replace(PLACEHOLDER, args.url)
 
-                    elif p_url_raw and isinstance(p_url_raw, str):
-                        target_p_url = p_url_raw.replace(PLACEHOLDER, base_url)
-                    
-                    # 如果有有效的 URL，加入待检测队列
-                    if target_p_url:
-                        urls_to_check.append((f"program_html[{idx}].url", target_p_url))
+                    if target_url:
+                        items_to_check.append((f"program_html[{idx}]", target_url, p_locator))
 
-            # 提交到线程池
-            for url_type, full_url in urls_to_check:
+            # 提交任务
+            for utype, u, loc in items_to_check:
                 total_checks += 1
-                futures.append(executor.submit(check_single_url, task_id, url_type, full_url, storage_path))
+                futures.append(executor.submit(
+                    check_single_url, task_id, utype, u, storage_path, loc
+                ))
 
-        # 3. 处理网络请求结果
-        processed_count = 0
-
-        print(f"正在通过网络检测 {total_checks} 个 URL (静态检查错误已记录)...\n")
-        
+        # 处理结果
+        print(f"正在并发检测 {total_checks} 个目标...\n")
+        done_count = 0
         for future in as_completed(futures):
             res = future.result()
-            processed_count += 1
-            
-            # 简单的进度展示
-            if processed_count % 10 == 0:
-                print(f"进度: {processed_count}/{total_checks} ...")
+            done_count += 1
+            if done_count % 20 == 0:
+                print(f"进度: {done_count}/{total_checks}...")
 
             if res["is_error"]:
-                # 实时打印错误
-                print(f"[Task {res['task_id']}] {res['url_type']} -> {res['status']}: {res['message']}")
+                print(f"[Task {res['task_id']}] {res['url_type']} | {res['status']} | {res['message']}")
                 error_results.append(res)
 
-    # 4. 最终报告
+    # 报告
     print("\n" + "="*40)
-    print("--- 检测完成 ---")
-    print("="*40)
-    # total_checks 只是网络请求的数量，不包含静态检查失败的数量
-    print(f"网络请求总数: {total_checks}")
-    print(f"总发现错误: {len(error_results)}")
-
+    print(f"检测结束。总计: {total_checks}, 失败: {len(error_results)}")
     if error_results:
-        # 保存详细报告到文件
-        report_file = 'check_report.json'
-        with open(report_file, 'w', encoding='utf-8') as f:
+        out_file = "check_report.json"
+        with open(out_file, 'w', encoding='utf-8') as f:
             json.dump(error_results, f, indent=2, ensure_ascii=False)
+        print(f"错误详情已写入 {out_file}")
         
-        print(f"\n详细错误列表已保存至: {report_file}")
-        
-        # 提取出错的 Task ID 列表
-        failed_ids = sorted(list(set(r['task_id'] for r in error_results)))
-        print(f"涉及的任务 ID ({len(failed_ids)}个): {failed_ids}")
+        # 打印一下 Locator 相关的特定错误统计
+        locator_errs = [e for e in error_results if "LOCATOR" in e.get("status", "")]
+        if locator_errs:
+            print(f"其中 Locator 相关错误: {len(locator_errs)} 个")
     else:
-        print("\n太棒了！所有检查（URL及Locator）均通过！")
+        print("所有检测通过！")
 
 if __name__ == "__main__":
     main()
