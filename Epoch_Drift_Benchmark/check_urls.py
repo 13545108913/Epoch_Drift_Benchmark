@@ -2,12 +2,16 @@ import json
 import requests
 import time
 import os
+import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 
-# --- 配置 ---
-INPUT_FILE = 'gitlab_tasks_processed.json'
-BASE_URL = 'http://localhost:8080'  # 替换 __GITLAB__ 的目标地址
+# --- 默认配置 ---
+DEFAULT_INPUT_FILE = 'gitlab_tasks_processed_edit.json'
+DEFAULT_BASE_URL = 'http://172.26.116.102:8080'
 PLACEHOLDER = '__GITLAB__'
-REQUEST_TIMEOUT = 5  # 每次请求的超时时间（秒）
+REQUEST_TIMEOUT = 5  # 秒
+MAX_WORKERS = 10     # 并发线程数
 
 NOT_FOUND_PHRASES = [
     "404 page not found",
@@ -15,20 +19,27 @@ NOT_FOUND_PHRASES = [
     "404 not found",
     "couldn't find page",
     "the page you're looking for could not be found",
-    "sign in", # 检查是否被重定向到了登录页
+    "sign in",
     "you need to sign in"
 ]
-# ---
+
+# 全局缓存，避免重复读取同一个 storage_state 文件
+session_cache = {}
 
 def load_session_from_storage_state(storage_path):
     """
-    从 storage_state.json 文件加载 cookies 并创建一个 requests.Session。
+    加载并缓存 Session。如果路径已在缓存中，直接返回缓存的 Session。
     """
-    print(f"\n--- 正在从 {storage_path} 加载新的登录会话... ---")
-    
+    if not storage_path:
+        return None
+
+    # 检查缓存
+    if storage_path in session_cache:
+        return session_cache[storage_path]
+
     if not os.path.exists(storage_path):
-        print(f"  [详细错误] 找不到 'storage_state' 文件: {storage_path}")
-        print(f"  [详细错误] 请确保路径相对于您运行脚本的位置是正确的。")
+        print(f"[警告] 找不到认证文件: {storage_path}")
+        session_cache[storage_path] = None # 标记为无效，避免重复尝试加载
         return None
 
     try:
@@ -37,7 +48,8 @@ def load_session_from_storage_state(storage_path):
         
         cookies_list = storage_data.get('cookies')
         if not cookies_list:
-            print(f"  [详细错误] {storage_path} 中未找到 'cookies' 键。")
+            print(f"[错误] {storage_path} 中缺少 cookies")
+            session_cache[storage_path] = None
             return None
         
         cookie_dict = {cookie['name']: cookie['value'] for cookie in cookies_list}
@@ -45,183 +57,226 @@ def load_session_from_storage_state(storage_path):
         session = requests.Session()
         session.cookies.update(cookie_dict)
         
-        print(f"  成功加载 {len(cookie_dict)} 个 cookies。会话已认证。")
+        # 存入缓存
+        session_cache[storage_path] = session
         return session
         
-    except json.JSONDecodeError as e:
-        print(f"  [详细错误] 无法解析 {storage_path}。它不是一个有效的 JSON。")
-        print(f"  [详细错误] JSON 错误: {e}")
-        return None
     except Exception as e:
-        print(f"  [详细错误] 加载 cookies 时发生未知错误: {e}")
+        print(f"[异常] 加载 {storage_path} 失败: {e}")
+        session_cache[storage_path] = None
         return None
 
-def check_url_accessibility(url, session):
+def check_single_url(task_id, url_type, url, storage_path):
     """
-    使用一个已认证的 session (带 cookies) 检查 URL。
-    返回 (状态, 详细消息)
+    单个 URL 检测逻辑，用于线程池调用。
+    返回结构化的结果字典。
     """
+    result = {
+        "task_id": task_id,
+        "url_type": url_type,
+        "url": url,
+        "status": "UNKNOWN",
+        "message": "",
+        "is_error": False
+    }
+
     if not url:
-        return ("SKIP", "URL为空")
-    
+        result["status"] = "SKIP"
+        result["message"] = "URL为空"
+        return result
+
+    # 获取 Session (带缓存)
+    session = load_session_from_storage_state(storage_path)
     if not session:
-        return ("ERROR", "跳过 - 登录会话 (Session) 无效")
+        result["status"] = "ERROR"
+        result["message"] = "登录会话 (Session) 无效或文件丢失"
+        result["is_error"] = True
+        return result
 
     try:
         response = session.get(url, timeout=REQUEST_TIMEOUT, allow_redirects=True)
         
         if response.status_code < 400:
             page_content = response.text.lower()
-            
             found_error_phrase = False
+            
             for phrase in NOT_FOUND_PHRASES:
                 if phrase in page_content:
                     found_error_phrase = True
-                    # 检查是否因为会话失效而被踢到登录页
                     if "sign in" in phrase or "you need to sign in" in phrase:
-                        return ("ERROR", f"被重定向到登录页 (Status: {response.status_code}) - Cookie 可能已失效")
+                        result["status"] = "AUTH_FAIL"
+                        result["message"] = f"重定向到登录页 (Code: {response.status_code}) - Cookie 可能失效"
+                    else:
+                        result["status"] = "CONTENT_ERR"
+                        result["message"] = f"页面包含错误关键字 (Code: {response.status_code})"
                     break
             
             if found_error_phrase:
-                return ("ERROR", f"内容错误 (Status: {response.status_code} 但页面包含 'Page Not Found' 关键字)")
+                result["is_error"] = True
             else:
-                return ("OK", f"可访问 (Status: {response.status_code})")
-        
-        elif response.status_code == 404:
-             return ("ERROR", f"不可访问 (Status: 404 Not Found)")
-        elif response.status_code == 403:
-             return ("ERROR", f"不可访问 (Status: 403 Forbidden) - 无权限")
-        else:
-            return ("ERROR", f"不可访问 (Status: {response.status_code})")
+                result["status"] = "OK"
+                result["message"] = f"正常 (Code: {response.status_code})"
 
-    except requests.exceptions.ConnectionError as e:
-        return ("ERROR", f"连接失败 - 无法连接到 {BASE_URL}。请确保服务正在运行。 (详情: {e})")
+        elif response.status_code == 404:
+            result["status"] = "404"
+            result["message"] = "404 Not Found"
+            result["is_error"] = True
+        elif response.status_code == 403:
+            result["status"] = "403"
+            result["message"] = "403 Forbidden (无权限)"
+            result["is_error"] = True
+        else:
+            result["status"] = f"HTTP_{response.status_code}"
+            result["message"] = f"HTTP 错误状态码: {response.status_code}"
+            result["is_error"] = True
+
+    except requests.exceptions.ConnectionError:
+        result["status"] = "CONN_ERR"
+        result["message"] = "连接失败 - 无法连接到服务器"
+        result["is_error"] = True
     except requests.exceptions.Timeout:
-        return ("ERROR", f"请求超时 (超过 {REQUEST_TIMEOUT} 秒)")
-    except requests.exceptions.RequestException as e:
-        # **这里提供更详细的错误信息**
-        return ("ERROR", f"发生未知的请求错误: {e}")
+        result["status"] = "TIMEOUT"
+        result["message"] = f"请求超时 (> {REQUEST_TIMEOUT}s)"
+        result["is_error"] = True
+    except Exception as e:
+        result["status"] = "EXCEPTION"
+        result["message"] = f"未知错误: {str(e)}"
+        result["is_error"] = True
+
+    return result
 
 def main():
-    try:
-        with open(INPUT_FILE, 'r', encoding='utf-8') as f:
-            tasks = json.load(f)
-    except FileNotFoundError:
-        print(f"[致命错误] 未找到输入文件 '{INPUT_FILE}'。")
-        print("请确保 'gitlab_tasks_processed.json' 文件在当前目录中。")
-        return
-    except json.JSONDecodeError as e:
-        print(f"[致命错误] 文件 '{INPUT_FILE}' 格式不正确，无法解析。")
-        print(f"[致命错误] JSON 错误: {e}")
-        return
-    
-    print(f"--- 网址可访问性检测开始 (使用已认证的Session) ---")
-    print(f"共 {len(tasks)} 个任务。")
-    print(f"占位符 '{PLACEHOLDER}' 将被替换为 '{BASE_URL}'\n")
+    parser = argparse.ArgumentParser(description='GitLab URL 批量检测工具')
+    parser.add_argument('-f', '--file', default=DEFAULT_INPUT_FILE, help='输入的 JSON 文件路径')
+    parser.add_argument('-u', '--url', default=DEFAULT_BASE_URL, help='GitLab 基础 URL (替换 __GITLAB__)')
+    parser.add_argument('-w', '--workers', type=int, default=MAX_WORKERS, help='并发线程数')
+    args = parser.parse_args()
 
-    error_list = [] # 用于存储所有错误的详细信息
+    input_file = args.file
+    base_url = args.url
+    
+    # 1. 加载任务
+    try:
+        with open(input_file, 'r', encoding='utf-8') as f:
+            tasks = json.load(f)
+    except Exception as e:
+        print(f"[致命错误] 无法读取任务文件: {e}")
+        return
+
+    print(f"--- 开始检测 ---")
+    print(f"文件: {input_file}")
+    print(f"目标: {base_url}")
+    print(f"任务数: {len(tasks)}")
+    print(f"并发数: {args.workers}")
+    print("-" * 30)
+
+    # 2. 准备检测队列
+    futures = []
+    error_results = [] # 提前初始化错误列表，用于存放静态检查错误
     total_checks = 0
     
-    current_storage_path = None
-    current_session = None
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        for task in tasks:
+            task_id = task.get('task_id')
+            storage_path = task.get('storage_state')
 
-    for task in tasks:
-        task_id = task.get('task_id')
-        print(f"--- [任务 {task_id}] ---")
-        
-        task_storage_path = task.get('storage_state')
-        session_valid = True
+            # 准备 URL 列表
+            urls_to_check = []
+            
+            # --- 1. Start URL ---
+            start_url = task.get('start_url')
+            if start_url and isinstance(start_url, str):
+                final_url = start_url.replace(PLACEHOLDER, base_url)
+                urls_to_check.append(("start_url", final_url))
 
-        # 1. 检查是否需要加载或更新 Session
-        if not task_storage_path:
-            print(f"  [警告] 任务 {task_id} 没有 'storage_state'，无法进行认证检测。")
-            current_session = None 
-            session_valid = False
-        elif task_storage_path != current_storage_path:
-            # 这是一个新的 storage_state 路径，加载新 session
-            current_storage_path = task_storage_path
-            current_session = load_session_from_storage_state(current_storage_path)
-            if not current_session:
-                print(f"  [错误] 无法加载 session。将跳过此任务及后续使用相同 state 的任务。")
-                session_valid = False
-        elif not current_session:
-             # storage_state 路径相同，但上次加载失败了
-             session_valid = False
+            # --- 2. Reference URL (需要保存以便 program_html 使用) ---
+            ref_url_raw = task.get('eval', {}).get('reference_url')
+            final_ref_url = None
+            if ref_url_raw and isinstance(ref_url_raw, str):
+                final_ref_url = ref_url_raw.replace(PLACEHOLDER, base_url)
+                urls_to_check.append(("reference_url", final_ref_url))
 
-        # 准备 URL 列表
-        urls_to_check = []
-        start_url = task.get('start_url')
-        if start_url and isinstance(start_url, str):
-            urls_to_check.append(("start_url", start_url.replace(PLACEHOLDER, BASE_URL)))
-        else:
-            print("  start_url: 未提供或格式不正确")
+            # --- 3. Program HTML 检查 ---
+            program_html = task.get('eval', {}).get('program_html')
+            if program_html and isinstance(program_html, list):
+                for idx, item in enumerate(program_html):
+                    # 3.1 检测 locator 是否有效 (静态检查)
+                    locator = item.get('locator')
+                    if not locator or not isinstance(locator, str) or not locator.strip():
+                        pass
 
-        eval_dict = task.get('eval', {})
-        ref_url = eval_dict.get('reference_url')
-        if ref_url and isinstance(ref_url, str):
-            urls_to_check.append(("reference_url", ref_url.replace(PLACEHOLDER, BASE_URL)))
-        else:
-            print("  reference_url: 为空或未提供，已跳过")
-        
-        # 2. 检查 URL
-        if not session_valid and urls_to_check:
-            print("  [跳过] 由于 'storage_state' 加载失败或缺失，跳过 URL 检测。")
-            # 记录错误
+                    # 3.2 检测 program_html URL
+                    p_url_raw = item.get('url')
+                    target_p_url = None
+                    
+                    if p_url_raw == 'last':
+                        # 如果是 last，则使用之前解析好的 final_ref_url
+                        if final_ref_url:
+                            target_p_url = final_ref_url
+                        else:
+                            # 如果指定了 last 但没有 reference_url，记录错误
+                            err_res = {
+                                "task_id": task_id,
+                                "url_type": f"program_html[{idx}].url",
+                                "url": "last",
+                                "status": "MISSING_REF",
+                                "message": "URL为'last'，但 Reference URL 为空",
+                                "is_error": True
+                            }
+                            error_results.append(err_res)
+                            print(f"[Task {task_id}] {err_res['url_type']} -> {err_res['status']}: {err_res['message']}")
+
+                    elif p_url_raw and isinstance(p_url_raw, str):
+                        target_p_url = p_url_raw.replace(PLACEHOLDER, base_url)
+                    
+                    # 如果有有效的 URL，加入待检测队列
+                    if target_p_url:
+                        urls_to_check.append((f"program_html[{idx}].url", target_p_url))
+
+            # 提交到线程池
             for url_type, full_url in urls_to_check:
-                error_list.append({
-                    "task_id": task_id,
-                    "url_type": url_type,
-                    "url": full_url,
-                    "error": "登录会话 (Session) 无效"
-                })
-            continue # 跳到下一个任务
+                total_checks += 1
+                futures.append(executor.submit(check_single_url, task_id, url_type, full_url, storage_path))
 
-        for url_type, full_url in urls_to_check:
-            total_checks += 1
-            status, message = check_url_accessibility(full_url, current_session)
-            
-            print(f"  {url_type}: {full_url}")
-            print(f"  结果: [{status}] {message}\n")
-            
-            if status == "ERROR":
-                # 记录错误详情
-                error_list.append({
-                    "task_id": task_id,
-                    "url_type": url_type,
-                    "url": full_url,
-                    "error": message
-                })
-            
-        time.sleep(0.05) 
+        # 3. 处理网络请求结果
+        processed_count = 0
 
-    # --- 3. 打印最终的详细错误报告 ---
-    print("\n" + "="*40)
-    print("--- 详细错误报告 ---")
-    print("="*40)
-    
-    error_id = []
-    if not error_list:
-        print("太好了！所有 URL 均检测通过。")
-    else:
-        print(f"检测完成，总共发现 {len(error_list)} 个错误。")
-        print("错误列表：\n")
+        print(f"正在通过网络检测 {total_checks} 个 URL (静态检查错误已记录)...\n")
         
-        current_task_id = -1
-        for err in error_list:
-            # 按 Task ID 组合
-            if err['task_id'] != current_task_id:
-                print(f"\n[任务 ID: {err['task_id']}]")
-                current_task_id = err['task_id']
-            # 打印该任务下的错误
-            print(f"  - URL 类型: {err['url_type']}")
-            print(f"  - URL: {err['url']}")
-            print(f"  - 错误信息: {err['error']}")
-            error_id.append(err['task_id'])
+        for future in as_completed(futures):
+            res = future.result()
+            processed_count += 1
+            
+            # 简单的进度展示
+            if processed_count % 10 == 0:
+                print(f"进度: {processed_count}/{total_checks} ...")
 
-    print("\n--- 总结 ---")
-    print(f"总共检测了 {total_checks} 个 URL。")
-    print(f"总共发现 {len(error_list)} 个错误。")
-    print(error_id)
+            if res["is_error"]:
+                # 实时打印错误
+                print(f"[Task {res['task_id']}] {res['url_type']} -> {res['status']}: {res['message']}")
+                error_results.append(res)
+
+    # 4. 最终报告
+    print("\n" + "="*40)
+    print("--- 检测完成 ---")
+    print("="*40)
+    # total_checks 只是网络请求的数量，不包含静态检查失败的数量
+    print(f"网络请求总数: {total_checks}")
+    print(f"总发现错误: {len(error_results)}")
+
+    if error_results:
+        # 保存详细报告到文件
+        report_file = 'check_report.json'
+        with open(report_file, 'w', encoding='utf-8') as f:
+            json.dump(error_results, f, indent=2, ensure_ascii=False)
+        
+        print(f"\n详细错误列表已保存至: {report_file}")
+        
+        # 提取出错的 Task ID 列表
+        failed_ids = sorted(list(set(r['task_id'] for r in error_results)))
+        print(f"涉及的任务 ID ({len(failed_ids)}个): {failed_ids}")
+    else:
+        print("\n太棒了！所有检查（URL及Locator）均通过！")
 
 if __name__ == "__main__":
     main()

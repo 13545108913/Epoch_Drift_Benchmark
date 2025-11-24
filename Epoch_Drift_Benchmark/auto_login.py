@@ -1,121 +1,67 @@
-"""Script to automatically login to GitLab only"""
-import argparse
-import glob
 import os
-import time
-from concurrent.futures import ThreadPoolExecutor
-from itertools import combinations
-from pathlib import Path
-
 from playwright.sync_api import sync_playwright
 
-# GitLab domain
-GITLAB = 'http://localhost:8080'
-
-assert GITLAB, f"Please setup the URL to GitLab. Current: Gitlab: {GITLAB}"
-
+# --- 配置信息 ---
+GITLAB_URL = 'http://172.26.116.102:8080'
 ACCOUNTS = {
-    "gitlab": {"username": "root", "password": "a_very_secure_password_123!"},
+    "gitlab": {"username": "byteblaze", "password": "a_very_secure_password_123!"},
 }
+OUTPUT_PATH = '.auth/gitlab_state.json'
 
-HEADLESS = True
-SLOW_MO = 0
+def save_gitlab_state():
+    # 1. 确保输出目录存在
+    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 
-SITES = ["gitlab"]
-URLS = [f"{GITLAB}/-/profile"]
-EXACT_MATCH = [True]
-KEYWORDS = [""]
+    with sync_playwright() as p:
+        print("正在启动浏览器...")
+        # 如果需要看到登录过程，可以将 headless 设置为 False
+        browser = p.chromium.launch(headless=True)
+        
+        # 创建上下文 (Context)
+        context = browser.new_context()
+        page = context.new_page()
 
+        try:
+            # 2. 导航到登录页面
+            login_url = f"{GITLAB_URL}/users/sign_in"
+            print(f"正在访问: {login_url}")
+            page.goto(login_url)
 
-def is_expired(
-    storage_state: Path, url: str, keyword: str, url_exact: bool = True
-) -> bool:
-    """Test whether the cookie is expired"""
-    if not storage_state.exists():
-        return True
+            # 3. 填写凭据
+            # GitLab 通常使用 id="user_login" 和 id="user_password"
+            print(f"正在登录用户: {ACCOUNTS['gitlab']['username']}")
+            page.fill("#user_login", ACCOUNTS['gitlab']['username'])
+            page.fill("#user_password", ACCOUNTS['gitlab']['password'])
 
-    context_manager = sync_playwright()
-    playwright = context_manager.__enter__()
-    browser = playwright.chromium.launch(headless=True, slow_mo=SLOW_MO)
-    context = browser.new_context(storage_state=storage_state)
-    page = context.new_page()
-    page.goto(url)
-    time.sleep(1)
-    d_url = page.url
-    content = page.content()
-    context_manager.__exit__()
-    if keyword:
-        return keyword not in content
-    else:
-        if url_exact:
-            return d_url != url
-        else:
-            return url not in d_url
+            # 4. 点击登录
+            # 尝试定位标准的登录按钮
+            # 也可以使用 'button[type="submit"]' 或 'input[type="submit"]'
+            if page.locator('button[data-qa-selector="sign_in_button"]').count() > 0:
+                page.click('button[data-qa-selector="sign_in_button"]')
+            else:
+                # 回退方案：点击任何提交类型的按钮或含有"Sign in"文字的按钮
+                page.click('button[type="submit"], input[type="submit"]')
 
+            # 5. 等待登录完成
+            # 等待 URL 跳转到非登录页面，或等待某个登录后才有的元素出现
+            print("等待跳转...")
+            page.wait_for_url(lambda url: "/users/sign_in" not in url, timeout=10000)
+            
+            # 也可以等待用户菜单出现来确认登录成功 (可选)
+            # page.wait_for_selector('.header-user-dropdown-toggle') 
 
-def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
-    context_manager = sync_playwright()
-    playwright = context_manager.__enter__()
-    browser = playwright.chromium.launch(headless=HEADLESS)
-    context = browser.new_context()
-    page = context.new_page()
+            # 6. 保存状态到 JSON 文件
+            context.storage_state(path=OUTPUT_PATH)
+            print(f"✅ 成功！登录状态已保存至: {os.path.abspath(OUTPUT_PATH)}")
 
-    if "gitlab" in comb:
-        username = ACCOUNTS["gitlab"]["username"]
-        password = ACCOUNTS["gitlab"]["password"]
-        page.goto(f"{GITLAB}/users/sign_in")
-        page.get_by_test_id("username-field").click()
-        page.get_by_test_id("username-field").fill(username)
-        page.get_by_test_id("username-field").press("Tab")
-        page.get_by_test_id("password-field").fill(password)
-        page.get_by_test_id("sign-in-button").click()
-
-    context.storage_state(path=f"{auth_folder}/{'.'.join(comb)}_state.json")
-
-    context_manager.__exit__()
-
-
-def get_site_comb_from_filepath(file_path: str) -> list[str]:
-    comb = os.path.basename(file_path).rsplit("_", 1)[0].split(".")
-    return comb
-
-
-def main(auth_folder: str = "./.auth") -> None:
-    # For GitLab only, we don't need combinations with other sites
-    # Just handle single site login
-    
-    max_workers = 8
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Only submit GitLab single site login
-        executor.submit(renew_comb, ["gitlab"], auth_folder=auth_folder)
-
-    futures = []
-    cookie_files = list(glob.glob(f"{auth_folder}/*.json"))
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for c_file in cookie_files:
-            comb = get_site_comb_from_filepath(c_file)
-            for cur_site in comb:
-                url = URLS[SITES.index(cur_site)]
-                keyword = KEYWORDS[SITES.index(cur_site)]
-                match = EXACT_MATCH[SITES.index(cur_site)]
-                future = executor.submit(
-                    is_expired, Path(c_file), url, keyword, match
-                )
-                futures.append(future)
-
-    for i, future in enumerate(futures):
-        assert not future.result(), f"Cookie {cookie_files[i]} expired."
-
+        except Exception as e:
+            print(f"❌ 发生错误: {e}")
+            # 截图以便调试
+            page.screenshot(path="error_screenshot.png")
+            print("已保存错误截图至 error_screenshot.png")
+        
+        finally:
+            browser.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--site_list", nargs="+", default=[])
-    parser.add_argument("--auth_folder", type=str, default="./.auth")
-    args = parser.parse_args()
-    if not args.site_list:
-        main()
-    else:
-        if "all" in args.site_list:
-            main(auth_folder=args.auth_folder)
-        else:
-            renew_comb(args.site_list, auth_folder=args.auth_folder)
+    save_gitlab_state()
