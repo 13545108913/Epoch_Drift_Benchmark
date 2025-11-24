@@ -292,6 +292,8 @@ class HTMLContentEvaluator(Evaluator):
                     selected_element = str(page.evaluate(f"() => {locator}"))
                     if not selected_element:
                         selected_element = ""
+                    else:
+                        print(f"--------------| find {locator} |--------------")
                 except Exception:
                     # the page is wrong, return empty
                     selected_element = ""

@@ -7,9 +7,9 @@ from agent import DemoAgentArgs
 
 # browsergym experiments utils
 from browsergym.experiments import EnvArgs, ExpArgs, get_exp_result
-import config, task
 
-from .init import register_myBenchmark
+
+from init import register_myBenchmark
 
 def str2bool(v):
     if isinstance(v, bool):
