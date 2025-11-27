@@ -10,8 +10,8 @@ import playwright.sync_api
 
 from browsergym.core.task import AbstractBrowserTask
 
-from instance import MyBenchmarkInstance
-from drift import DriftInjector
+from .instance import MyBenchmarkInstance
+from .drift import DriftInjector
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
 
         import os
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        json_file_path = os.path.join(current_dir, 'gitlab_tasks_processed_edit.json')
+        json_file_path = os.path.join(current_dir, 'gitlab_tasks_final.json')
         with open(json_file_path, "r", encoding="utf-8") as f:
             all_configs_str = f.read()
 
@@ -128,7 +128,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
 
     def setup(self, page: playwright.sync_api.Page) -> tuple[str, dict]:
         # import webarena on instanciation
-        from evaluators import evaluator_router
+        from .evaluators import evaluator_router
 
         if (self.with_drift):
             # 1. 生成漂移脚本 (此时还没加载页面)
@@ -288,7 +288,7 @@ If you believe the task is impossible to complete, provide the answer "N/A".
             score = 0.0
 
         verify_drift_applied(page)
-        print(f"--------------| score: {score} |--------------")
+        # print(f"--------------| score: {score} |--------------")
         if score > 0 or last_action["action_type"] == ActionTypes.STOP:
             return score, True, "", {}
         else:

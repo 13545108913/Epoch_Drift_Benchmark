@@ -283,6 +283,7 @@ class MyBenchmarkInstance:
                 page.get_by_label("Username or email").fill(username)
                 page.locator("#user_password").fill(password)
                 page.get_by_role("button", name="Sign in").click()
+                page.goto(f"{base_url}/?logging=StartingRun1") 
 
             # ... (其他站点的登录逻辑同理，只需确保使用 base_url) ...
             case _:

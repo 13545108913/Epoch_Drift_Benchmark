@@ -1,7 +1,7 @@
 from browsergym.core.registration import register_task
 
-import config
-import task
+from . import config
+from . import task
 
 ALL_MYBENCHMARK_TASK_IDS = []
 
