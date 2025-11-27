@@ -4,29 +4,8 @@ import playwright.sync_api
 page: playwright.sync_api.Page = None
 
 
-
-def check_issue_status_and_notify():
-    """Check if the current issue is closed and notify the user.
-    
-    Args:
-        None
-        
-    Returns:
-        None
-        
-    Examples:
-        check_issue_status_and_notify()
-    """
-    # Check the status indicator on the issue page
-    # Assuming the status is visible and we can determine if it's closed
-    status_element = page.get_by_text("Status:")
-    if "closed" in status_element.inner_text().lower():
-        send_msg_to_user("The issue is currently closed.")
-    else:
-        send_msg_to_user("The issue is currently open, not closed.")
-
 def search_issues(search_box_id: str, keyword: str):
-    """Search for issues containing a specific keyword.
+    """Search for issues containing a specific keyword in their titles.
     
     Args:
         search_box_id: The ID of the search box element
@@ -36,271 +15,69 @@ def search_issues(search_box_id: str, keyword: str):
         None
         
     Examples:
-        search_issues('144', 'theme editor')
+        search_issues('144', 'homepage content')
         search_issues('144', 'bug fix')
     """
-    click(search_box_id)
-    fill(search_box_id, keyword)
-    noop(2000)  # Wait for search results to load
-
-def filter_issues(filter_button_id: str):
-    """Apply a filter to the current issue search results.
-    
-    Args:
-        filter_button_id: The ID of the filter button element
-        
-    Returns:
-        None
-        
-    Examples:
-        filter_issues('245')  # Filter by closed issues
-        filter_issues('249')  # Filter by assigned issues
-    """
-    click(filter_button_id)
-    noop(3000)  # Wait for filter results to load
-
-def navigate_to_issues(issues_link_id: str):
-    """Navigate to the issues dashboard.
-    
-    Args:
-        issues_link_id: The ID of the Issues link
-        
-    Returns:
-        None
-        
-    Examples:
-        navigate_to_issues('161')
-    """
-    click(issues_link_id)  # Click on Issues link to access issues dashboard
-
-def open_issue_by_title(issue_title: str):
-    """Open an issue by clicking on its title link.
-    
-    Args:
-        issue_title: The title text of the issue to open
-        
-    Returns:
-        None
-        
-    Examples:
-        open_issue_by_title('Better sharing solution')
-    """
-    issue_element = page.get_by_role("link", name=issue_title)
-    issue_element.click()
-
-def check_issue_status():
-    """Check if the current issue is closed and send status message.
-    
-    Args:
-        None
-        
-    Returns:
-        None
-        
-    Examples:
-        check_issue_status()
-    """
-    status_element = page.get_by_test_id("issue-status")
-    status_text = status_element.inner_text()
-    if "closed" in status_text.lower():
-        send_msg_to_user(f"The issue is currently closed.")
-    else:
-        send_msg_to_user(f"The issue is currently open, not closed.")
+    click(search_box_id)  # Click on the search box
+    fill(search_box_id, keyword)  # Type the search keyword
+    keyboard_press("Enter")  # Execute the search
 
 def search_project(search_box_id: str | int, project_name: str):
-    """Search for a GitLab project using the search functionality.
+    """Search for a GitLab project using the search box.
     
     Args:
-        search_box_id: The ID of the search box element
+        search_box_id: The ID of the search input element
         project_name: The name of the project to search for
         
     Returns:
         None
         
     Examples:
-        search_project('142', 'metaseq')
-        search_project('search-box', 'my-project')
-    """
-    click(search_box_id)  # Click on the search box
-    fill(search_box_id, project_name)  # Enter the project name
-    keyboard_press('Enter')  # Execute the search
-
-def search_and_select_project(search_box_id: str | int, project_name: str, project_link_id: str | int):
-    """Search for a project and select it from search results.
-    
-    Args:
-        search_box_id: The ID of the search box element
-        project_name: The name of the project to search for
-        project_link_id: The ID of the project link in search results
-        
-    Returns:
-        None
-        
-    Examples:
-        search_and_select_project('142', 'Pytorch GAN', '281')
+        search_project('241', 'Super_Awesome_Robot')
     """
     click(search_box_id)
     fill(search_box_id, project_name)
-    press(search_box_id, 'Enter')
-    click(project_link_id)
-
-def navigate_to_contributors(members_link_id: str | int, repo_section_id: str | int, contributors_link_id: str | int):
-    """Navigate from project page to contributors statistics page.
-    
-    Args:
-        members_link_id: The ID of the Members link
-        repo_section_id: The ID of the Repository section
-        contributors_link_id: The ID of the Contributors link
-        
-    Returns:
-        None
-        
-    Examples:
-        navigate_to_contributors('351', '249', '268')
-    """
-    click(members_link_id)
-    click(repo_section_id)
-    click(contributors_link_id)
-
-def navigate_to_member_settings(project_link_id: str, settings_link_id: str, members_link_id: str):
-    """Navigate from project page to member management settings.
-    
-    Args:
-        project_link_id: The ID of the project link to click
-        settings_link_id: The ID of the Settings link
-        members_link_id: The ID of the Members link
-        
-    Returns:
-        None
-        
-    Examples:
-        navigate_to_member_settings('765', '395', '407')
-    """
-    click(project_link_id)  # Click project link
-    click(settings_link_id)  # Click Settings link
-    click(members_link_id)  # Click Members link
-
-def add_user_with_role(search_box_id: str, username: str, role_dropdown_id: str, role: str):
-    """Search for and add a user with specified role.
-    
-    Args:
-        search_box_id: The ID of the member search box
-        username: The username to search for
-        role_dropdown_id: The ID of the role dropdown
-        role: The role to assign (e.g., "Reporter")
-        
-    Returns:
-        None
-        
-    Examples:
-        add_user_with_role('490', 'yjlou', '498', 'Reporter')
-    """
-    fill(search_box_id, username)  # Fill search box with username
-    keyboard_press("Enter")  # Press Enter to select user
-    select_option(role_dropdown_id, role)  # Select role from dropdown
-
-def confirm_member_addition(add_button_id: str):
-    """Confirm adding members to the project.
-    
-    Args:
-        add_button_id: The ID of the "Add to project" button
-        
-    Returns:
-        None
-        
-    Examples:
-        confirm_member_addition('512')
-    """
-    click(add_button_id)  # Click Add to project button
-
-def search_repository(search_bar_id: str | int, repo_name: str):
-    """Search for a repository in the search bar.
-    
-    Args:
-        search_bar_id: The ID of the search bar element
-        repo_name: The name of the repository to search for
-        
-    Returns:
-        None
-        
-    Examples:
-        search_repository('156', 'umano/AndroidSlidingUpPanel')
-        search_repository('156', 'microsoft/vscode')
-    """
-    click(search_bar_id)
-    fill(search_bar_id, repo_name)
     keyboard_press("Enter")
 
-def navigate_to_issues(issues_link_id: str):
-    """Navigate to the issues dashboard.
-    
-    Args:
-        issues_link_id: The ID of the Issues link
-        
-    Returns:
-        None
-        
-    Examples:
-        navigate_to_issues('155')
-        navigate_to_issues('issues_tab')
-    """
-    click(issues_link_id)
-
-def search_issues(issues_search_id: str | int, search_query: str):
-    """Search for issues using the issues search bar.
-    
-    Args:
-        issues_search_id: The ID of the issues search bar
-        search_query: The search query for filtering issues
-        
-    Returns:
-        None
-        
-    Examples:
-        search_issues('360', 'umano/AndroidSlidingUpPanel')
-        search_issues('360', 'label:BUG')
-    """
-    click(issues_search_id)
-    fill(issues_search_id, search_query)
-    keyboard_press("Enter")
-
-def search_and_select_repository(search_bar_id: str, repo_name: str):
+def search_and_select_repo(search_id: str | int, repo_name: str, repo_link_id: str | int):
     """Search for a repository and select it from search results.
     
     Args:
-        search_bar_id: The ID of the search bar element
+        search_id: The ID of the search input field
         repo_name: The name of the repository to search for
+        repo_link_id: The ID of the repository link in search results
         
     Returns:
         None
         
     Examples:
-        search_and_select_repository('156', 'Super_Awesome_Robot')
+        search_and_select_repo('241', 'csvkit', '284')
+        search_and_select_repo('142', 'pandas', '301')
     """
-    click(search_bar_id)
-    fill(search_bar_id, repo_name)
-    press(search_bar_id, 'Enter')
-    click('341')  # Repository link (assuming consistent ID across examples)
+    click(search_id)
+    fill(search_id, repo_name)
+    keyboard_press("Enter")
+    click(repo_link_id)
 
-def get_top_contributor():
-    """Get the top contributor from the contributors page.
+def navigate_to_contributors(commits_link_id: str | int, contributors_link_id: str | int):
+    """Navigate from repository page to contributors statistics.
     
     Args:
-        None
+        commits_link_id: The ID of the commits link
+        contributors_link_id: The ID of the contributors link
         
     Returns:
-        str: The name of the top contributor
+        None
         
     Examples:
-        get_top_contributor()
+        navigate_to_contributors('522', '270')
+        navigate_to_contributors('601', '315')
     """
-    # The top contributor is always the first one listed on the contributors page
-    top_contributor = page.locator(".contributor-name").first.text_content()
-    commit_count = page.locator(".contributor-commits").first.text_content()
-    return f"{top_contributor} has made the most contributions with {commit_count} commits."
+    click(commits_link_id)
+    click(contributors_link_id)
 
-def search_and_select_repo(search_box_id: str, repo_name: str):
-    """Search for a repository and select the first result.
+def search_repository(search_box_id: str | int, repo_name: str):
+    """Search for a repository using the search box.
     
     Args:
         search_box_id: The ID of the search box element
@@ -310,83 +87,312 @@ def search_and_select_repo(search_box_id: str, repo_name: str):
         None
         
     Examples:
-        search_and_select_repo('156', 'csvkit')
-        search_and_select_repo('156', 'pandas')
+        search_repository('241', 'metaseq')
+        search_repository('142', 'pytorch')
     """
     click(search_box_id)
     fill(search_box_id, repo_name)
     keyboard_press("Enter")
-    click("341")  # Assuming '341' is the first repo result link ID
 
-def navigate_to_contributors():
-    """Navigate from repository page to contributors statistics page.
+def navigate_to_contributors(repo_link_id: str | int, commits_link_id: str | int, contributors_link_id: str | int):
+    """Navigate from repository page to contributors page.
     
     Args:
-        None
+        repo_link_id: The ID of the repository link
+        commits_link_id: The ID of the commits link
+        contributors_link_id: The ID of the contributors link
         
     Returns:
         None
         
     Examples:
-        navigate_to_contributors()
+        navigate_to_contributors('284', '522', '270')
     """
-    click("419")  # Click Analytics link
-    scroll(0, 300)
-    click("302")  # Click Repository section
-    click("335")  # Click Contributors link
+    click(repo_link_id)
+    click(commits_link_id)
+    click(contributors_link_id)
 
-def search_repositories(search_box_id: str | int, search_term: str):
-    """Search for repositories using the search box.
+def navigate_to_merge_request(project_id: str, mr_tab_id: str, mr_link_id: str):
+    """Navigate from project page to specific merge request.
     
     Args:
-        search_box_id: The ID of the search box element
-        search_term: The term to search for
+        project_id: ID of project link
+        mr_tab_id: ID of Merge Requests tab/link
+        mr_link_id: ID of specific merge request link
         
     Returns:
         None
         
     Examples:
-        search_repositories('156', 'facebook')
-        search_repositories('search_box', 'microsoft')
+        navigate_to_merge_request('289', '306', '845')
     """
-    click(search_box_id)
-    fill(search_box_id, search_term)
-    keyboard_press("Enter")
+    click(project_id)  # Click project link
+    click(mr_tab_id)  # Click Merge Requests tab
+    click(mr_link_id)  # Click specific merge request
 
-def navigate_to_new_issue(project_id: str, issues_id: str, new_issue_id: str):
-    """Navigate from project page to new issue creation page.
+def post_merge_request_comment(comment_box_id: str, comment_text: str, action_button_id: str):
+    """Post a comment and perform an action on a merge request.
+    
+    Args:
+        comment_box_id: The ID of the comment textbox
+        comment_text: The text to post as a comment
+        action_button_id: The ID of the action button (e.g., Comment & close)
+        
+    Returns:
+        None
+        
+    Examples:
+        post_merge_request_comment('705', 'close because non reproducible', '751')
+    """
+    click(comment_box_id)  # Click comment textbox
+    fill(comment_box_id, comment_text)  # Fill comment text
+    click(action_button_id)  # Click action button
+
+def update_project_title(settings_id: str, title_field_id: str, save_button_id: str, new_title: str):
+    """Update the project site's title by navigating to settings, filling the title field, and saving.
+    
+    Args:
+        settings_id: The ID of the Settings link
+        title_field_id: The ID of the project title input field
+        save_button_id: The ID of the Save changes button
+        new_title: The new title text to set
+    
+    Returns:
+        None
+    
+    Examples:
+        update_project_title('395', '481', '503', 'New Project Title')
+    """
+    click(settings_id)  # Click Settings link
+    fill(title_field_id, new_title)  # Fill title field with new title
+    click(save_button_id)  # Click Save changes button
+
+def navigate_to_member_management(project_id: str, settings_id: str, members_id: str):
+    """Navigate from project page to member management section.
     
     Args:
         project_id: The ID of the project link
-        issues_id: The ID of the Issues tab/link
-        new_issue_id: The ID of the New Issue button/link
+        settings_id: The ID of the Settings link
+        members_id: The ID of the Members link
         
     Returns:
         None
         
     Examples:
-        navigate_to_new_issue('868', '347', '624')
+        navigate_to_member_management('889', '395', '407')
     """
-    click(project_id)  # Click project link
-    click(issues_id)  # Click Issues tab
-    click(new_issue_id)  # Click New Issue button
+    click(project_id)  # Click on the project
+    click(settings_id)  # Click Settings link
+    click(members_id)  # Click Members link
 
-def create_issue(title_id: str, description_id: str, create_button_id: str, title_text: str, description_text: str):
-    """Fill in and submit a new issue form.
+def add_user_as_role(search_field_id: str, user_name: str, user_select_id: str, add_button_id: str, repo_name: str, role: str):
+    """Search for and add a user with specific role to a repository.
+    
+    Args:
+        search_field_id: The ID of the user search field
+        user_name: The username to search for
+        user_select_id: The ID to select the user from search results
+        add_button_id: The ID of the add button
+        repo_name: The name of the repository/project
+        role: The role to assign to the user
+        
+    Returns:
+        None
+        
+    Examples:
+        add_user_as_role('490', 'yjlou', '607', '512', 'timeit', 'guest')
+    """
+    fill(search_field_id, user_name)  # Search for the user
+    click(user_select_id)  # Select the user from search results
+    click(add_button_id)  # Click add button
+    send_msg_to_user(f"Successfully added user '{user_name}' as {role} to the {repo_name} project.")
+
+def navigate_to_new_issue(repo_id: str, issues_id: str, new_issue_id: str):
+    """Navigate from repository page to new issue creation form.
+    
+    Args:
+        repo_id: The ID of the repository link
+        issues_id: The ID of the Issues tab/link
+        new_issue_id: The ID of the "New issue" button
+        
+    Returns:
+        None
+        
+    Examples:
+        navigate_to_new_issue('663', '253', '453')
+    """
+    click(repo_id)  # Click repository link
+    click(issues_id)  # Click Issues tab
+    click(new_issue_id)  # Click New issue button
+
+def create_issue_with_details(title_id: str, title: str, due_date_id: str, due_date: str, submit_id: str):
+    """Fill issue details and submit the issue.
     
     Args:
         title_id: The ID of the title input field
-        description_id: The ID of the description input field
-        create_button_id: The ID of the create/submit button
-        title_text: The title for the new issue
-        description_text: The description for the new issue
+        title: The issue title text
+        due_date_id: The ID of the due date input field
+        due_date: The due date in YYYY-MM-DD format
+        submit_id: The ID of the submit button
         
     Returns:
         None
         
     Examples:
-        create_issue('592', '666', '841', 'Bug Report', 'Detailed description of the bug')
+        create_issue_with_details('440', 'Bug fix', '649', '2024-12-31', '655')
     """
-    fill(title_id, title_text)  # Fill issue title
-    fill(description_id, description_text)  # Fill issue description
-    click(create_button_id)  # Click create button
+    fill(title_id, title)  # Fill issue title
+    fill(due_date_id, due_date)  # Set due date
+    click(submit_id)  # Submit the issue
+
+def search_and_select_repository(search_bar_id: str | int, repo_name: str, result_id: str | int):
+    """Search for a repository and select it from search results.
+    
+    Args:
+        search_bar_id: ID of the search bar element
+        repo_name: Name of the repository to search for
+        result_id: ID of the repository search result to click
+        
+    Returns:
+        None
+        
+    Examples:
+        search_and_select_repository('241', 'aem-hacker', '284')
+        search_and_select_repository('142', 'my-project', '300')
+    """
+    click(search_bar_id)
+    fill(search_bar_id, repo_name)
+    keyboard_press("Enter")
+    click(result_id)
+
+def navigate_to_new_issue(issues_link_id: str | int, new_issue_link_id: str | int):
+    """Navigate from repository page to new issue creation form.
+    
+    Args:
+        issues_link_id: ID of the Issues link
+        new_issue_link_id: ID of the New issue link
+        
+    Returns:
+        None
+        
+    Examples:
+        navigate_to_new_issue('279', '429')
+        navigate_to_new_issue('300', '450')
+    """
+    click(issues_link_id)
+    click(new_issue_link_id)
+
+def create_issue(title_field_id: str | int, description_field_id: str | int, submit_button_id: str | int, title: str, description: str):
+    """Create a new issue with title and description.
+    
+    Args:
+        title_field_id: ID of the title input field
+        description_field_id: ID of the description textarea
+        submit_button_id: ID of the submit button
+        title: Issue title text
+        description: Issue description text
+        
+    Returns:
+        None
+        
+    Examples:
+        create_issue('419', '460', '505', 'Bug Report', 'Detailed bug description')
+        create_issue('500', '550', '600', 'Feature Request', 'Feature details')
+    """
+    fill(title_field_id, title)
+    fill(description_field_id, description)
+    click(submit_button_id)
+
+def create_repository_from_template(new_project_id: str, template_tab_id: str, template_id: str, project_name: str):
+    """Create a new repository using a template.
+    
+    Args:
+        new_project_id: ID of the "New project" button
+        template_tab_id: ID of the "Create from template" tab
+        template_id: ID of the specific template to use
+        project_name: Name for the new repository
+        
+    Returns:
+        None
+        
+    Examples:
+        create_repository_from_template('223', '242', '441', 'web_agent_index')
+    """
+    click(new_project_id)  # Click New project button
+    click(template_tab_id)  # Click Create from template tab
+    click(template_id)  # Select specific template
+    fill('543', project_name)  # Fill project name field
+    click('586')  # Click Create project button
+
+def create_project_from_template(new_project_id: str, create_from_template_id: str, template_id: str, use_template_id: str, project_name: str):
+    """Create a new project using a specific template.
+    
+    Args:
+        new_project_id: ID of the "New project" button/link
+        create_from_template_id: ID of the "Create from template" tab
+        template_id: ID of the specific template to use
+        use_template_id: ID of the "Use template" button/label
+        project_name: Name for the new project
+        
+    Returns:
+        None
+        
+    Examples:
+        create_project_from_template('223', '242', '429', '428', '11711_gitlab')
+    """
+    click(new_project_id)  # Click New project
+    click(create_from_template_id)  # Click Create from template tab
+    click(template_id)  # Click specific template
+    click(use_template_id)  # Click Use template
+    fill('543', project_name)  # Fill project name field
+    click('586')  # Click Create project button
+
+def navigate_to_commits_page(repo_link_id: str):
+    """Navigate from repository page to commits page.
+    
+    Args:
+        repo_link_id: The ID of the repository link
+        
+    Returns:
+        None
+        
+    Examples:
+        navigate_to_commits_page('284')
+    """
+    click(repo_link_id)  # Click repository link
+    click("249")  # Click Activity link
+    click("479")  # Click Push events filter
+    click("255")  # Click Repository section
+    click("270")  # Click Commits link
+
+def filter_commits_by_author(search_box_id: str, author_name: str):
+    """Filter commits by author name.
+    
+    Args:
+        search_box_id: The ID of the search box
+        author_name: The name of the author to filter by
+        
+    Returns:
+        None
+        
+    Examples:
+        filter_commits_by_author('500', 'kilian')
+    """
+    fill(search_box_id, author_name)  # Fill search box with author name
+
+def switch_to_main_branch(branch_selector_id: str, main_branch_id: str):
+    """Switch from current branch to main branch.
+    
+    Args:
+        branch_selector_id: The ID of the branch selector
+        main_branch_id: The ID of the main branch option
+        
+    Returns:
+        None
+        
+    Examples:
+        switch_to_main_branch('477', '1466')
+    """
+    click(branch_selector_id)  # Click branch selector
+    click(main_branch_id)  # Click main branch option
+
