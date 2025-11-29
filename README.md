@@ -139,6 +139,19 @@ phpMyAdmin: http://dockerized-magento.local:8080 (root/pw)
 
 ### WordPress
 
+```bash
+# 第一步：赋予脚本执行权限
+chmod +x drift_manager.sh
+
+# 第二步：启动容器
+docker-compose up -d --build
+
+# 第三步：执行初始化
+./drift_manager.sh init
+
+# 第四步：测试“漂移” (Drift)
+./drift_manager.sh drift twentytwentyfour
+```
 
 
 ## 运行方式
@@ -152,7 +165,7 @@ python run_online.py --experiment asi --website gitlab --task_ids 419-419
 ```bash
 python -m skillweaver.explore gitlab logs/explore-gitlab
 
-python -m skillweaver.evaluation.evaluate_benchmark gitlab results1/gitlab_with_skills2 --knowledge-base-path-prefix logs/explore-gitlab/iter_159/kb_post --pool-size 8
+python -m skillweaver.evaluation.evaluate_benchmark gitlab results/gitlab_with_skills2 --knowledge-base-path-prefix logs/explore-gitlab/iter_159/kb_post --pool-size 8
 
 python -m skillweaver.evaluation.evaluate_single_task --task_id 60 --out_dir results/gitlab_with_skills --knowledge_base_path_prefix logs/explore-gitlab/iter_159/kb_post
 ```
