@@ -79,7 +79,7 @@ async def run_test_case_with_webrover(
     # ===========================================================================
     # [Drift & Security Patch] 注入漂移脚本并强制绕过 CSP/HTTPS 错误
     # ===========================================================================
-    with_drift = True
+    with_drift = False
     drift_intensity = 'high'
     drift_type = 'all'
 
@@ -116,7 +116,7 @@ async def run_test_case_with_webrover(
         if browser.active_page:
             await secure_page_context(browser.active_page)
             if drift_script:
-                await browser.active_page.reload() # 刷新以确保生效
+                await browser.active_page.reload(wait_until='domcontentloaded') # 刷新以确保生效
 
         # C. 监听新页面事件：确保未来打开的所有 Tab/Popup 也被绕过
         # 注意：我们需要用 lambda 或 wrapper 捕获当前的 loop 变量，但在 async 中直接定义 handler 即可

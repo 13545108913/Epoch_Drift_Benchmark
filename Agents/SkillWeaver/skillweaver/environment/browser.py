@@ -70,8 +70,9 @@ class Browser:
             self.temp_dir.name, f"screenshot_full{scount}.png"
         )
         screenshot_path = os.path.join(self.temp_dir.name, f"screenshot{scount}.png")
-        await page.screenshot(full_page=True, path=screenshot_path_full, timeout=15000)
-        await page.screenshot(full_page=False, path=screenshot_path, timeout=15000)
+        await page.wait_for_load_state('domcontentloaded')  # 只等待DOM加载
+        await page.screenshot(full_page=True, path=screenshot_path_full, timeout=30000)
+        await page.screenshot(full_page=False, path=screenshot_path, timeout=30000)
 
         # await page.screenshot(
         #     full_page=True, 
@@ -186,7 +187,13 @@ async def make_browser(
     context.set_default_navigation_timeout(navigation_timeout)
     # BUG in Playwright:
     page = await context.new_page()
-    await page.goto(start_url)  # state_url
+    # await page.goto(start_url)  # state_url
+    # 修改为：
+    await page.goto(
+        start_url, 
+        timeout=60000,              # 将超时从 16s 增加到 60s
+        wait_until='domcontentloaded' # 只要 DOM 加载完就算成功，不用等所有图片/脚本
+    )
     content = await page.content()
     await aprint("went to", start_url)
     return Browser(browser, context, page, screen_size=(height, width))

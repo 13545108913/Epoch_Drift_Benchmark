@@ -197,4 +197,13 @@ python -m skillweaver.evaluation.evaluate_benchmark gitlab results/gitlab_with_s
 
 Drift：
 166/166 [1:51:13<00:00, 40.20s/it, ⏳ Evaluating. ✅ 13/77; ❓ 89; 💰 $0.00 🕐 8.31 (n=77) (remaining=0)]
+
+原：
+161/162 [2:24:25<00:53, 53.82s/it, ⏳ Evaluating. ✅ 26/144; ❓ 17; 💰 $0.00 🕐 4.54 (n=144) (remaining=1)]
+
+Drift：
+161/162 [2:12:56<00:49, 49.55s/it, ⏳ Evaluating. ✅ 22/146; ❓ 15; 💰 $0.00 🕐 5.59 (n=146) (remaining=1)]
+
+重新跑原：
+162/162 [1:57:41<00:00, 43.59s/it, ⏳ Evaluating. ✅ 19/150; ❓ 12; 💰 $0.00 🕐 5.58 (n=150) (remaining=0)]
 ```

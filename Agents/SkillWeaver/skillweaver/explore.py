@@ -418,7 +418,7 @@ def cli(
             help="Can be 'test_probability:X' or 'explore:X,test:Y' to alternate between exploration and testing (explore X iters, and test Y iters)"
         ),
     ] = "test_probability:0.5",
-    num_workers: int = 4,
+    num_workers: int = 8,
 ):
     out_dir = _get_dir(out_dir)
     os.makedirs(out_dir, exist_ok=True)
