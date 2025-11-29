@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-def analyze_webarena_results(result_dir: str = "./results") -> Dict:
+def analyze_webarena_results(result_dir: str = "./results3") -> Dict:
     """
     分析WebArena任务运行结果
     
@@ -27,10 +27,15 @@ def analyze_webarena_results(result_dir: str = "./results") -> Dict:
     successful_steps = []
     failed_steps = []
     
-    # 分数统计列表 (新增)
+    # 分数统计列表
     all_scores = []
     successful_scores = []
     failed_scores = []
+    
+    # 错误信息统计 (新增)
+    error_messages = []  # 存储所有非null的错误信息
+    tasks_with_errors = 0  # 有错误的task数量
+    tasks_without_errors = 0  # 没有错误的task数量
     
     # 遍历结果目录
     for task_dir in result_path.iterdir():
@@ -42,9 +47,10 @@ def analyze_webarena_results(result_dir: str = "./results") -> Dict:
             autoeval_file = task_dir / "deepseek-chat_autoeval.json"
             summary_file = task_dir / "summary_info.json"
             
-            # 获取步骤数和分数
+            # 获取步骤数、分数和错误信息
             n_steps = None
             score = None
+            err_msg = None
             
             if summary_file.exists():
                 try:
@@ -56,7 +62,7 @@ def analyze_webarena_results(result_dir: str = "./results") -> Dict:
                         if n_steps is not None:
                             all_steps.append(n_steps)
                             
-                        # 提取 Score (新增)
+                        # 提取 Score
                         raw_score = summary_data.get("cum_reward")
                         if raw_score is not None:
                             try:
@@ -65,6 +71,19 @@ def analyze_webarena_results(result_dir: str = "./results") -> Dict:
                             except (ValueError, TypeError):
                                 print(f"警告: 任务 {task_id} 的 score 格式不正确: {raw_score}")
                                 score = None
+
+                        # 提取错误信息 (新增)
+                        err_msg = summary_data.get("err_msg")
+                        if err_msg is not None:
+                            # err_msg不为null，表示有错误
+                            tasks_with_errors += 1
+                            error_messages.append({
+                                "task_id": task_id,
+                                "err_msg": err_msg
+                            })
+                        else:
+                            # err_msg为null，表示没有错误
+                            tasks_without_errors += 1
 
                 except (json.JSONDecodeError, KeyError) as e:
                     print(f"警告: 无法读取 {summary_file}: {e}")
@@ -110,6 +129,10 @@ def analyze_webarena_results(result_dir: str = "./results") -> Dict:
     # 计算统计信息
     success_rate = successful_tasks / total_tasks if total_tasks > 0 else 0
     
+    # 错误信息统计计算 (新增)
+    total_err_tasks = tasks_with_errors + tasks_without_errors
+    error_rate = tasks_with_errors / total_err_tasks if total_err_tasks > 0 else 0
+    
     # 通用统计函数 (用于步骤和分数)
     def calculate_basic_stats(data_list: List[float]) -> Dict:
         if not data_list:
@@ -138,15 +161,24 @@ def analyze_webarena_results(result_dir: str = "./results") -> Dict:
             "successful_tasks": calculate_basic_stats(successful_steps),
             "failed_tasks": calculate_basic_stats(failed_steps)
         },
-        # 新增分数统计
         "score_statistics": {
             "all_tasks": calculate_basic_stats(all_scores),
             "successful_tasks": calculate_basic_stats(successful_scores),
             "failed_tasks": calculate_basic_stats(failed_scores)
         },
+        # 新增错误信息统计
+        "error_statistics": {
+            "tasks_with_errors": tasks_with_errors,
+            "tasks_without_errors": tasks_without_errors,
+            "total_tasks_with_err_info": total_err_tasks,
+            "error_rate": round(error_rate * 100, 2),
+            "error_rate_decimal": round(error_rate, 4),
+            "error_messages": error_messages  # 包含所有错误信息的列表
+        },
         "detailed_counts": {
             "tasks_with_steps": len(all_steps),
-            "tasks_with_scores": len(all_scores), # 新增
+            "tasks_with_scores": len(all_scores),
+            "tasks_with_err_info": total_err_tasks,  # 新增
             "successful_with_steps": len(successful_steps),
             "failed_with_steps": len(failed_steps)
         }
@@ -160,7 +192,8 @@ def print_statistics(stats: Dict):
     
     overall = stats["overall"]
     step_stats = stats["step_statistics"]
-    score_stats = stats["score_statistics"] # 新增
+    score_stats = stats["score_statistics"]
+    error_stats = stats["error_statistics"]  # 新增
     
     print(f"\n总体统计:")
     print(f"  总任务数: {overall['total_tasks']}")
@@ -183,13 +216,30 @@ def print_statistics(stats: Dict):
     print_sub_stats("成功任务步骤", step_stats["successful_tasks"])
     print_sub_stats("失败任务步骤", step_stats["failed_tasks"])
 
-    # --- 分数统计 (新增) ---
+    # --- 分数统计 ---
     print("\n" + "-"*20 + " 分数统计 (Score) " + "-"*20)
     print_sub_stats("所有任务分数", score_stats["all_tasks"])
     print_sub_stats("成功任务分数", score_stats["successful_tasks"])
     print_sub_stats("失败任务分数", score_stats["failed_tasks"])
 
-def save_statistics(stats: Dict, output_file: str = "webarena_statistics_gitlab_drift_2.json"):
+    # --- 错误信息统计 (新增) ---
+    print("\n" + "-"*20 + " 错误信息统计 (Error Messages) " + "-"*20)
+    print(f"  有错误的任务数: {error_stats['tasks_with_errors']}")
+    print(f"  无错误的任务数: {error_stats['tasks_without_errors']}")
+    print(f"  有错误信息记录的任务总数: {error_stats['total_tasks_with_err_info']}")
+    print(f"  错误率: {error_stats['error_rate']}%")
+    
+    # 打印具体的错误信息
+    if error_stats['error_messages']:
+        print(f"\n  具体错误信息:")
+        for i, error in enumerate(error_stats['error_messages'][:10], 1):  # 只显示前10个错误
+            print(f"    {i}. 任务 {error['task_id']}: {error['err_msg']}")
+        if len(error_stats['error_messages']) > 10:
+            print(f"    ... 还有 {len(error_stats['error_messages']) - 10} 个错误信息")
+    else:
+        print(f"\n  无错误信息")
+
+def save_statistics(stats: Dict, output_file: str = "webarena_statistics_gitlab_2.json"):
     """保存统计结果到JSON文件"""
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
