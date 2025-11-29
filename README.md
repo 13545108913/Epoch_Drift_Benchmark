@@ -17,7 +17,9 @@ playwright install chromium
 
 ## Docker容器：
 
-### 运行 GitLab 服务
+### GitLab
+
+#### 运行 GitLab 服务
 
 1. 启动服务
 ```bash
@@ -34,7 +36,7 @@ docker-compose -f docker-compose.v12.yml ps
 docker-compose -f docker-compose.v12.yml logs -f
 ```
 
-### 停止 GitLab 服务
+#### 停止 GitLab 服务
 
 1. 停止服务（保留数据）
 ```bash
@@ -51,20 +53,20 @@ docker-compose -f docker-compose.v12.yml down
 docker-compose -f docker-compose.v12.yml down --volumes
 ```
 
-### 设置外部URL
+#### 设置外部URL
 ```bash
 docker exec gitlab-v13.0 sed -i "s|^external_url.*|external_url 'http://172.26.116.102:8080'|" /etc/gitlab/gitlab.rb
 docker exec gitlab-v13.0 gitlab-ctl reconfigure
 ```
 
-### 账户密码
+#### 账户密码
+```
 Account: root
 
 Password: zlxQGkIhkgLcnGpsJyMRjAGdPhKP75k2mscZZJm6b+A=
+```
 
-
-
-## 设置环境变量：
+#### 设置环境变量：
 ```bash
 $env:BASE_URL="http://172.26.116.102"              
 $env:WA_SHOPPING="http://localhost:7770/"
@@ -110,100 +112,132 @@ export WA_GITLAB_V1="$BASE_URL:8080"
 export WA_GITLAB_V2="$BASE_URL:8080"
 ```
 
-## 运行方式
+### Magento
+
 ```bash
-python run_demo.py --task_name myBenchmark.419 --websites gitlab
-python run_online.py --experiment asi --website gitlab --task_ids 419-419
+echo "127.0.0.1 dockerized-magento.local" | sudo tee -a /etc/hosts
+```
+
+```bash
+./magento start      # 启动项目
+./magento stop       # 停止项目  
+./magento restart    # 重启并清缓存
+./magento status     # 查看状态
+./magento stats      # 资源使用统计
+./magento magerun    # 运行 magerun
+./magento composer   # 运行 composer
+./magento enter      # 进入容器
+./magento destroy    # 删除所有数据
 ```
 
 
+前端: http://dockerized-magento.local
+
+后台: http://dockerized-magento.local/admin (admin/password123)
+
+phpMyAdmin: http://dockerized-magento.local:8080 (root/pw)
+
+### WordPress
+
+
+
+## 运行方式
+### ASI
+```bash
+python run_demo.py --task_name myBenchmark.3 --websites gitlab
+python run_online.py --experiment asi --website gitlab --task_ids 419-419
+```
+
+### SkillWeaver
+```bash
+python -m skillweaver.explore gitlab logs/explore-gitlab
+
+python -m skillweaver.evaluation.evaluate_benchmark gitlab results1/gitlab_with_skills2 --knowledge-base-path-prefix logs/explore-gitlab/iter_159/kb_post --pool-size 8
+
+python -m skillweaver.evaluation.evaluate_single_task --task_id 60 --out_dir results/gitlab_with_skills --knowledge_base_path_prefix logs/explore-gitlab/iter_159/kb_post
+```
+
+### MUSE
+```bash
+python run_myBenchmark_muse.py
+```
+
+## Drift脚本
 ```python
 import random
 
 class DriftInjector:
-    def __init__(self):
-        pass
+    def __init__(self, seed=42):
+        """
+        :param seed: 随机种子，确保每次生成的干扰逻辑在浏览器端执行顺序一致。
+        """
+        self.seed = seed
+
+    def _get_seeded_rng_script(self) -> str:
+        """
+        生成一个基于种子的伪随机数生成器 (LCG 算法) 的 JS 代码。
+        替代 Math.random()，确保由 Python 指定的 seed 控制随机结果。
+        """
+        return f"""
+            // === Deterministic RNG Setup ===
+            window.__drift_seed = {self.seed};
+            
+            // 简单的线性同余生成器 (LCG)
+            // 只要初始 seed 相同，生成的序列永远相同
+            const seededRandom = () => {{
+                window.__drift_seed = (window.__drift_seed * 9301 + 49297) % 233280;
+                return window.__drift_seed / 233280;
+            }};
+
+            // 辅助函数：生成确定性的随机字符串 (用于替换 Math.random().toString(36))
+            const seededString = () => {{
+                return Math.floor(seededRandom() * 2147483648).toString(36);
+            }};
+        """
 
     def _get_visual_drift_css(self, intensity: str) -> str:
         """
-        根据强度生成 CSS 样式。
-        Low: 轻微的背景色变化，行高调整（干扰视觉定位但不破坏布局）。
-        Medium: 字体变更（影响 OCR），按钮颜色反转，去圆角。
-        High: 全局字体间距（破坏文本分割），轻微旋转（破坏坐标），高对比度/反色。
+        (保持不变) 根据强度生成 CSS 样式。
         """
         css_parts = []
-
-        # 1. 基础样式库
         if intensity == "low":
-            # 轻微干扰：修改背景色，微调行高
             css_parts.append("body { background-color: #f9f9f9 !important; line-height: 1.6 !important; }")
             css_parts.append("a { text-decoration: underline !important; }")
-        
         elif intensity == "medium":
-            # 中度干扰：修改字体（影响基于像素的定位和OCR），修改按钮样式
             css_parts.append("body, * { font-family: 'Courier New', monospace !important; }")
             css_parts.append("button, .btn { border-radius: 0px !important; background-color: #4a90e2 !important; color: #fff !important; border: 2px solid #000 !important; }")
             css_parts.append("input { background-color: #fff8dc !important; }")
-
         elif intensity == "high":
-            # 高度干扰：字母间距（破坏分词），元素轻微旋转（破坏精确坐标点击），强制反色
             css_parts.append("* { letter-spacing: 1.5px !important; word-spacing: 2px !important; }")
-            # 极轻微旋转，通常会让基于坐标的点击失效，但人类还能操作
             css_parts.append("div, p, span { transform: rotate(0.2deg); }") 
             css_parts.append("body { filter: contrast(120%); }")
             css_parts.append("button, .btn { border: 3px dashed red !important; font-weight: bold !important; }")
-
-        # 既然看不见属性变化，我们可以临时修改 CSS，让被修改了 DOM 的元素“显形”。
-        # css_parts.append("""
-        #     /* 让被移除了 testid 或被修改属性的元素显示红框 */
-        #     [data-drifted-id] { border: 2px solid red !important; box-shadow: 0 0 5px red !important; }
             
-        #     /* 让被添加了随机 class 的元素背景变黄 (半透明) */
-        #     .drift-c { background-color: rgba(255, 255, 0, 0.2) !important; }
-            
-        #     /* 让被替换标签的元素显示绿框 */
-        #     [data-drifted-tag] { border: 2px solid green !important; }
-        # """)
-
-        # 压缩为一行
         return " ".join(css_parts).replace("\n", " ")
 
     def _get_mutation_params(self, intensity: str) -> dict:
         """
-        根据强度定义 DOM 变异的概率参数
+        (保持不变) 根据强度定义 DOM 变异的概率参数
         """
         if intensity == "low":
-            return {
-                "remove_testid_prob": 0.1,    # 10% 概率移除 id
-                "add_class_prob": 0.2,        # 20% 概率添加垃圾 class
-                "enable_tag_replace": False,  # 不改变标签结构
-                "attr_noise_prob": 0.1        # 10% 概率修改 data 属性值
-            }
+            return {"remove_testid_prob": 0.1, "add_class_prob": 0.2, "enable_tag_replace": False, "attr_noise_prob": 0.1}
         elif intensity == "medium":
-            return {
-                "remove_testid_prob": 0.4,    # 40% 概率移除 id
-                "add_class_prob": 0.5,        # 50% 概率添加垃圾 class
-                "enable_tag_replace": True,   # 开启简单标签替换 (b -> strong)
-                "attr_noise_prob": 0.3
-            }
+            return {"remove_testid_prob": 0.4, "add_class_prob": 0.5, "enable_tag_replace": True, "attr_noise_prob": 0.3}
         elif intensity == "high":
-            return {
-                "remove_testid_prob": 0.8,    # 80% 概率移除关键 id (迫使 Agent 用文本定位)
-                "add_class_prob": 0.9,        # 几乎所有元素都加垃圾 class
-                "enable_tag_replace": True,   # 开启标签替换
-                "attr_noise_prob": 0.6        # 高概率污染属性值
-            }
+            return {"remove_testid_prob": 0.8, "add_class_prob": 0.9, "enable_tag_replace": True, "attr_noise_prob": 0.6}
         return self._get_mutation_params("medium")
 
     def generate_drift_script(self, drift_type: str, intensity: str) -> str:
         """
-        生成带有强度控制的 JS 注入脚本。
+        生成带有强度控制且【结果确定】的 JS 注入脚本。
         """
         params = self._get_mutation_params(intensity)
         script_parts = []
         
-        # Log 用于调试
-        script_parts.append(f"console.log('[DriftInjector] Intensity: {intensity}, Type: {drift_type}');")
+        # 1. 注入 RNG 核心逻辑 (这是实现“每次结果相同”的关键)
+        script_parts.append(self._get_seeded_rng_script())
+        
+        script_parts.append(f"console.log('[DriftInjector] Intensity: {intensity}, Type: {drift_type}, Seed: {self.seed}');")
 
         # === Part 1: Visual Drift (CSS) ===
         if "visual" in drift_type or drift_type == "all":
@@ -215,63 +249,50 @@ class DriftInjector:
                     style.textContent = "{css_content}";
                     style.id = 'drift-style-injected';
                     (document.head || document.documentElement).appendChild(style);
-                    console.log('[DriftInjector] Styles injected.');
                 }};
             """)
         else:
             script_parts.append("const injectStyles = () => {};")
 
         # === Part 2: DOM Mutation Logic ===
+        # 注意：这里所有的 Math.random() 都被替换为了 seededRandom()
         mutation_logic = ""
         
-        # Locator Drift: 针对 data-testid, id, class 等属性进行干扰
         if "locator" in drift_type or drift_type == "all":
             mutation_logic += f"""
-                // 1. 干扰 data-testid (Agent 最常用的定位符)
+                // 1. 干扰 data-testid
                 if (node.getAttribute && node.getAttribute('data-testid')) {{
                     if (!node.getAttribute('data-drifted-id')) {{
-                        const r = Math.random();
+                        const r = seededRandom(); // <--- 使用确定性随机数
                         if (r < {params['remove_testid_prob']}) {{
-                            // 移除属性
                             node.removeAttribute('data-testid');
                         }} else if (r < {params['remove_testid_prob']} + {params['attr_noise_prob']}) {{
-                            // 修改属性值 (加后缀)
                             node.setAttribute('data-testid', node.getAttribute('data-testid') + '__drifted');
                         }}
-                        node.setAttribute('data-drifted-id', 'true'); // 防止重复处理
+                        node.setAttribute('data-drifted-id', 'true'); 
                     }}
                 }}
 
-                // 2. 干扰 Class (增加噪声，防止基于 strict class match 定位)
+                // 2. 干扰 Class
                 if (node.classList && !node.classList.contains('drift-c')) {{
-                    if (Math.random() < {params['add_class_prob']}) {{
-                        node.classList.add('drift-' + Math.random().toString(36).substring(7));
-                        node.classList.add('drift-c'); // 标记已处理
+                    if (seededRandom() < {params['add_class_prob']}) {{ // <--- 使用确定性随机数
+                        // 生成确定性的随机字符串
+                        node.classList.add('drift-' + seededString()); 
+                        node.classList.add('drift-c');
                     }}
                 }}
             """
 
-        # Structural Drift: 改变 HTML 标签结构
         if ("structural" in drift_type or drift_type == "all") and params['enable_tag_replace']:
             mutation_logic += """
-                // 标签替换：不改变语义，但改变 XPath 结构
-                // 例如: b -> strong, i -> em
-                // 注意：这必须非常小心，不能破坏 Vue 的事件绑定，通常只替换纯展示标签
-                
                 const tagMap = { 'B': 'STRONG', 'I': 'EM', 'SPAN': 'LABEL' };
                 if (tagMap[node.tagName] && !node.getAttribute('data-drifted-tag')) {
-                     // 仅当节点没有复杂的 Vue 属性时尝试替换（简化判断）
-                     // 在真实 Vue 环境彻底替换标签风险很高，这里做保守处理：
-                     // 仅修改 innerHTML 简单的节点
                      if (node.children.length === 0 && node.textContent.length < 50) {
                         const newTag = tagMap[node.tagName];
                         const newEl = document.createElement(newTag);
                         newEl.innerHTML = node.innerHTML;
-                        // 复制 class
                         newEl.className = node.className;
                         newEl.setAttribute('data-drifted-tag', 'true');
-                        
-                        // 替换
                         try {
                             node.parentNode.replaceChild(newEl, node);
                         } catch(e) {}
@@ -280,15 +301,12 @@ class DriftInjector:
             """
 
         # === Part 3: Execution & Observer ===
-        # 包含防抖、等待 Body、递归处理子节点的逻辑
         script_parts.append(f"""
             const applyDrift = (node) => {{
-                if (!node || node.nodeType !== 1) return; // 仅处理元素节点
+                if (!node || node.nodeType !== 1) return;
                 try {{
                     {mutation_logic}
-                }} catch (e) {{
-                    // 忽略错误，防止阻塞页面脚本
-                }}
+                }} catch (e) {{}}
             }};
 
             const startObserver = () => {{
@@ -297,25 +315,18 @@ class DriftInjector:
                     requestAnimationFrame(startObserver);
                     return;
                 }}
-
                 injectStyles();
-
-                // 初始遍历 (处理已存在的 DOM)
                 document.querySelectorAll('*').forEach(applyDrift);
-
-                // 监听后续变化 (AJAX, Vue Re-render)
                 const observer = new MutationObserver((mutations) => {{
                     mutations.forEach((mutation) => {{
                         mutation.addedNodes.forEach((node) => {{
                             if (node.nodeType === 1) {{
                                 applyDrift(node);
-                                // 深度优先，处理新插入子树中的所有节点
                                 node.querySelectorAll('*').forEach(applyDrift);
                             }}
                         }});
                     }});
                 }});
-                
                 observer.observe(target, {{ childList: true, subtree: true }});
             }};
 
@@ -328,3 +339,53 @@ class DriftInjector:
 
         return "\n".join(script_parts)
 ```
+
+## gitlab任务更改：
+```
+id：6 增加一个"OpenAPI Generator CLI"的issue
+id: 59 gimmiethat.space仓库中移除member Jakub
+id: 62 增加一个标题为“octovisuals page”的merge request
+id: 63 增加一个标题为“semantic HTML post”的merge request
+id: 64 增加一个标题为“focus edge cases”的merge request
+id: 65
+id: 96 删除chatgpt_plugin仓库
+id: 97 删除awesome_llm_reading仓库
+id: 98
+id: 99
+id: 100
+id: 101 移除yjlou成员
+id: 102
+id: 103
+id: 104
+id: 105
+id: 106
+id: 119
+id: 120
+id: 124
+id: 125
+id: 145
+id: 146
+...
+id: 159
+id: 167
+...
+id: 171
+
+修改：3, 15, 16, 19, 20, 23, 24, 33, 34, 35, 36, 37, 38, 51, 53(repo name), 60, 62, 63, 75, 108-112, 144, 163
+待定：17, 18, 21, 22, 43, 66, 76, 77, 78, 89, 90, 113-117(不能查看follow), 164
+
+url 里面的/-/
+两种match都要修改
+
+issue 在v16里有bug
+git clone 的比对逻辑需要修改
+
+最终删除：
+17, 18, 21, 22, 26, 27, 43, 66, 71, 76, 77, 78, 113-117, 164
+```
+
+## 运行结果
+| 方法        | v1(训练) | v1_drift | v1_waber |
+|:-------------:|:----------:|:----------:|:----------:|
+| ASI         | 22.22%   | 16.05%   | 0.00%    |
+| SkillWeaver | 18.06%   | 15.07%   | 无       |
