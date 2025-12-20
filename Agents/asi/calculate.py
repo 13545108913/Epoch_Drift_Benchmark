@@ -263,7 +263,7 @@ def print_statistics(stats: Dict):
     if stats['error_statistics']['error_messages']:
         print(f"  首个错误示例: {stats['error_statistics']['error_messages'][0]['err_msg']}")
 
-def save_statistics(stats: Dict, output_file: str = "analyze/webarena_statistics_gitlab_final_v16_awm_drift.json"):
+def save_statistics(stats: Dict, output_file: str = "analyze/webarena_statistics_admin_awm_v1_drift.json"):
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(stats, f, indent=2, ensure_ascii=False)
