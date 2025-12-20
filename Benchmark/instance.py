@@ -219,7 +219,7 @@ logger = logging.getLogger(__name__)
 AVAILABLE_VERSIONS = ["v1", "v2"] 
 
 # 定义站点名称
-SITE_NAMES = ("GITLAB",)
+SITE_NAMES = ("GITLAB", "SHOPPING_ADMIN", )
 
 class MyBenchmarkInstance:
     """
@@ -279,10 +279,26 @@ class MyBenchmarkInstance:
                 password = self.credentials[site]["password"]
                 
                 # 使用 base_url
-                page.goto(f"{base_url}/users/sign_in") 
+                page.goto(f"{base_url}/users/sign_in", timeout=60000, wait_until='domcontentloaded') 
                 page.get_by_label("Username or email").fill(username)
                 page.locator("#user_password").fill(password)
                 page.get_by_role("button", name="Sign in").click()
+                page.goto(f"{base_url}/?logging=StartingRun1") 
+            
+            case "shopping_admin":
+                username = self.credentials[site]["username"]
+                password = self.credentials[site]["password"]
+                
+                # 使用 base_url
+                page.goto(f"{base_url}", timeout=60000, wait_until='domcontentloaded') 
+                # 1. 修正用户名定位 (虽然 get_by_label 可能行得通，但用 ID #username 最稳)
+                page.locator("#username").fill(username)
+
+                # 2. 修正密码定位 (HTML中 id="login")
+                page.locator("#login").fill(password)
+
+                # 3. 修正按钮定位 (HTML中 value="Login")
+                page.get_by_role("button", name="Login").click()
                 page.goto(f"{base_url}/?logging=StartingRun1") 
 
             # ... (其他站点的登录逻辑同理，只需确保使用 base_url) ...

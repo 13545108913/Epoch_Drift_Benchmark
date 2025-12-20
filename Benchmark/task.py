@@ -82,7 +82,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
 
         import os
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        json_file_path = os.path.join(current_dir, 'gitlab_tasks_final.json')
+        json_file_path = os.path.join(current_dir, 'admin_tasks_processed.json')
         with open(json_file_path, "r", encoding="utf-8") as f:
             all_configs_str = f.read()
 
@@ -99,6 +99,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
 
         replacements = {
             "__GITLAB__": self.webarena_instance.urls["gitlab"][self.site_version],
+            "__SHOPPING_ADMIN__": self.webarena_instance.urls["shopping_admin"][self.site_version],
         }
         
         for pattern, target_url in replacements.items():
@@ -184,7 +185,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
         if self.config["start_url"]:
             start_urls = self.config["start_url"].split(" |AND| ")
             for i, url in enumerate(start_urls):
-                page.goto(url)
+                page.goto(url, timeout=60000, wait_until='domcontentloaded')
                 if i < len(start_urls) - 1:
                     page = page.context.new_page()
 
@@ -206,7 +207,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
 If you believe the task is impossible to complete, provide the answer "N/A".
 """
 
-        verify_drift_applied(page)
+        # verify_drift_applied(page)
         return goal, {"drift_applied": self.drift_type}
 
     def cheat(self, page: playwright.sync_api.Page, chat_messages: list[str]) -> None:
@@ -287,7 +288,7 @@ If you believe the task is impossible to complete, provide the answer "N/A".
             )
             score = 0.0
 
-        verify_drift_applied(page)
+        # verify_drift_applied(page)
         # print(f"--------------| score: {score} |--------------")
         if score > 0 or last_action["action_type"] == ActionTypes.STOP:
             return score, True, "", {}

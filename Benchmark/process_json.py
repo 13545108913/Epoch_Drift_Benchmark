@@ -2,7 +2,7 @@ import json
 
 # 定义输入和输出文件名
 input_file = 'test.raw.json'
-output_file = 'gitlab_tasks_processed_2.json'
+output_file = 'admin_tasks_processed.json'
 
 try:
     # --- 1. 读取原始JSON文件 ---
@@ -17,7 +17,7 @@ try:
     # task.get("sites", []) 是一种安全的写法，防止某个任务万一没有 "sites" 键
     gitlab_tasks = [
         task for task in all_tasks 
-        if task.get("sites", []) == ["gitlab"]
+        if task.get("sites", []) == ["shopping_admin"]
     ]
 
     print(f"已筛选出 {len(gitlab_tasks)} 个 'gitlab' 相关任务。")

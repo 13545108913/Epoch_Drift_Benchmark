@@ -3,10 +3,10 @@ import json
 # --- 配置 ---
 
 # 2. 输入文件（上一步生成的文件）
-INPUT_FILE = 'gitlab_tasks_processed_edit.json'
+INPUT_FILE = 'admin_tasks_processed.json'
 
 # 3. 输出文件（最终的、已清理的文件）
-OUTPUT_FILE = 'gitlab_tasks_final.json'
+OUTPUT_FILE = 'admin_tasks_processed_v1.json'
 
 # --- 脚本开始 ---
 

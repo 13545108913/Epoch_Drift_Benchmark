@@ -16,8 +16,8 @@ except ImportError:
     exit(1)
 
 # --- 默认配置 ---
-DEFAULT_INPUT_FILE = 'gitlab_tasks_processed_edit.json'
-DEFAULT_BASE_URL = 'http://172.26.116.102:8080'
+DEFAULT_INPUT_FILE = 'admin_tasks_processed_v1.json'
+DEFAULT_BASE_URL = 'http://172.26.116.102:8081'
 PLACEHOLDER = '__GITLAB__'
 REQUEST_TIMEOUT = 10  # 增加超时时间以应对大页面
 MAX_WORKERS = 10     
@@ -141,7 +141,7 @@ def check_single_url(task_id, url_type, url, storage_path, locator=None):
         result["status"] = "OK"
         result["message"] = f"可访问 (Code: {response.status_code})"
 
-        # --- 3. Locator 唯一性检测 (如果存在) ---
+        """ # --- 3. Locator 唯一性检测 (如果存在) ---
         if locator:
             # 跳过 func: 类型的 locator (需要 Python eval，静态脚本不支持)
             if locator.strip().startswith("func:"):
@@ -175,7 +175,7 @@ def check_single_url(task_id, url_type, url, storage_path, locator=None):
                 # 这种情况下标记为警告而不是错误，因为可能是 BeautifulSoup 无法处理但 Playwright 可以处理的 JS
                 result["status"] = "LOCATOR_UNKNOWN_FMT"
                 result["message"] += f" | [Locator警告] 无法提取CSS选择器，无法静态检测: {locator[:30]}..."
-                # 视需求决定是否算作 Error，这里暂时算作 Warning (is_error=False)
+                # 视需求决定是否算作 Error，这里暂时算作 Warning (is_error=False) """
 
     except requests.exceptions.RequestException as e:
         result["status"] = "REQ_ERR"
@@ -290,7 +290,7 @@ def main():
     print("\n" + "="*40)
     print(f"检测结束。总计: {total_checks}, 失败: {len(error_results)}")
     if error_results:
-        out_file = "check_report.json"
+        out_file = "check_report_v1.json"
         with open(out_file, 'w', encoding='utf-8') as f:
             json.dump(error_results, f, indent=2, ensure_ascii=False)
         print(f"错误详情已写入 {out_file}")

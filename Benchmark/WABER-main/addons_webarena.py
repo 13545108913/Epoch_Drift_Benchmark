@@ -329,12 +329,14 @@ def response(flow: http.HTTPFlow) -> None:
                 'interception_allowed'] == "True":
             ctx.log.info("addon and interception_allowed are both true")
             if addon == 1:
+                # Check for Content-Type safely
+                c_type = flow.response.headers.get("Content-Type", "")
+                
                 if (env_flags[env]["start_url"].search(flow.request.url)
                         or env_flags[env]["end_url"].search(flow.request.url)
-                        or (frequency > 0
-                            and flow.response.headers.get("Content-Type")
-                            != "text/html; charset=UTF-8") or
-                    (frequency == 2 and 'popup-closed' in flow.request.url)):
+                        # New permissive check: return if it is NOT html
+                        or (frequency > 0 and "text/html" not in c_type) 
+                        or (frequency == 2 and 'popup-closed' in flow.request.url)):
                     return
 
                 if frequency == 0:

@@ -6,6 +6,9 @@ DEEPSEEK_API_KEY = "sk-41fae6597fd14d6fa2c5c4068c0e5760"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_MODEL = "deepseek-chat"
 
+import os
+print(os.cpu_count())
+
 class DeepSeekClient:
     def __init__(self, api_key, base_url, model):
         self.api_key = api_key
