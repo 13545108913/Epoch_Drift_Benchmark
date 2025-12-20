@@ -63,7 +63,7 @@ docker exec gitlab-v13.0 gitlab-ctl reconfigure
 ```
 Account: root
 
-Password: zlxQGkIhkgLcnGpsJyMRjAGdPhKP75k2mscZZJm6b+A=
+Password: a_very_secure_password_123!
 ```
 
 #### 设置环境变量：
@@ -93,7 +93,7 @@ $env:WA_GITLAB_V2="http://localhost:8080"
 ```bash
 BASE_URL="http://172.26.116.102"                                                                                     
 export WA_SHOPPING="$BASE_URL:7770/"
-export WA_SHOPPING_ADMIN="$BASE_URL:7780/admin"
+export WA_SHOPPING_ADMIN="http://dockerized-magento.local/admin"
 export WA_REDDIT="$BASE_URL:9999"
 export WA_GITLAB="$BASE_URL:8080"
 export WA_WIKIPEDIA="$BASE_URL:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
@@ -101,7 +101,7 @@ export WA_MAP="$BASE_URL:3000"
 export WA_HOMEPAGE="$BASE_URL:4399"
 
 export SHOPPING="$BASE_URL:7770/"
-export SHOPPING_ADMIN="$BASE_URL:7780/admin"
+export SHOPPING_ADMIN="http://dockerized-magento.local/admin"
 export REDDIT="$BASE_URL:9999"
 export GITLAB="$BASE_URL:8080"
 export WIKIPEDIA="$BASE_URL:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
@@ -110,9 +110,13 @@ export HOMEPAGE="$BASE_URL:4399"
 
 export WA_GITLAB_V1="$BASE_URL:8080"
 export WA_GITLAB_V2="$BASE_URL:8080"
+export WA_SHOPPING_ADMIN_V1="http://dockerized-magento.local/admin"
+export WA_SHOPPING_ADMIN_V2="http://dockerized-magento.local/admin"
 ```
 
 ### Magento
+
+#### Magento 1.9
 
 ```bash
 echo "127.0.0.1 dockerized-magento.local" | sudo tee -a /etc/hosts
@@ -137,6 +141,36 @@ echo "127.0.0.1 dockerized-magento.local" | sudo tee -a /etc/hosts
 
 phpMyAdmin: http://dockerized-magento.local:8080 (root/pw)
 
+接收者操作步骤：
+```bash
+mkdir my-magento
+tar -xzvf magento-full-backup.tar.gz -C my-magento
+cd my-magento
+
+./magento start
+```
+
+#### Magento 2.4
+
+关闭VPN！！！！！
+
+任务,原生命令,推荐快捷命令
+启动容器,docker compose up -d,bin/start
+停止容器,docker compose stop,bin/stop
+运行 Magento 命令,docker exec -it ... php bin/magento c:f,bin/magento c:f
+运行 Composer,docker exec -it ... composer install,bin/composer install
+进入 PHP 容器,docker exec -it <php_container> bash,bin/bash
+查看日志,docker compose logs -f,bin/logs
+启用/禁用缓存,(Magento 命令),bin/clinotty bin/magento cache:enable
+
+前端地址: https://magento.test/
+
+后台地址: https://magento.test/admin
+
+Username: admin
+
+Password: Password123
+
 ### WordPress
 
 ```bash
@@ -153,26 +187,54 @@ docker-compose up -d --build
 ./drift_manager.sh drift twentytwentyfour
 ```
 
+前台首页: http://localhost:8000
+
+后台管理: http://localhost:8000/wp-admin
+
+用户名 (Username): admin
+
+密码 (Password): password
+
+## WABER设置
+
+### ASI
+
+```bash
+mitmdump -p 8848 -s addons_webarena.py
+```
+
+在`/Users/chenboyu/anaconda3/envs/asi/lib/python3.10/site-packages/browsergym/core/env.py`的236行加上`proxy={"server": "http://127.0.0.1:8848"},`
+
 
 ## 运行方式
 ### ASI
 ```bash
-python run_demo.py --task_name myBenchmark.3 --websites gitlab
-python run_online.py --experiment asi --website gitlab --task_ids 419-419
+python run_demo.py --task_name myBenchmark.9 --websites gitlab
+python run_online.py --website gitlab --task_ids 0-7
+python run_online_parallel.py --website gitlab --task_ids 0-7
+python run_online_parallel.py --website gitlab --task_ids 0-161 --fast
 ```
 
 ### SkillWeaver
 ```bash
 python -m skillweaver.explore gitlab logs/explore-gitlab
 
-python -m skillweaver.evaluation.evaluate_benchmark gitlab results/gitlab_with_skills2 --knowledge-base-path-prefix logs/explore-gitlab/iter_159/kb_post --pool-size 8
+python -m skillweaver.evaluation.evaluate_benchmark gitlab results/gitlab_with_skills_v12_waber_3 --knowledge-base-path-prefix logs/explore-gitlab/iter_159/kb_post --pool-size 1
 
-python -m skillweaver.evaluation.evaluate_single_task --task_id 60 --out_dir results/gitlab_with_skills --knowledge_base_path_prefix logs/explore-gitlab/iter_159/kb_post
+python -m skillweaver.evaluation.evaluate_single_task --task_id 8 --out_dir results/gitlab_with_skills_v12 --knowledge_base_path_prefix logs/explore-gitlab/iter_159/kb_post
 ```
 
 ### MUSE
 ```bash
 python run_myBenchmark_muse.py
+```
+
+### WALT
+
+```bash
+walt discover --url http://172.26.116.102:8080 --llm "deepseek-chat" --planner-llm "deepseek-chat" --max-processes 8 --auth-file /Users/chenboyu/Desktop/Epoch_Drift_Benchmark/Agents/WALT/gitlab_state.json
+
+python src/walt/benchmarks/wa/aeval.py --config experiment_configs/wa_with_tools.yaml --tool_dir walt-tools/gitlab_v12/ --expose_tool_actions
 ```
 
 ## Drift脚本
@@ -400,36 +462,60 @@ git clone 的比对逻辑需要修改
 
 ### v16更改：
 ```
-3, 15, 16, 19, 20, 21, 23, 24, 25, 28, 33, 34, 35, 36, 37, 38, 
+3, 15, 16, 19, 20, 21, 23, 24, 25, 28, 33, 34, 35, 36, 37, 38, 51, 62, 63, 64, 65, 75, 144, 163, 
 
 删除：
-17, 18, 21, 22, 26, 27, 
+17, 18, 21, 22, 26, 27, 43, 66, 71, 76, 77, 78, 113-117, 164
+```
+
+## Magento任务更改：
+### v1.9更改：
+
+```
+2.4也要改: 59, 126
+
+删除: 4, 5, 6, 17, 22, 23, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 45, 46, 61, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 87, 88, 89, 90-94, 101, 112-116, 117-121, 132-135, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175-178, 180, 181
 ```
 
 ### git clone 的command需要修改（不一定为ssh://git@172.26.116.102:2223/eriklindernoren/PyTorch-GAN.git）
 
 ## 运行结果
+### 成功率
 | 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
-|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|
-| ASI         | 22.22%   | 16.05%   | 0.00%    | | | |
-| SkillWeaver | 18.06%   | 15.07%   | 无       | | | |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         | 25.93%   | 18.52%   | 6.79%    | 25.31%    | 22.16%    |
+| ASI         | 30.25%   | 20.99%   | 14.20%    | 34.57%    | 25.31%    |
+| SkillWeaver | 18.06%   | 15.07%   | 12.63%    | 17.90%    | 13.75%    |
+| WALT        | 27.78%   | 19.75%   |  0.00%    | 25.93%    | 23.46%    |
 
+### LLM调用次数
+| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         | 8.59    | 9.17     | 9.90    | 9.59    | 9.80     |
+| ASI         | 7.68    | 8.03     | 9.37    | 9.00    | 9.39     |
+| SkillWeaver | 14.14   | 15.07    | 34.24   | 21.85   | 23.68    |
+| WALT        | 8.69    | 8.90     |  0      | 8.65    | 8.78     |
+
+### Skill调用次数
+| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         | -    | -     | -    | -    | -     |
+| ASI         | 0.210    | 0.302     | 0.451    | 0.284    | 0.247     |
+| SkillWeaver | 0.728   | 0.796    | 0.816   | 0.710   | 1.432     |
+| WALT        | 0.031    | 0.025     |  0      | 0    |  0.025    |
 
 ## 实验框架
 ```
-1.有变化
-程度越大，性能下降越严重，尝试改进prompt，如果无法解决，则直接作为结论
-第二种完全无法处理，可以在prompt中改进，如何让agent处理。在此基础上，将两者结合。
+1.在引入drift和waber后，性能会下降
+1.1 drift程度越大，性能下降越严重。
+1.2 尝试改进prompt，让agent能够适应drift脚本；如果无法通过改进prompt解决，则直接作为结论。
+1.3 有一些agent完全无法处理加入waber后的场景（成功率为0%），可以在prompt中改进，如何让agent处理。在此基础上，将drift与waber两者结合。
 
-2. 利用既有的经验总结比从头开始总结要更好，这方面的欠缺（变化了之后应该怎么办）
-可以比较drift上总结的经验与最初的经验的不同
-经验是否改变，是否有效，是否更高效
-直接在v1drift上训练并测试，记录开销
-比较两者的开销差距，性能变化
+2. 性能变化了之后应该怎么办
+2.1 可以在v1_drift上进行训练（提取技能），记录开销（LLM调用次数，token数），比较drift上总结的经验与最初的经验的不同。比较经验是否改变，是否有效，是否更高效，比较两者的开销差距。
 
-3. cost的视角（额外补充）
-比较LLM与小模型的性能差距（7B），cost与性能
-小模型也是有必要做的，类似的性能，更小的cost
-
-统计每个方法的调用次数
+3. cost的视角
+3.1 目前的Web Agent都是调用的LLM，可以训练一个7B的小模型，比较LLM与小模型的性能差距（7B），cost差距
+3.2 小模型也是有必要做的，能够有类似的性能，更小的cost。
 ```
+
