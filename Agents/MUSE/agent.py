@@ -3,11 +3,20 @@ import os
 import re
 import sys
 import json
+import threading
 import time
 import asyncio
 import tempfile
 import traceback
 import subprocess
+# === [Modification Start] ===
+# 引入 fcntl 用于文件锁 (主要针对 Unix/Linux/macOS)
+# 如果是 Windows 环境，fcntl 会导入失败，这里做了简单的容错处理，或者可以使用 portalocker/filelock 库
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+# === [Modification End] ===
 from pathlib import Path
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -28,7 +37,31 @@ from prompt.reflect_prompt import reflect_check_completion_prompt, reflect_updat
     reflect_analyse_failure__instruction_prompt, reflect_execute_check__instruction_prompt, reflect_action_with_observation_prompt, reflect_plan__instruction_prompt
 from prompt.summarize_prompt import reflect_tool_enhance_prompt, reflect_methodology_enhance_prompt, \
     summarize_success_and_failure_prompt, merge_methodology_prompt, merge_application_prompt
+from usage_recorder import UsageRecorder
 
+def extract_text_from_history(history_list):
+    """
+    安全地从历史记录中提取纯文本，兼容 content 为 string 或 list 的情况
+    """
+    texts = []
+    for m in history_list:
+        content = m.get("content", "")
+        if isinstance(content, str):
+            texts.append(content)
+        elif isinstance(content, list):
+            # 处理列表格式，例如 [{"type": "text", "text": "..."}] 或简单的字符串列表
+            part_text = ""
+            for item in content:
+                if isinstance(item, dict):
+                    part_text += item.get("text", str(item))
+                elif isinstance(item, str):
+                    part_text += item
+                else:
+                    part_text += str(item)
+            texts.append(part_text)
+        else:
+            texts.append(str(content))
+    return "\n".join(texts)
 
 @dataclass
 class ToolCallParseResult:
@@ -66,6 +99,12 @@ class BaseAgent:
         self.history = []
         self.sys_prompt_template = sys_prompt_template
 
+        # 【新增】初始化统计器
+        self.usage_recorder = UsageRecorder(
+            log_file=os.path.join(output_dir, "llm_usage.jsonl"), 
+            model_name=init_model_name
+        )
+
     def render_tool_schema_texts(self) -> str:
         tool_schemas = []
         for tool_name, tool_func in self.tool_registrar.tools.items():
@@ -83,8 +122,20 @@ class BaseAgent:
             output_path = self._get_output_dir() / "history.txt"
             output_path.parent.mkdir(parents=True, exist_ok=True)
             history = pretty_print_trajectory(trajectory, show_full_content=True, print_to_terminal=False)
+            
+            # === [Modification Start] ===
+            # 使用排他锁 (LOCK_EX) 写入文件，防止并行写入冲突
             with output_path.open("w", encoding="utf-8") as f:
-                f.write(history)
+                if fcntl:
+                    try:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                        f.write(history)
+                    finally:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                else:
+                    f.write(history)
+            # === [Modification End] ===
+            
             print(f"✅ History saved to: {output_path}")
         except Exception as e:
             import traceback
@@ -97,11 +148,12 @@ class BaseAgent:
         STATUS_FAILURE_TIMEOUT = "TOOL_FAILURE_TIMEOUT"
         STATUS_FAILURE_EXCEPTION = "TOOL_FAILURE_UNKNOWN_EXCEPTION"
 
-        timeout = 270
+        timeout = 200
         result = {}
         script_path = None
 
         try:
+            # NamedTemporaryFile 生成唯一文件名，理论上并行安全，但如果需要在同一目录并发操作大量文件，需注意文件句柄耗尽问题
             with tempfile.NamedTemporaryFile(mode='w+', suffix='.py', delete=False, dir=work_dir, encoding='utf-8') as f:
                 f.write(code)
                 script_path = f.name
@@ -213,6 +265,14 @@ class BaseAgent:
         Have a single-step conversation with LLM. Both the input prompt and LLM's reply will be saved in the Agent's history.
         """
         ai_response = ""
+        # history 在此时还没有包含当前的 prompt，所以 prompt 就是 input
+        # 注意：如果 self.history 也会被发送给 LLM，计算 input_token 时应该把 history 也加上
+        # 为了简化，这里仅计算本次 Prompt 的消耗，如果需要计算完整的 Context Window，需要拼接 history
+        
+        # 【修改】使用辅助函数安全提取上下文文本
+        history_text = extract_text_from_history(self.history)
+        full_input_context = history_text + "\n" + prompt
+
         async for chunk in self.llm.async_stream_generate(prompt, history=self.history):
             ai_response += chunk
             yield chunk
@@ -220,6 +280,13 @@ class BaseAgent:
             create_message("user", prompt),
             create_message("assistant", ai_response)
         ])
+
+        # 【新增】记录 Token
+        self.usage_recorder.record(
+            prompt=full_input_context, # 或者仅传 prompt，取决于你想统计全量还是增量
+            completion=ai_response,
+            caller_method="_in_context_step"
+        )
 
     @abstractmethod
     async def _run(self, prompt: str) -> AsyncGenerator[str, None]:
@@ -425,12 +492,27 @@ class MUSE(BaseAgent):
             self.memory_manager.trim_traj(working_trajectory, preserve_last=3)
 
             ai_response = ""
+            # 构造完整的输入上下文用于统计 (User Prompt + History + Working Trajectory)
+            # 这是一个估算，具体取决于 LLM 类内部如何拼接 Prompt
+            # 【修改】构造上下文用于统计 (User Prompt + History + Working Trajectory)
+            # 使用辅助函数避免崩溃
+            full_history = self.history + working_trajectory
+            context_text = extract_text_from_history(full_history) + "\n" + cur_prompt
+
             async for chunk in self.llm.async_stream_generate(
                     cur_prompt if actions == 0 else MUSE_action_with_observation__instruction_prompt.format(observation=cur_prompt) + self.language_prompt,
                     history=self.history + working_trajectory, temperature=temperature
             ):
                 yield chunk
                 ai_response += chunk
+            
+            # 【新增】记录 Token
+            # 注意：这里记录的是这一步 ReAct 的消耗
+            self.usage_recorder.record(
+                prompt=context_text,
+                completion=ai_response,
+                caller_method="exec_subtask"
+            )
 
             if not ai_response.strip():
                 yield "[SYSTEM WARNING: LLM response is empty, the ReAct workflow will end.]"
@@ -835,11 +917,22 @@ class MUSE(BaseAgent):
     @staticmethod
     def _load_memory_for_render() -> dict:
         # A helper to load memory just for render_tool_schema_texts, used **before** memory_manager is initialized
+        thread_id = threading.get_ident()
         memory_dir = Path("memory") # Default path, adjust if necessary
-        tool_enhance_path = memory_dir / "tool_memory.json"
+        tool_enhance_path = memory_dir / str(thread_id) /"tool_memory.json"
         try:
+            # === [Modification Start] ===
+            # 使用共享锁 (LOCK_SH) 读取文件，允许其他进程并发读取，但阻止写入
             with open(tool_enhance_path, "r", encoding="utf-8") as f:
-                text = f.read()
+                if fcntl:
+                    try:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+                        text = f.read()
+                    finally:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                else:
+                    text = f.read()
+            # === [Modification End] ===
                 if not text.strip():
                     return {}
                 return json.loads(text)

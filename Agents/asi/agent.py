@@ -4,6 +4,7 @@ import io
 import os
 import openai  # 移除了 litellm，添加了 openai
 import logging
+import json
 
 import numpy as np
 from PIL import Image
@@ -66,6 +67,8 @@ class DemoAgent(Agent):
         websites: tuple[str],
         actions: list[str],
         memory: str,
+        output_dir: str,
+        task_name: str
     ) -> None:
         super().__init__()
         self.model_name = model_name
@@ -73,6 +76,9 @@ class DemoAgent(Agent):
         self.use_html = use_html
         self.use_axtree = use_axtree
         self.use_screenshot = use_screenshot
+        self.task_name = task_name
+        self.output_dir = output_dir
+        os.makedirs(self.output_dir, exist_ok=True)
         
         # 添加：初始化 OpenAI 客户端
         self.client = openai.OpenAI(
@@ -83,7 +89,7 @@ class DemoAgent(Agent):
         if not (use_html or use_axtree):
             raise ValueError(f"Either use_html or use_axtree must be set to True.")
 
-        custom_actions = ACTION_DICT["general"] + ACTION_DICT["webarena"] + ACTION_DICT["gitlab"]
+        custom_actions = ACTION_DICT["general"] + ACTION_DICT["webarena"]
         
 
         self.action_set = CustomActionSet(
@@ -365,6 +371,42 @@ class DemoAgent(Agent):
                 )
                 action = response.choices[0].message.content
                 action = action.replace('```python', '```')
+
+                # === 【新增】记录 Token 使用信息 ===
+                if response.usage:
+                    log_file_path = os.path.join(self.output_dir, f"{self.task_name}.json")
+                    
+                    token_info = {
+                        "step": self.num_actions,
+                        "prompt_tokens": response.usage.prompt_tokens,
+                        "completion_tokens": response.usage.completion_tokens,
+                        "total_tokens": response.usage.total_tokens,
+                        "model": response.model
+                    }
+
+                    try:
+                        # 读取现有数据或创建新列表
+                        if os.path.exists(log_file_path):
+                            with open(log_file_path, 'r', encoding='utf-8') as f:
+                                try:
+                                    data = json.load(f)
+                                    if not isinstance(data, list):
+                                        data = []
+                                except json.JSONDecodeError:
+                                    data = []
+                        else:
+                            data = []
+                        
+                        data.append(token_info)
+
+                        # 写入文件
+                        with open(log_file_path, 'w', encoding='utf-8') as f:
+                            json.dump(data, f, indent=4, ensure_ascii=False)
+                            
+                    except Exception as io_err:
+                        logger.error(f"Failed to write token logs to {log_file_path}: {io_err}")
+  
+                # ========================================
             except Exception as e:
                 logger.error(f"Error calling Deepseek API: {e}")
                 action = ""
@@ -403,6 +445,8 @@ class DemoAgentArgs(AbstractAgentArgs):
     websites: tuple[str] = ()
     actions: list[str] = ()
     memory: str = None
+    output_dir: str = None
+    task_name: str = None
 
     def make_agent(self):
         return DemoAgent(
@@ -415,4 +459,6 @@ class DemoAgentArgs(AbstractAgentArgs):
             websites=self.websites,
             actions=self.actions,
             memory=self.memory,
+            output_dir=self.output_dir,
+            task_name=self.task_name
         )

@@ -1,19 +1,22 @@
 import os
 import json
+import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
-def analyze_webarena_results(result_dir: str = "./results3") -> Dict:
+def analyze_webarena_results(result_dir: str = "./results", llm_info_dir: str = "./llm_info") -> Dict:
     """
-    分析WebArena任务运行结果
+    分析WebArena任务运行结果，包含LLM调用统计
     
     Args:
         result_dir: 结果目录路径
+        llm_info_dir: LLM信息目录路径
         
     Returns:
         包含统计信息的字典
     """
     result_path = Path(result_dir)
+    llm_info_path = Path(llm_info_dir)
     
     if not result_path.exists():
         raise FileNotFoundError(f"结果目录 {result_dir} 不存在")
@@ -32,10 +35,16 @@ def analyze_webarena_results(result_dir: str = "./results3") -> Dict:
     successful_scores = []
     failed_scores = []
     
-    # 错误信息统计 (新增)
-    error_messages = []  # 存储所有非null的错误信息
-    tasks_with_errors = 0  # 有错误的task数量
-    tasks_without_errors = 0  # 没有错误的task数量
+    # LLM调用统计列表 (存储字典)
+    # 结构: {"total": int, "step1": int, "step2": int, "step3": int, "step4": int}
+    all_llm_usage = []
+    successful_llm_usage = []
+    failed_llm_usage = []
+    
+    # 错误信息统计
+    error_messages = []
+    tasks_with_errors = 0
+    tasks_without_errors = 0
     
     # 遍历结果目录
     for task_dir in result_path.iterdir():
@@ -43,11 +52,14 @@ def analyze_webarena_results(result_dir: str = "./results3") -> Dict:
             task_id = task_dir.name.split(".")[1]
                 
             total_tasks += 1
-            # 检查是否存在 deepseek-chat_autoeval.json 文件
-            autoeval_file = task_dir / "deepseek-chat_autoeval.json"
-            summary_file = task_dir / "summary_info.json"
             
-            # 获取步骤数、分数和错误信息
+            # 文件路径
+            autoeval_file = task_dir / "deepseek-chat_autoeval.json"
+            cleaned_steps_file = task_dir / "cleaned_steps.json" # 用于 step3 统计
+            summary_file = task_dir / "summary_info.json"
+            llm_file = llm_info_path / f"{task_id}.json" # LLM info 文件
+            
+            # 1. 获取步骤数、分数和错误信息
             n_steps = None
             score = None
             err_msg = None
@@ -56,105 +68,131 @@ def analyze_webarena_results(result_dir: str = "./results3") -> Dict:
                 try:
                     with open(summary_file, 'r', encoding='utf-8') as f:
                         summary_data = json.load(f)
-                        
-                        # 提取 Steps
                         n_steps = summary_data.get("n_steps")
                         if n_steps is not None:
                             all_steps.append(n_steps)
                             
-                        # 提取 Score
                         raw_score = summary_data.get("cum_reward")
                         if raw_score is not None:
                             try:
-                                score = float(raw_score) # 确保转换为数字
+                                score = float(raw_score)
                                 all_scores.append(score)
                             except (ValueError, TypeError):
-                                print(f"警告: 任务 {task_id} 的 score 格式不正确: {raw_score}")
                                 score = None
 
-                        # 提取错误信息 (新增)
                         err_msg = summary_data.get("err_msg")
                         if err_msg is not None:
-                            # err_msg不为null，表示有错误
                             tasks_with_errors += 1
-                            error_messages.append({
-                                "task_id": task_id,
-                                "err_msg": err_msg
-                            })
+                            error_messages.append({"task_id": task_id, "err_msg": err_msg})
                         else:
-                            # err_msg为null，表示没有错误
                             tasks_without_errors += 1
-
-                except (json.JSONDecodeError, KeyError) as e:
-                    print(f"警告: 无法读取 {summary_file}: {e}")
+                except (json.JSONDecodeError, KeyError):
+                    pass
             
-            # 检查任务是否成功
+            # 2. 获取 LLM 调用信息并应用逻辑
+            llm_data = None
+            if llm_file.exists():
+                try:
+                    with open(llm_file, 'r', encoding='utf-8') as f:
+                        llm_json = json.load(f)
+                        result_str = llm_json.get("result", "")
+                        # 解析字符串: "Task [0]: Total 2 (step1_solve: 2, step2_eval: 0, step3_cal: 0, step4_induce: 0)"
+                        # 使用正则提取
+                        match = re.search(r"step1_solve:\s*(\d+).*?step2_eval:\s*(\d+).*?step3_cal:\s*(\d+).*?step4_induce:\s*(\d+)", result_str)
+                        
+                        if match:
+                            s1 = int(match.group(1))
+                            s2 = int(match.group(2))
+                            s3 = int(match.group(3))
+                            s4 = int(match.group(4))
+                            
+                            # --- 应用自定义统计逻辑 ---
+                            # 如果存在 deepseek-chat_autoeval.json，则 step2_eval + 1
+                            if autoeval_file.exists():
+                                s2 += 1
+                            
+                            # 如果存在 cleaned_steps.json，则 step3_cal + 1
+                            if cleaned_steps_file.exists():
+                                s3 += 1
+                            
+                            # 重新计算 Total
+                            total_calls = s1 + s2 + s3 + s4
+                            
+                            llm_data = {
+                                "total": total_calls,
+                                "step1_solve": s1,
+                                "step2_eval": s2,
+                                "step3_cal": s3,
+                                "step4_induce": s4
+                            }
+                            all_llm_usage.append(llm_data)
+                except Exception as e:
+                    print(f"警告: 读取LLM文件 {llm_file} 失败: {e}")
+
+            # 3. 检查任务是否成功并分类数据
             task_success = False
             if autoeval_file.exists():
                 try:
                     with open(autoeval_file, 'r', encoding='utf-8') as f:
                         autoeval_data = json.load(f)
-                        # 注意：具体结构可能是一个列表或字典，根据你之前的代码假设是一个列表
                         item = autoeval_data[0] if isinstance(autoeval_data, list) and len(autoeval_data) > 0 else {}
                         rm_value = item.get("rm") if isinstance(item, dict) else None
                         
                         if rm_value is True:
                             task_success = True
                             successful_tasks += 1
-                            # 记录成功任务的数据
-                            if n_steps is not None:
-                                successful_steps.append(n_steps)
-                            if score is not None:
-                                successful_scores.append(score)
+                            if n_steps is not None: successful_steps.append(n_steps)
+                            if score is not None: successful_scores.append(score)
+                            if llm_data is not None: successful_llm_usage.append(llm_data)
                         else:
-                            # 记录失败任务的数据
-                            if n_steps is not None:
-                                failed_steps.append(n_steps)
-                            if score is not None:
-                                failed_scores.append(score)
-                except (json.JSONDecodeError, KeyError, IndexError) as e:
-                    print(f"警告: 无法读取 {autoeval_file}: {e}")
-                    # 读取autoeval失败通常视为任务判断逻辑出错，这里按原逻辑归为失败处理
-                    if n_steps is not None:
-                        failed_steps.append(n_steps)
-                    if score is not None:
-                        failed_scores.append(score)
+                            if n_steps is not None: failed_steps.append(n_steps)
+                            if score is not None: failed_scores.append(score)
+                            if llm_data is not None: failed_llm_usage.append(llm_data)
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    if n_steps is not None: failed_steps.append(n_steps)
+                    if score is not None: failed_scores.append(score)
+                    if llm_data is not None: failed_llm_usage.append(llm_data)
             else:
-                # 没有 autoeval 文件，任务失败
-                if n_steps is not None:
-                    failed_steps.append(n_steps)
-                if score is not None:
-                    failed_scores.append(score)
+                if n_steps is not None: failed_steps.append(n_steps)
+                if score is not None: failed_scores.append(score)
+                if llm_data is not None: failed_llm_usage.append(llm_data)
     
     # 计算统计信息
     success_rate = successful_tasks / total_tasks if total_tasks > 0 else 0
-    
-    # 错误信息统计计算 (新增)
     total_err_tasks = tasks_with_errors + tasks_without_errors
     error_rate = tasks_with_errors / total_err_tasks if total_err_tasks > 0 else 0
     
-    # 通用统计函数 (用于步骤和分数)
+    # 通用基础统计函数
     def calculate_basic_stats(data_list: List[float]) -> Dict:
         if not data_list:
             return {"count": 0, "mean": 0, "median": 0, "min": 0, "max": 0}
-        
         sorted_data = sorted(data_list)
         n = len(data_list)
         return {
             "count": n,
-            "mean": sum(data_list) / n,
+            "mean": round(sum(data_list) / n, 4),
             "median": sorted_data[n // 2] if n % 2 == 1 else (sorted_data[n // 2 - 1] + sorted_data[n // 2]) / 2,
             "min": min(data_list),
             "max": max(data_list)
         }
     
-    # 返回统计结果
+    # LLM 专用统计函数 (处理字典列表)
+    def calculate_llm_stats(usage_list: List[Dict]) -> Dict:
+        if not usage_list:
+            return {}
+        
+        keys = ["total", "step1_solve", "step2_eval", "step3_cal", "step4_induce"]
+        stats = {}
+        for key in keys:
+            values = [d[key] for d in usage_list]
+            stats[key] = calculate_basic_stats(values)
+        return stats
+
     return {
         "overall": {
             "total_tasks": total_tasks,
             "successful_tasks": successful_tasks,
             "success_rate": round(success_rate * 100, 2),
-            "success_rate_decimal": round(success_rate, 4)
         },
         "step_statistics": {
             "all_tasks": calculate_basic_stats(all_steps),
@@ -166,21 +204,16 @@ def analyze_webarena_results(result_dir: str = "./results3") -> Dict:
             "successful_tasks": calculate_basic_stats(successful_scores),
             "failed_tasks": calculate_basic_stats(failed_scores)
         },
-        # 新增错误信息统计
+        # 新增 LLM 统计
+        "llm_statistics": {
+            "all_tasks": calculate_llm_stats(all_llm_usage),
+            "successful_tasks": calculate_llm_stats(successful_llm_usage),
+            "failed_tasks": calculate_llm_stats(failed_llm_usage)
+        },
         "error_statistics": {
             "tasks_with_errors": tasks_with_errors,
-            "tasks_without_errors": tasks_without_errors,
-            "total_tasks_with_err_info": total_err_tasks,
             "error_rate": round(error_rate * 100, 2),
-            "error_rate_decimal": round(error_rate, 4),
-            "error_messages": error_messages  # 包含所有错误信息的列表
-        },
-        "detailed_counts": {
-            "tasks_with_steps": len(all_steps),
-            "tasks_with_scores": len(all_scores),
-            "tasks_with_err_info": total_err_tasks,  # 新增
-            "successful_with_steps": len(successful_steps),
-            "failed_with_steps": len(failed_steps)
+            "error_messages": error_messages
         }
     }
 
@@ -191,56 +224,46 @@ def print_statistics(stats: Dict):
     print("=" * 60)
     
     overall = stats["overall"]
-    step_stats = stats["step_statistics"]
-    score_stats = stats["score_statistics"]
-    error_stats = stats["error_statistics"]  # 新增
-    
     print(f"\n总体统计:")
     print(f"  总任务数: {overall['total_tasks']}")
     print(f"  成功任务数: {overall['successful_tasks']}")
     print(f"  成功率: {overall['success_rate']}%")
     
-    # --- 辅助打印函数 ---
     def print_sub_stats(title, sub_stats):
         print(f"\n{title}:")
-        print(f"  记录数量: {sub_stats['count']}")
-        if sub_stats['count'] > 0:
-            print(f"  平均值: {sub_stats['mean']:.2f}")
-            print(f"  中位数: {sub_stats['median']:.2f}")
-            print(f"  最小值: {sub_stats['min']}")
-            print(f"  最大值: {sub_stats['max']}")
+        if not sub_stats or sub_stats['count'] == 0:
+            print("  无数据")
+            return
+        print(f"  数量: {sub_stats['count']} | 均值: {sub_stats['mean']} | 中位数: {sub_stats['median']} | Min/Max: {sub_stats['min']}/{sub_stats['max']}")
 
-    # --- 步骤统计 ---
+    # 步骤和分数
     print("\n" + "-"*20 + " 步骤数统计 (Steps) " + "-"*20)
-    print_sub_stats("所有任务步骤", step_stats["all_tasks"])
-    print_sub_stats("成功任务步骤", step_stats["successful_tasks"])
-    print_sub_stats("失败任务步骤", step_stats["failed_tasks"])
-
-    # --- 分数统计 ---
-    print("\n" + "-"*20 + " 分数统计 (Score) " + "-"*20)
-    print_sub_stats("所有任务分数", score_stats["all_tasks"])
-    print_sub_stats("成功任务分数", score_stats["successful_tasks"])
-    print_sub_stats("失败任务分数", score_stats["failed_tasks"])
-
-    # --- 错误信息统计 (新增) ---
-    print("\n" + "-"*20 + " 错误信息统计 (Error Messages) " + "-"*20)
-    print(f"  有错误的任务数: {error_stats['tasks_with_errors']}")
-    print(f"  无错误的任务数: {error_stats['tasks_without_errors']}")
-    print(f"  有错误信息记录的任务总数: {error_stats['total_tasks_with_err_info']}")
-    print(f"  错误率: {error_stats['error_rate']}%")
+    print_sub_stats("所有任务", stats["step_statistics"]["all_tasks"])
+    print_sub_stats("成功任务", stats["step_statistics"]["successful_tasks"])
     
-    # 打印具体的错误信息
-    if error_stats['error_messages']:
-        print(f"\n  具体错误信息:")
-        for i, error in enumerate(error_stats['error_messages'][:10], 1):  # 只显示前10个错误
-            print(f"    {i}. 任务 {error['task_id']}: {error['err_msg']}")
-        if len(error_stats['error_messages']) > 10:
-            print(f"    ... 还有 {len(error_stats['error_messages']) - 10} 个错误信息")
-    else:
-        print(f"\n  无错误信息")
+    print("\n" + "-"*20 + " 分数统计 (Score) " + "-"*20)
+    print_sub_stats("所有任务", stats["score_statistics"]["all_tasks"])
 
-def save_statistics(stats: Dict, output_file: str = "webarena_statistics_gitlab_2.json"):
-    """保存统计结果到JSON文件"""
+    # --- LLM 调用统计 (新增) ---
+    print("\n" + "-"*20 + " LLM 调用次数统计 " + "-"*20)
+    llm_stats = stats["llm_statistics"]["all_tasks"]
+    if llm_stats:
+        print(f"  统计样本数: {llm_stats['total']['count']}")
+        print(f"  [Total] 平均: {llm_stats['total']['mean']} (Max: {llm_stats['total']['max']})")
+        print(f"  [Step1 Solve]  平均: {llm_stats['step1_solve']['mean']}")
+        print(f"  [Step2 Eval]   平均: {llm_stats['step2_eval']['mean']} (包含自动修正)")
+        print(f"  [Step3 Cal]    平均: {llm_stats['step3_cal']['mean']} (包含自动修正)")
+        print(f"  [Step4 Induce] 平均: {llm_stats['step4_induce']['mean']}")
+    else:
+        print("  无 LLM 统计数据")
+
+    # 错误信息
+    print("\n" + "-"*20 + " 错误统计 " + "-"*20)
+    print(f"  错误率: {stats['error_statistics']['error_rate']}%")
+    if stats['error_statistics']['error_messages']:
+        print(f"  首个错误示例: {stats['error_statistics']['error_messages'][0]['err_msg']}")
+
+def save_statistics(stats: Dict, output_file: str = "analyze/webarena_statistics_gitlab_final_v16_awm_drift.json"):
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(stats, f, indent=2, ensure_ascii=False)
@@ -249,19 +272,14 @@ def save_statistics(stats: Dict, output_file: str = "webarena_statistics_gitlab_
         print(f"保存统计结果时出错: {e}")
 
 def main():
-    """主函数"""
-    # 分析结果
     print("正在分析WebArena运行结果...")
+    # 假设 llm_info 文件夹在当前目录下，如果位置不同请修改此处
     try:
         stats = analyze_webarena_results()
-        # 打印统计结果
         print_statistics(stats)
-        # 保存统计结果
         save_statistics(stats)
-    except FileNotFoundError as e:
-        print(f"错误: {e}")
     except Exception as e:
-        print(f"运行时发生未预期的错误: {e}")
+        print(f"错误: {e}")
 
 if __name__ == "__main__":
     main()

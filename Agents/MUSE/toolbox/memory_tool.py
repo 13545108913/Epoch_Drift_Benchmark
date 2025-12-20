@@ -1,10 +1,12 @@
 import json
+import threading
 import traceback
 from pathlib import Path
 from typing import List, Dict, Optional, Union
 
 memory_dir = "memory"
-path = Path(memory_dir) / "procedural_memory.json"
+thread_id = threading.get_ident()
+path = Path(memory_dir) / str(thread_id) /"procedural_memory.json"
 application_guide: Dict[str, Dict[str, str]] = {}
 
 def _update_application_guide() -> None:

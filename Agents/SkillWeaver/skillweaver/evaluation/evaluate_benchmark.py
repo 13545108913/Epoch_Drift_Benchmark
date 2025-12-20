@@ -140,8 +140,9 @@ def evaluate_benchmark(
     elif set_name == "myBenchmark":
         test_cases = load_test_cases_myBenchmark()
 
+    selected_tasks = list(range(68, 162))
     if selected_tasks is not None and selected_tasks != "reduced_set":
-        task_ids = [int(x) for x in selected_tasks.split(",")]
+        task_ids = [int(x) for x in selected_tasks]
         test_cases = [tc for tc in test_cases if tc["task_id"] in task_ids]
 
     out_dir = os.path.join(out_dir, site)

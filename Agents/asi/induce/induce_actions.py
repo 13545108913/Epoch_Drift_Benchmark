@@ -11,6 +11,20 @@ from induce.utils import (
     extract_code_pieces, get_task_id, get_result_dirs,
     get_output_dir
 )
+import logging  # <--- 新增
+import sys      # <--- 新增
+
+# === 【新增】配置日志，确保 HTTP 请求信息能被打印出来 ===
+# 只有配置了 logging，openai/httpx 才会输出 "HTTP Request: POST ..."
+logging.basicConfig(
+    format='%(asctime)s - %(process)d - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    level=logging.INFO,  # 必须是 INFO 级别
+    stream=sys.stderr    # 输出到 stderr，主脚本会捕获这个流
+)
+# 强制设置 httpx 的日志级别，防止被其他库屏蔽
+logging.getLogger("httpx").setLevel(logging.INFO) 
+# ========================================================
 
 DEEPSEEK_API_KEY = "sk-41fae6597fd14d6fa2c5c4068c0e5760"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
@@ -227,22 +241,24 @@ def write_tests(response: str, result_id_list: list[str], action_names: list[str
     with open(test_script_path, 'w') as fw:
         fw.write('\n'.join(script_content))
     
-    # run all tests
-    process = subprocess.Popen(["bash", test_script_path])
+    # === 【修改】优化子进程调用，确保孙子进程的日志能实时传给主脚本 ===
+    # 使用 sys.stdout/stderr 作为输出目标，确保流式透传
+    print(f"Running tests via {test_script_path} ...")
+    process = subprocess.Popen(
+        ["bash", test_script_path],
+        stdout=sys.stdout, # 显式指向标准输出
+        stderr=sys.stderr  # 显式指向标准错误 (log在这里)
+    )
+    
     try:
-        stdout, stderr = process.communicate(timeout=500)
-        print(stdout)
-    except subprocess.TimeoutExpired as e:
+        # 等待结束，而不是用 communicate() 缓冲所有输出
+        process.wait(timeout=500) 
+    except subprocess.TimeoutExpired:
         process.kill()
-        stdout, stderr = process.communicate() # Clean up resources
-        print(f"Process timed out after {e.timeout} seconds.")
-        print(stderr)
+        process.wait()
+        print(f"Process timed out after 500 seconds.")
         return True  # revert
-    # try:
-    #     process = subprocess.Popen(["bash", test_script_path])
-    #     process.wait()
-    # except Exception as e:
-    #     print(e)
+    # =================================================================
 
     # check test results
     scores = []

@@ -3,6 +3,7 @@ import argparse
 import shutil
 import sys
 import time
+import requests
 
 # locally defined agent
 from agent import DemoAgentArgs
@@ -17,7 +18,7 @@ import os
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
-from Epoch_Drift_Benchmark.init import register_myBenchmark
+from Benchmark.init import register_myBenchmark
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -138,6 +139,8 @@ https://github.com/ServiceNow/AgentLab"""
         websites=args.websites,
         actions=tuple(actions),
         memory=args.memory_path,
+        output_dir="llm_info/",
+        task_name=args.task_name
     )
     
     patch_with_custom_exec(agent_args)
@@ -178,6 +181,25 @@ https://github.com/ServiceNow/AgentLab"""
         # os.rename(exp_args.exp_dir, f"results/{args.rename_to}")
         os.replace(exp_args.exp_dir, f"results/{args.rename_to}")
 
+    # --- 新增代码开始：发送停止干扰信号 ---
+    # stop_url = "http://172.26.116.102:8080/?logging=EndingMyTest"
+    
+    # # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
+    # # 这样 addon 脚本才能捕获到这个请求并重置状态
+    # mitm_proxy = "http://127.0.0.1:8848" 
+    # proxies = {
+    #     "http": mitm_proxy,
+    #     "https": mitm_proxy,
+    # }
+
+    # try:
+    #     # 发送请求，设置超时防止卡死
+    #     response = requests.get(stop_url, proxies=proxies, timeout=5)
+    # except requests.exceptions.ProxyError:
+    #     print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
+    # except Exception as e:
+    #     print(f"Failed to send stop signal: {e}")
+    # --- 新增代码结束 ---
 
 if __name__ == "__main__":
     main()

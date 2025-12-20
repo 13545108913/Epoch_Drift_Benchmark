@@ -16,6 +16,7 @@ from typing_extensions import TypedDict
 # 保持原有的 SkillWeaver 引用
 from skillweaver.environment import State
 from skillweaver.evaluation.webarena_config import _resolve_start_url
+from skillweaver.util.perfmon import monitor
 from skillweaver.evaluation.webarena_helper_functions import (
     PseudoPage, 
     # 下面这些辅助函数在 LLM 版中可能用不到，但为了兼容性保留
@@ -71,6 +72,11 @@ class LLMJudge:
             )
             content = response.choices[0].message.content
             result_json = json.loads(content)
+
+            cmpl_tokens = response.usage.completion_tokens  # type: ignore
+            prompt_tokens = response.usage.prompt_tokens  # type: ignore
+
+            monitor.log_token_usage("general", "openai:" + DEEPSEEK_MODEL, prompt_tokens, cmpl_tokens)
             
             # Normalize keys just in case
             success = result_json.get("success", result_json.get("correct", False))

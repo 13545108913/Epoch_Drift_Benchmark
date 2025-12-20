@@ -1,0 +1,77 @@
+# PolySkill Configuration for Self-Proposing Exploration
+# This config enables autonomous task proposal and skill learning
+
+skill_induction:
+  enabled: true
+  judge_method: webjudge_general
+  use_screenshots: true
+  storage_path: ./results/self_proposing_skills/
+
+  # Polymorphic skill settings
+  use_polymorphism: true
+  abstract_class_induction: true
+  composition_enabled: true
+
+  # Self-proposing specific settings
+  self_proposing:
+    enabled: true
+    max_iterations: 150
+    exploration_strategy: structured  # Use polymorphic hierarchy to guide exploration
+    task_complexity_schedule: gradual  # Start simple, gradually increase complexity
+
+  # Learning frequency
+  update_frequency: 1  # Learn after every successful task
+
+  formats:
+    - code  # Primary format for polymorphic skills
+
+# Model Configuration
+model_configs:
+  gpt4:
+    provider: openai
+    name: gpt-4.1
+    temperature: 0.3  # Higher temperature for exploration
+
+  claude:
+    provider: anthropic
+    name: claude-3.7-sonnet
+    temperature: 0.3
+
+# Exploration Domains
+exploration_domains:
+  shopping:
+    websites:
+      - webarena_shopping
+      - amazon
+      - target
+    abstract_class: AbstractShoppingSite
+
+  dev_tools:
+    websites:
+      - github
+      - gitlab
+    abstract_class: AbstractDevPlatform
+
+  mixed:
+    # Agent chooses which domain to explore
+    allow_domain_switching: true
+
+# Agent Configuration
+agents:
+  explorer:
+    name: hsm_v3_explorer
+    model_config_name: gpt4
+    max_actions_per_step: 5
+
+    # Task proposal settings
+    task_proposer:
+      enabled: true
+      use_abstract_classes: true  # Propose tasks based on abstract skills
+      novelty_bonus: 0.2  # Encourage exploring new functionality
+
+# Runner Settings
+runner:
+  threads: 1  # Sequential execution for online learning
+  timeout_per_task: 300  # 5 minutes per proposed task
+  save_trajectories: true
+  result_dir: ./results/self_proposing/

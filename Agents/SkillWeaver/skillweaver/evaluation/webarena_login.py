@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import uuid
+import requests
 
 from skillweaver.evaluation.webarena_config import ACCOUNTS
 from skillweaver.environment import make_browser
@@ -21,6 +22,27 @@ SHOPPING_ADMIN = "ec2-18-118-35-60.us-east-2.compute.amazonaws.com:7780/admin"
 # example `comb``: {"shopping": "127.0.0.1:8003"}
 async def webarena_renew_comb(comb: dict[str, str], path: str):
     comb = {k: v[7:] if v.startswith("http://") else v for k, v in comb.items()}
+
+    # --- 新增代码开始：发送停止干扰信号 ---
+    stop_url = "http://172.26.116.102:8080/?logging=EndingMyTest"
+    
+    # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
+    # 这样 addon 脚本才能捕获到这个请求并重置状态
+    mitm_proxy = "http://127.0.0.1:8848" 
+    proxies = {
+        "http": mitm_proxy,
+        "https": mitm_proxy,
+    }
+
+    try:
+        # 发送请求，设置超时防止卡死
+        response = requests.get(stop_url, proxies=proxies, timeout=5)
+        print(f"OK: Connect to {stop_url}")
+    except requests.exceptions.ProxyError:
+        print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
+    except Exception as e:
+        print(f"Failed to send stop signal: {e}")
+    # --- 新增代码结束 ---
 
     # Returns the filename.
     async with async_playwright() as p:

@@ -8,13 +8,13 @@ BASE_URL = "http://172.26.116.102"
 SHOPPING = f"{BASE_URL}:7770"
 SHOPPING_ADMIN = f"{BASE_URL}:7780/admin"
 REDDIT = f"{BASE_URL}:9999"
-GITLAB = f"{BASE_URL}:8080"
+GITLAB = f"{BASE_URL}:8081"
 MAP = f"{BASE_URL}:3000"
 WIKIPEDIA = f"{BASE_URL}:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
 
 
 def main() -> None:
-    with open("./gitlab_tasks_final.json", "r") as f:
+    with open("./gitlab_tasks_final_v16.json", "r") as f:
         raw = f.read()
     raw = raw.replace("__GITLAB__", GITLAB)
     raw = raw.replace("__REDDIT__", REDDIT)

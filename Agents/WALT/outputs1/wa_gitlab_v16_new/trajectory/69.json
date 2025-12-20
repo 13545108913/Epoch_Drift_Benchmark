@@ -1,0 +1,1870 @@
+{
+    "task_prompt": "Set my gitlab status as Playing Badminton.",
+    "is_successful": true,
+    "steps": {
+        "1": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Set my gitlab status as Playing Badminton.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "[Your task history memory starts here]",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/users/sign_in\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/users/sign_in', title='Sign in \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\n[0]<img />\nGitLab Community Edition\n[1]<div tabpanel>1W-dviJCdKUM5Ql7uYKN2RW2tdqUIH86ml709w_6iOw3lftmjZDuw5J_hMDRg62hMXMCn6cnGXh8jjl0PJYZ5w\nThis field is required.\nThis field is required.\nThis field is required.\nThis field is required.\n0\n1/>\n[2]<label Username or email/>\n[3]<input user[login];This field is required.;text>Username or email/>\n[4]<label Password/>\n[5]<input ;password;user[password]>Password/>\n[6]<button Show password/>\n[7]<label Remember me/>\n[8]<a Forgot your password?/>\n[9]<button submit>Sign in/>\nDon't have an account yet?\n[10]<a Register now/>\n[11]<a Explore/>\n[12]<a Help/>\n[13]<a About GitLab/>\n[14]<a Community forum/>\n[15]<button English/>\n... 37 pixels below - scroll or extract content to see more ...\nCurrent step: 1/20Current date and time: 2025-12-06 18:24\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 3422,
+                "cumulative_input_token_count": 3422
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 5941,
+                    "prompt_tokens_cached": 5376,
+                    "completion_tokens": 203,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 6144,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Unknown - Just starting the task. Need to log in first to access GitLab and set status",
+                                    "memory": "Starting task to set GitLab status as 'Playing Badminton'. Need to log in first using provided credentials: username: 'byteblaze', password: 'a_very_secure_password_123!'. Step 1/20",
+                                    "next_goal": "Log in to GitLab using the provided credentials"
+                                },
+                                "action": [
+                                    {
+                                        "input_text": {
+                                            "index": 3,
+                                            "text": "byteblaze"
+                                        }
+                                    },
+                                    {
+                                        "input_text": {
+                                            "index": 5,
+                                            "text": "a_very_secure_password_123!"
+                                        }
+                                    },
+                                    {
+                                        "click_element": {
+                                            "index": 9
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "2",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "2",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 209
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 9: Sign in",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null,
+                    null,
+                    null
+                ]
+            }
+        },
+        "2": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Set my gitlab status as Playing Badminton.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task. Need to log in first to access GitLab and set status",
+                                        "memory": "Starting task to set GitLab status as 'Playing Badminton'. Need to log in first using provided credentials: username: 'byteblaze', password: 'a_very_secure_password_123!'. Step 1/20",
+                                        "next_goal": "Log in to GitLab using the provided credentials"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "byteblaze"
+                                            }
+                                        },
+                                        {
+                                            "input_text": {
+                                                "index": 5,
+                                                "text": "a_very_secure_password_123!"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 9: Sign in",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/', title='Projects \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\nSkip to content\nGitLab\n[0]<a Homepage/>\n[1]<a false;button/>\n[2]<input search;Search GitLab;text/>\n/\n[3]<a Create new.../>\n[4]<a Issues>13/>\n[5]<a Merge requests>0/>\n[6]<a To-Do List>11/>\n[7]<a Help/>\n[8]<a />\n[9]<img />\n[10]<a Your work/>\n[11]<a Projects/>\n[12]<a Groups/>\n[13]<a Issues>Issues\n13/>\n[14]<a Merge requests/>\n[15]<a To-Do List>To-Do List\n11/>\n[16]<a Milestones/>\n[17]<a Snippets/>\n[18]<a Activity/>\n[19]<a button;Toggle sidebar>Collapse sidebar/>\n[20]<a Your work/>\n[21]<a Projects/>\nProjects\n[22]<a Explore projects/>\n[23]<a New project/>\n[24]<a Yours\n17/>\n[25]<a Starred\n3/>\n[26]<input name;search;Filter by name/>\n[27]<button Language/>\n[28]<button Most stars/>\n[29]<a All/>\n[30]<a Personal/>\n[31]<a A/>\n[32]<a The A11Y Project\n/\na11yproject.com/>\nMaintainer\nThe A11Y Project is a community-driven effort to make digital accessibility easier.\n[33]<a Pipeline: failed/>\n[34]<a Stars>22/>\n[35]<a Forks>0/>\n[36]<a Merge requests>3/>\n[37]<a Issues>41/>\nUpdated\n14 minutes ago\n[38]<a D/>\n[39]<a Primer\n/\ndesign/>\nDeveloper\nPrimer Design Guidelines\n[40]<a Pipeline: failed/>\n[41]<a Stars>21/>\n[42]<a Forks>0/>\n[43]<a Merge requests>145/>\n[44]<a Issues>21/>\nUpdated\n16 minutes ago\n[45]<a E/>\n[46]<a Byte Blaze\n/\nempathy-prompts/>\nMaintainer\n\ud83d\udca1\nIdeas to help consider Inclusive Design principles when making things for others to use.\n[47]<a Stars>7/>\n[48]<a Forks>0/>\n[49]<a Merge requests>0/>\n[50]<a Issues>8/>\nUpdated\n2 weeks ago\n[51]<a M/>\n[52]<a Byte Blaze\n/\nmillennials-to-snake-people/>\nMaintainer\n\ud83d\udc0d\nChrome extension that replaces occurrences of 'Millennials' with 'Snake People'\n[53]<a Pipeline: failed/>\n[54]<a Stars>6/>\n[55]<a Forks>0/>\n[56]<a Merge requests>17/>\n[57]<a Issues>4/>\nUpdated\n6 days ago\n[58]<a E/>\n[59]<a Byte Blaze\n/\nericwbailey.website/>\nMaintainer\n\ud83d\udcd0\nRepo for my personal website.\n[60]<a Pipeline: failed/>\n[61]<a Stars>2/>\n[62]<a Forks>0/>\n[63]<a Merge requests>0/>\n[64]<a Issues>0/>\nUpdated\n2 weeks ago\n[65]<a A/>\n[66]<a Byte Blaze\n/\na11y-webring.club/>\nMaintainer\n\ud83c\udf10\nA webring for digital accessibility practitioners.\n[67]<a Pipeline: failed/>\n[68]<a Stars>2/>\n[69]<a Forks>0/>\n[70]<a Merge requests>67/>\n[71]<a Issues>4/>\nUpdated\n2 weeks ago\n[72]<a A/>\n[73]<a Byte Blaze\n/\na11y-syntax-highlighting/>\nMaintainer\n\ud83d\udc84\nAccessible light and dark syntax highlighting themes\n[74]<a Pipeline: failed/>\n[75]<a Stars>1/>\n[76]<a Forks>0/>\n[77]<a Merge requests>3/>\n[78]<a Issues>2/>\nUpdated\n9 minutes ago\n[79]<a />\n[80]<img />\n[81]<a Byte Blaze\n/\naccessible-html-content-patterns/>\nMaintainer\n\u267f\n\ufe0f The full HTML5 Doctor Element Index as well as common markup patterns for quick reference.\n[82]<a Pipeline: failed/>\n[83]<a Stars>1/>\n[84]<a Forks>0/>\n[85]<a Merge requests>9/>\n[86]<a Issues>0/>\nUpdated\n10 minutes ago\n[87]<a T/>\n[88]<a Byte Blaze\n/\ntimeit/>\nMaintainer\nRails implementation of time tracking tool timeit\n[89]<a Pipeline: failed/>\n[90]<a Stars>0/>\n[91]<a Forks>0/>\n[92]<a Merge requests>0/>\n[93]<a Issues>0/>\nUpdated\n6 days ago\n[94]<a C/>\n[95]<a Byte Blaze\n/\nChatgpt/>\nOwner\n[96]<a Stars>0/>\n[97]<a Forks>0/>\n[98]<a Merge requests>0/>\n[99]<a Issues>0/>\nUpdated\n7 minutes ago\n[100]<a R/>\n[101]<a Byte Blaze\n/\nremove-board-movement-events-from-the-github-issue-timeline/>\nMaintainer\nThis extension can remove and restore the presence of timeline items generated by a project board event from GitHub's timeline.\n[102]<a Stars>0/>\n[103]<a Forks>0/>\n[104]<a Merge requests>0/>\n[105]<a Issues>0/>\nUpdated\n2 weeks ago\n[106]<a G/>\n[107]<a Byte Blaze\n/\ngimmiethat.space/>\nMaintainer\nI need some space.\n[108]<a Pipeline: failed/>\n[109]<a Stars>0/>\n[110]<a Forks>0/>\n[111]<a Merge requests>0/>\n[112]<a Issues>0/>\nUpdated\n1 week ago\n[113]<a D/>\n[114]<a Byte Blaze\n/\ndotfiles/>\nMaintainer\n\ud83e\udd16\nComputer setup\n[115]<a Stars>0/>\n[116]<a Forks>0/>\n[117]<a Merge requests>0/>\n[118]<a Issues>3/>\nUpdated\n1 week ago\n[119]<a S/>\n[120]<a Byte Blaze\n/\nsolarized-prism-theme/>\nMaintainer\nsolarized theme for prism.js\n[121]<a Pipeline: failed/>\n[122]<a Stars>0/>\n[123]<a Forks>0/>\n[124]<a Merge requests>0/>\n[125]<a Issues>1/>\nUpdated\n1 week ago\n[126]<a />\n[127]<img />\n[128]<a Byte Blaze\n/\ncloud-to-butt/>\nMaintainer\nChrome extension that replaces occurrences of 'the cloud' with 'my butt'\n[129]<a Stars>0/>\n[130]<a Forks>0/>\n[131]<a Merge requests>0/>\n[132]<a Issues>1/>\nUpdated\n14 minutes ago\n[133]<a 2/>\n[134]<a Byte Blaze\n/\n2019-nCov/>\nOwner\nUse Google Maps Timeline data to compare with COVID-19 patient history location.\n[135]<a Stars>0/>\n[136]<a Forks>0/>\n[137]<a Merge requests>0/>\n[138]<a Issues>0/>\nUpdated\n10 minutes ago\n[139]<a P/>\n[140]<a Byte Blaze\n/\nPyTorch-GAN/>\nOwner\nPyTorch implementations of Generative Adversarial Networks.\n[141]<a Stars>0/>\n[142]<a Forks>0/>\n[143]<a Merge requests>0/>\n[144]<a Issues>0/>\nUpdated\n6 minutes ago\n[End of page]\nCurrent step: 2/20Current date and time: 2025-12-06 18:25\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 5011,
+                "cumulative_input_token_count": 5011
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 7613,
+                    "prompt_tokens_cached": 5504,
+                    "completion_tokens": 131,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 7744,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Successfully logged in to GitLab. Now on the main projects page",
+                                    "memory": "Logged in successfully. Need to find where to set user status. Typically this is in user profile/settings. Step 2/20",
+                                    "next_goal": "Navigate to user profile/settings to find status setting"
+                                },
+                                "action": [
+                                    {
+                                        "click_element": {
+                                            "index": 9
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "3",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "3",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 146
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 9: ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null
+                ]
+            }
+        },
+        "3": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Set my gitlab status as Playing Badminton.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task. Need to log in first to access GitLab and set status",
+                                        "memory": "Starting task to set GitLab status as 'Playing Badminton'. Need to log in first using provided credentials: username: 'byteblaze', password: 'a_very_secure_password_123!'. Step 1/20",
+                                        "next_goal": "Log in to GitLab using the provided credentials"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "byteblaze"
+                                            }
+                                        },
+                                        {
+                                            "input_text": {
+                                                "index": 5,
+                                                "text": "a_very_secure_password_123!"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully logged in to GitLab. Now on the main projects page",
+                                        "memory": "Logged in successfully. Need to find where to set user status. Typically this is in user profile/settings. Step 2/20",
+                                        "next_goal": "Navigate to user profile/settings to find status setting"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 9: ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/', title='Projects \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\nSkip to content\nGitLab\n[0]<a Homepage/>\n[1]<a false;button/>\n[2]<input search;Search GitLab;text/>\n/\n[3]<a Create new.../>\n[4]<a Issues>13/>\n[5]<a Merge requests>0/>\n[6]<a To-Do List>11/>\n[7]<a Help/>\n[8]<a true/>\n[9]<img />\n[10]<a Byte Blaze\nBusy\n@byteblaze\n\ud83d\udcac\nEnjoying life/>\n[11]<button Edit status/>\n[12]<a Edit profile/>\n[13]<a Preferences/>\nNavigation redesign\nNew navigation\nToggle new navigation\n[14]<button switch/>\n[15]<a Sign out/>\n[16]<a Your work/>\n[17]<a Projects/>\n[18]<a Groups/>\n[19]<a Issues>Issues\n13/>\n[20]<a Merge requests/>\n[21]<a To-Do List>To-Do List\n11/>\n[22]<a Milestones/>\n[23]<a Snippets/>\n[24]<a Activity/>\n[25]<a button;Toggle sidebar>Collapse sidebar/>\n[26]<a Your work/>\n[27]<a Projects/>\nProjects\nExplore projects\nNew project\n[28]<a Yours\n17/>\n[29]<a Starred\n3/>\n[30]<input name;search;Filter by name/>\n[31]<button Language/>\nMost stars\n[32]<a All/>\n[33]<a Personal/>\n[34]<a A/>\n[35]<a The A11Y Project\n/\na11yproject.com/>\nMaintainer\nThe A11Y Project is a community-driven effort to make digital accessibility easier.\n22\n0\n3\n41\nUpdated\n14 minutes ago\n[36]<a D/>\n[37]<a Primer\n/\ndesign/>\nDeveloper\nPrimer Design Guidelines\n21\n0\n145\n21\nUpdated\n16 minutes ago\n[38]<a E/>\n[39]<a Byte Blaze\n/\nempathy-prompts/>\nMaintainer\n\ud83d\udca1\nIdeas to help consider Inclusive Design principles when making things for others to use.\n[40]<a Stars>7/>\n[41]<a Forks>0/>\n[42]<a Merge requests>0/>\n[43]<a Issues>8/>\nUpdated\n2 weeks ago\n[44]<a M/>\n[45]<a Byte Blaze\n/\nmillennials-to-snake-people/>\nMaintainer\n\ud83d\udc0d\nChrome extension that replaces occurrences of 'Millennials' with 'Snake People'\n[46]<a Pipeline: failed/>\n[47]<a Stars>6/>\n[48]<a Forks>0/>\n[49]<a Merge requests>17/>\n[50]<a Issues>4/>\nUpdated\n6 days ago\n[51]<a E/>\n[52]<a Byte Blaze\n/\nericwbailey.website/>\nMaintainer\n\ud83d\udcd0\nRepo for my personal website.\n[53]<a Pipeline: failed/>\n[54]<a Stars>2/>\n[55]<a Forks>0/>\n[56]<a Merge requests>0/>\n[57]<a Issues>0/>\nUpdated\n2 weeks ago\n[58]<a A/>\n[59]<a Byte Blaze\n/\na11y-webring.club/>\nMaintainer\n\ud83c\udf10\nA webring for digital accessibility practitioners.\n[60]<a Pipeline: failed/>\n[61]<a Stars>2/>\n[62]<a Forks>0/>\n[63]<a Merge requests>67/>\n[64]<a Issues>4/>\nUpdated\n2 weeks ago\n[65]<a A/>\n[66]<a Byte Blaze\n/\na11y-syntax-highlighting/>\nMaintainer\n\ud83d\udc84\nAccessible light and dark syntax highlighting themes\n[67]<a Pipeline: failed/>\n[68]<a Stars>1/>\n[69]<a Forks>0/>\n[70]<a Merge requests>3/>\n[71]<a Issues>2/>\nUpdated\n9 minutes ago\n[72]<a />\n[73]<img />\n[74]<a Byte Blaze\n/\naccessible-html-content-patterns/>\nMaintainer\n\u267f\n\ufe0f The full HTML5 Doctor Element Index as well as common markup patterns for quick reference.\n[75]<a Pipeline: failed/>\n[76]<a Stars>1/>\n[77]<a Forks>0/>\n[78]<a Merge requests>9/>\n[79]<a Issues>0/>\nUpdated\n10 minutes ago\n[80]<a T/>\n[81]<a Byte Blaze\n/\ntimeit/>\nMaintainer\nRails implementation of time tracking tool timeit\n[82]<a Pipeline: failed/>\n[83]<a Stars>0/>\n[84]<a Forks>0/>\n[85]<a Merge requests>0/>\n[86]<a Issues>0/>\nUpdated\n6 days ago\n[87]<a C/>\n[88]<a Byte Blaze\n/\nChatgpt/>\nOwner\n[89]<a Stars>0/>\n[90]<a Forks>0/>\n[91]<a Merge requests>0/>\n[92]<a Issues>0/>\nUpdated\n7 minutes ago\n[93]<a R/>\n[94]<a Byte Blaze\n/\nremove-board-movement-events-from-the-github-issue-timeline/>\nMaintainer\nThis extension can remove and restore the presence of timeline items generated by a project board event from GitHub's timeline.\n[95]<a Stars>0/>\n[96]<a Forks>0/>\n[97]<a Merge requests>0/>\n[98]<a Issues>0/>\nUpdated\n2 weeks ago\n[99]<a G/>\n[100]<a Byte Blaze\n/\ngimmiethat.space/>\nMaintainer\nI need some space.\n[101]<a Pipeline: failed/>\n[102]<a Stars>0/>\n[103]<a Forks>0/>\n[104]<a Merge requests>0/>\n[105]<a Issues>0/>\nUpdated\n1 week ago\n[106]<a D/>\n[107]<a Byte Blaze\n/\ndotfiles/>\nMaintainer\n\ud83e\udd16\nComputer setup\n[108]<a Stars>0/>\n[109]<a Forks>0/>\n[110]<a Merge requests>0/>\n[111]<a Issues>3/>\nUpdated\n1 week ago\n[112]<a S/>\n[113]<a Byte Blaze\n/\nsolarized-prism-theme/>\nMaintainer\nsolarized theme for prism.js\n[114]<a Pipeline: failed/>\n[115]<a Stars>0/>\n[116]<a Forks>0/>\n[117]<a Merge requests>0/>\n[118]<a Issues>1/>\nUpdated\n1 week ago\n[119]<a />\n[120]<img />\n[121]<a Byte Blaze\n/\ncloud-to-butt/>\nMaintainer\nChrome extension that replaces occurrences of 'the cloud' with 'my butt'\n[122]<a Stars>0/>\n[123]<a Forks>0/>\n[124]<a Merge requests>0/>\n[125]<a Issues>1/>\nUpdated\n14 minutes ago\n[126]<a 2/>\n[127]<a Byte Blaze\n/\n2019-nCov/>\nOwner\nUse Google Maps Timeline data to compare with COVID-19 patient history location.\n[128]<a Stars>0/>\n[129]<a Forks>0/>\n[130]<a Merge requests>0/>\n[131]<a Issues>0/>\nUpdated\n10 minutes ago\n[132]<a P/>\n[133]<a Byte Blaze\n/\nPyTorch-GAN/>\nOwner\nPyTorch implementations of Generative Adversarial Networks.\n[134]<a Stars>0/>\n[135]<a Forks>0/>\n[136]<a Merge requests>0/>\n[137]<a Issues>0/>\nUpdated\n6 minutes ago\n[End of page]\nCurrent step: 3/20Current date and time: 2025-12-06 18:25\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 5152,
+                "cumulative_input_token_count": 5152
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 7753,
+                    "prompt_tokens_cached": 5760,
+                    "completion_tokens": 168,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 7921,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - I can see the user profile dropdown is open and there's an 'Edit status' button (index 11). This is exactly what I need to set the GitLab status",
+                                    "memory": "Logged in successfully. Found 'Edit status' button in user dropdown. Current status shows 'Busy'. Need to click 'Edit status' to change it to 'Playing Badminton'. Step 3/20",
+                                    "next_goal": "Click the 'Edit status' button to open status editor"
+                                },
+                                "action": [
+                                    {
+                                        "click_element": {
+                                            "index": 11
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "4",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "4",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 191
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 11: Edit status",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null
+                ]
+            }
+        },
+        "4": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Set my gitlab status as Playing Badminton.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task. Need to log in first to access GitLab and set status",
+                                        "memory": "Starting task to set GitLab status as 'Playing Badminton'. Need to log in first using provided credentials: username: 'byteblaze', password: 'a_very_secure_password_123!'. Step 1/20",
+                                        "next_goal": "Log in to GitLab using the provided credentials"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "byteblaze"
+                                            }
+                                        },
+                                        {
+                                            "input_text": {
+                                                "index": 5,
+                                                "text": "a_very_secure_password_123!"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully logged in to GitLab. Now on the main projects page",
+                                        "memory": "Logged in successfully. Need to find where to set user status. Typically this is in user profile/settings. Step 2/20",
+                                        "next_goal": "Navigate to user profile/settings to find status setting"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I can see the user profile dropdown is open and there's an 'Edit status' button (index 11). This is exactly what I need to set the GitLab status",
+                                        "memory": "Logged in successfully. Found 'Edit status' button in user dropdown. Current status shows 'Busy'. Need to click 'Edit status' to change it to 'Playing Badminton'. Step 3/20",
+                                        "next_goal": "Click the 'Edit status' button to open status editor"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 11
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "4",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "4",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 11: Edit status",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/', title='Projects \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\nSkip to content\nGitLab\n/\n13\n11\nHelp\nYour work\nProjects\nGroups\nIssues\n13\nMerge requests\nTo-Do List\n11\nMilestones\nSnippets\nActivity\nCollapse sidebar\nYour work\nProjects\nProjects\nExplore projects\nNew project\nYours\n17\nStarred\n3\nLanguage\nMost stars\nAll\nPersonal\nA\nThe A11Y Project\n/\na11yproject.com\nMaintainer\nThe A11Y Project is a community-driven effort to make digital accessibility easier.\n22\n0\n3\n41\nUpdated\n14 minutes ago\nD\nPrimer\n/\ndesign\nDeveloper\nPrimer Design Guidelines\n21\n0\n145\n21\nUpdated\n16 minutes ago\nE\nByte Blaze\n/\nempathy-prompts\nMaintainer\n\ud83d\udca1\nIdeas to help consider Inclusive Design principles when making things for others to use.\n7\n0\n0\n8\nUpdated\n2 weeks ago\nM\nByte Blaze\n/\nmillennials-to-snake-people\nMaintainer\n\ud83d\udc0d\nChrome extension that replaces occurrences of 'Millennials' with 'Snake People'\n6\n0\n17\n4\nUpdated\n6 days ago\nE\nByte Blaze\n/\nericwbailey.website\nMaintainer\n\ud83d\udcd0\nRepo for my personal website.\n2\n0\n0\n0\nUpdated\n2 weeks ago\nA\nByte Blaze\n/\na11y-webring.club\nMaintainer\n\ud83c\udf10\nA webring for digital accessibility practitioners.\n2\n0\n67\n4\nUpdated\n2 weeks ago\nA\nByte Blaze\n/\na11y-syntax-highlighting\nMaintainer\n\ud83d\udc84\nAccessible light and dark syntax highlighting themes\n1\n0\n3\n2\nUpdated\n9 minutes ago\nByte Blaze\n/\naccessible-html-content-patterns\nMaintainer\n\u267f\n\ufe0f The full HTML5 Doctor Element Index as well as common markup patterns for quick reference.\n1\n0\n9\n0\nUpdated\n10 minutes ago\nT\nByte Blaze\n/\ntimeit\nMaintainer\nRails implementation of time tracking tool timeit\n0\n0\n0\n0\nUpdated\n6 days ago\nC\nByte Blaze\n/\nChatgpt\nOwner\n0\n0\n0\n0\nUpdated\n7 minutes ago\nR\nByte Blaze\n/\nremove-board-movement-events-from-the-github-issue-timeline\nMaintainer\nThis extension can remove and restore the presence of timeline items generated by a project board event from GitHub's timeline.\n0\n0\n0\n0\nUpdated\n2 weeks ago\nG\nByte Blaze\n/\ngimmiethat.space\nMaintainer\nI need some space.\n0\n0\n0\n0\nUpdated\n1 week ago\nD\nByte Blaze\n/\ndotfiles\nMaintainer\n\ud83e\udd16\nComputer setup\n0\n0\n0\n3\nUpdated\n1 week ago\nS\nByte Blaze\n/\nsolarized-prism-theme\nMaintainer\nsolarized theme for prism.js\n0\n0\n0\n1\nUpdated\n1 week ago\nByte Blaze\n/\ncloud-to-butt\nMaintainer\nChrome extension that replaces occurrences of 'the cloud' with 'my butt'\n0\n0\n0\n1\nUpdated\n14 minutes ago\n2\nByte Blaze\n/\n2019-nCov\nOwner\nUse Google Maps Timeline data to compare with COVID-19 patient history location.\n0\n0\n0\n0\nUpdated\n10 minutes ago\nP\nByte Blaze\n/\nPyTorch-GAN\nOwner\nPyTorch implementations of Generative Adversarial Networks.\n0\n0\n0\n0\nUpdated\n6 minutes ago\n[0]<div dialog;Set a status>Set a status\ntrue\nClear status after\nNever\n30 minutes\n3 hours\n8 hours\n1 day\n3 days\n7 days\n30 days/>\n[1]<button Close/>\n[2]<button false>\ud83d\udcac/>\n[3]<input What's your status?;text>Enjoying life/>\n[4]<button Clear status/>\n[5]<label Set yourself as busy\nDisplays that you are busy or not able to respond/>\n[6]<button false>Never/>\n[7]<button Remove status/>\n[8]<button Set status/>\n[End of page]\nCurrent step: 4/20Current date and time: 2025-12-06 18:25\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 4724,
+                "cumulative_input_token_count": 4724
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 7236,
+                    "prompt_tokens_cached": 5888,
+                    "completion_tokens": 184,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 7420,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Successfully opened the 'Set a status' dialog. I can see the status input field (index 3) where I need to enter 'Playing Badminton', and the 'Set status' button (index 8) to save it",
+                                    "memory": "Logged in successfully. Opened status editor dialog. Need to enter 'Playing Badminton' in the status field and save. Step 4/20",
+                                    "next_goal": "Enter 'Playing Badminton' in the status input field"
+                                },
+                                "action": [
+                                    {
+                                        "input_text": {
+                                            "index": 3,
+                                            "text": "Playing Badminton"
+                                        }
+                                    },
+                                    {
+                                        "click_element": {
+                                            "index": 8
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "5",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "5",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 207
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input Playing Badminton into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 8: Set status",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null,
+                    null
+                ]
+            }
+        },
+        "5": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Set my gitlab status as Playing Badminton.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task. Need to log in first to access GitLab and set status",
+                                        "memory": "Starting task to set GitLab status as 'Playing Badminton'. Need to log in first using provided credentials: username: 'byteblaze', password: 'a_very_secure_password_123!'. Step 1/20",
+                                        "next_goal": "Log in to GitLab using the provided credentials"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "byteblaze"
+                                            }
+                                        },
+                                        {
+                                            "input_text": {
+                                                "index": 5,
+                                                "text": "a_very_secure_password_123!"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully logged in to GitLab. Now on the main projects page",
+                                        "memory": "Logged in successfully. Need to find where to set user status. Typically this is in user profile/settings. Step 2/20",
+                                        "next_goal": "Navigate to user profile/settings to find status setting"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I can see the user profile dropdown is open and there's an 'Edit status' button (index 11). This is exactly what I need to set the GitLab status",
+                                        "memory": "Logged in successfully. Found 'Edit status' button in user dropdown. Current status shows 'Busy'. Need to click 'Edit status' to change it to 'Playing Badminton'. Step 3/20",
+                                        "next_goal": "Click the 'Edit status' button to open status editor"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 11
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "4",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "4",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully opened the 'Set a status' dialog. I can see the status input field (index 3) where I need to enter 'Playing Badminton', and the 'Set status' button (index 8) to save it",
+                                        "memory": "Logged in successfully. Opened status editor dialog. Need to enter 'Playing Badminton' in the status field and save. Step 4/20",
+                                        "next_goal": "Enter 'Playing Badminton' in the status input field"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "Playing Badminton"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 8
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "5",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "5",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input Playing Badminton into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 8: Set status",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/', title='Projects \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\nSkip to content\nGitLab\n[0]<a Homepage/>\n[1]<a false;button/>\n[2]<input search;Search GitLab;text/>\n/\n[3]<a Create new.../>\n[4]<a Issues>13/>\n[5]<a Merge requests>0/>\n[6]<a To-Do List>11/>\n[7]<a Help/>\n[8]<a />\n[9]<img />\n[10]<a Your work/>\n[11]<a Projects/>\n[12]<a Groups/>\n[13]<a Issues>Issues\n13/>\n[14]<a Merge requests/>\n[15]<a To-Do List>To-Do List\n11/>\n[16]<a Milestones/>\n[17]<a Snippets/>\n[18]<a Activity/>\n[19]<a button;Toggle sidebar>Collapse sidebar/>\n[20]<a Your work/>\n[21]<a Projects/>\nProjects\n[22]<a Explore projects/>\n[23]<a New project/>\n[24]<a Yours\n17/>\n[25]<a Starred\n3/>\n[26]<input name;search;Filter by name/>\n[27]<button Language/>\n[28]<button Most stars/>\n[29]<a All/>\n[30]<a Personal/>\n[31]<a A/>\n[32]<a The A11Y Project\n/\na11yproject.com/>\nMaintainer\nThe A11Y Project is a community-driven effort to make digital accessibility easier.\n[33]<a Pipeline: failed/>\n[34]<a Stars>22/>\n[35]<a Forks>0/>\n[36]<a Merge requests>3/>\n[37]<a Issues>41/>\nUpdated\n15 minutes ago\n[38]<a D/>\n[39]<a Primer\n/\ndesign/>\nDeveloper\nPrimer Design Guidelines\n[40]<a Pipeline: failed/>\n[41]<a Stars>21/>\n[42]<a Forks>0/>\n[43]<a Merge requests>145/>\n[44]<a Issues>21/>\nUpdated\n17 minutes ago\n[45]<a E/>\n[46]<a Byte Blaze\n/\nempathy-prompts/>\nMaintainer\n\ud83d\udca1\nIdeas to help consider Inclusive Design principles when making things for others to use.\n[47]<a Stars>7/>\n[48]<a Forks>0/>\n[49]<a Merge requests>0/>\n[50]<a Issues>8/>\nUpdated\n2 weeks ago\n[51]<a M/>\n[52]<a Byte Blaze\n/\nmillennials-to-snake-people/>\nMaintainer\n\ud83d\udc0d\nChrome extension that replaces occurrences of 'Millennials' with 'Snake People'\n[53]<a Pipeline: failed/>\n[54]<a Stars>6/>\n[55]<a Forks>0/>\n[56]<a Merge requests>17/>\n[57]<a Issues>4/>\nUpdated\n6 days ago\n[58]<a E/>\n[59]<a Byte Blaze\n/\nericwbailey.website/>\nMaintainer\n\ud83d\udcd0\nRepo for my personal website.\n[60]<a Pipeline: failed/>\n[61]<a Stars>2/>\n[62]<a Forks>0/>\n[63]<a Merge requests>0/>\n[64]<a Issues>0/>\nUpdated\n2 weeks ago\n[65]<a A/>\n[66]<a Byte Blaze\n/\na11y-webring.club/>\nMaintainer\n\ud83c\udf10\nA webring for digital accessibility practitioners.\n[67]<a Pipeline: failed/>\n[68]<a Stars>2/>\n[69]<a Forks>0/>\n[70]<a Merge requests>67/>\n[71]<a Issues>4/>\nUpdated\n2 weeks ago\n[72]<a A/>\n[73]<a Byte Blaze\n/\na11y-syntax-highlighting/>\nMaintainer\n\ud83d\udc84\nAccessible light and dark syntax highlighting themes\n[74]<a Pipeline: failed/>\n[75]<a Stars>1/>\n[76]<a Forks>0/>\n[77]<a Merge requests>3/>\n[78]<a Issues>2/>\nUpdated\n10 minutes ago\n[79]<a />\n[80]<img />\n[81]<a Byte Blaze\n/\naccessible-html-content-patterns/>\nMaintainer\n\u267f\n\ufe0f The full HTML5 Doctor Element Index as well as common markup patterns for quick reference.\n[82]<a Pipeline: failed/>\n[83]<a Stars>1/>\n[84]<a Forks>0/>\n[85]<a Merge requests>9/>\n[86]<a Issues>0/>\nUpdated\n10 minutes ago\n[87]<a T/>\n[88]<a Byte Blaze\n/\ntimeit/>\nMaintainer\nRails implementation of time tracking tool timeit\n[89]<a Pipeline: failed/>\n[90]<a Stars>0/>\n[91]<a Forks>0/>\n[92]<a Merge requests>0/>\n[93]<a Issues>0/>\nUpdated\n6 days ago\n[94]<a C/>\n[95]<a Byte Blaze\n/\nChatgpt/>\nOwner\n[96]<a Stars>0/>\n[97]<a Forks>0/>\n[98]<a Merge requests>0/>\n[99]<a Issues>0/>\nUpdated\n8 minutes ago\n[100]<a R/>\n[101]<a Byte Blaze\n/\nremove-board-movement-events-from-the-github-issue-timeline/>\nMaintainer\nThis extension can remove and restore the presence of timeline items generated by a project board event from GitHub's timeline.\n[102]<a Stars>0/>\n[103]<a Forks>0/>\n[104]<a Merge requests>0/>\n[105]<a Issues>0/>\nUpdated\n2 weeks ago\n[106]<a G/>\n[107]<a Byte Blaze\n/\ngimmiethat.space/>\nMaintainer\nI need some space.\n[108]<a Pipeline: failed/>\n[109]<a Stars>0/>\n[110]<a Forks>0/>\n[111]<a Merge requests>0/>\n[112]<a Issues>0/>\nUpdated\n1 week ago\n[113]<a D/>\n[114]<a Byte Blaze\n/\ndotfiles/>\nMaintainer\n\ud83e\udd16\nComputer setup\n[115]<a Stars>0/>\n[116]<a Forks>0/>\n[117]<a Merge requests>0/>\n[118]<a Issues>3/>\nUpdated\n1 week ago\n[119]<a S/>\n[120]<a Byte Blaze\n/\nsolarized-prism-theme/>\nMaintainer\nsolarized theme for prism.js\n[121]<a Pipeline: failed/>\n[122]<a Stars>0/>\n[123]<a Forks>0/>\n[124]<a Merge requests>0/>\n[125]<a Issues>1/>\nUpdated\n1 week ago\n[126]<a />\n[127]<img />\n[128]<a Byte Blaze\n/\ncloud-to-butt/>\nMaintainer\nChrome extension that replaces occurrences of 'the cloud' with 'my butt'\n[129]<a Stars>0/>\n[130]<a Forks>0/>\n[131]<a Merge requests>0/>\n[132]<a Issues>1/>\nUpdated\n15 minutes ago\n[133]<a 2/>\n[134]<a Byte Blaze\n/\n2019-nCov/>\nOwner\nUse Google Maps Timeline data to compare with COVID-19 patient history location.\n[135]<a Stars>0/>\n[136]<a Forks>0/>\n[137]<a Merge requests>0/>\n[138]<a Issues>0/>\nUpdated\n11 minutes ago\n[139]<a P/>\n[140]<a Byte Blaze\n/\nPyTorch-GAN/>\nOwner\nPyTorch implementations of Generative Adversarial Networks.\n[141]<a Stars>0/>\n[142]<a Forks>0/>\n[143]<a Merge requests>0/>\n[144]<a Issues>0/>\nUpdated\n7 minutes ago\n[End of page]\nCurrent step: 5/20Current date and time: 2025-12-06 18:25\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 5574,
+                "cumulative_input_token_count": 5574
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 8182,
+                    "prompt_tokens_cached": 6080,
+                    "completion_tokens": 161,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 8343,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Successfully set GitLab status to 'Playing Badminton'. The dialog closed and I'm back on the main projects page. I should verify the status was actually set by checking the user dropdown",
+                                    "memory": "Successfully entered 'Playing Badminton' and clicked 'Set status'. Need to verify the status was saved by checking the user dropdown. Step 5/20",
+                                    "next_goal": "Open user dropdown to verify status shows 'Playing Badminton'"
+                                },
+                                "action": [
+                                    {
+                                        "click_element": {
+                                            "index": 8
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "6",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "6",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 198
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 8: ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null
+                ]
+            }
+        },
+        "6": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Set my gitlab status as Playing Badminton.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task. Need to log in first to access GitLab and set status",
+                                        "memory": "Starting task to set GitLab status as 'Playing Badminton'. Need to log in first using provided credentials: username: 'byteblaze', password: 'a_very_secure_password_123!'. Step 1/20",
+                                        "next_goal": "Log in to GitLab using the provided credentials"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "byteblaze"
+                                            }
+                                        },
+                                        {
+                                            "input_text": {
+                                                "index": 5,
+                                                "text": "a_very_secure_password_123!"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully logged in to GitLab. Now on the main projects page",
+                                        "memory": "Logged in successfully. Need to find where to set user status. Typically this is in user profile/settings. Step 2/20",
+                                        "next_goal": "Navigate to user profile/settings to find status setting"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I can see the user profile dropdown is open and there's an 'Edit status' button (index 11). This is exactly what I need to set the GitLab status",
+                                        "memory": "Logged in successfully. Found 'Edit status' button in user dropdown. Current status shows 'Busy'. Need to click 'Edit status' to change it to 'Playing Badminton'. Step 3/20",
+                                        "next_goal": "Click the 'Edit status' button to open status editor"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 11
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "4",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "4",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully opened the 'Set a status' dialog. I can see the status input field (index 3) where I need to enter 'Playing Badminton', and the 'Set status' button (index 8) to save it",
+                                        "memory": "Logged in successfully. Opened status editor dialog. Need to enter 'Playing Badminton' in the status field and save. Step 4/20",
+                                        "next_goal": "Enter 'Playing Badminton' in the status input field"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "Playing Badminton"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 8
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "5",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "5",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input Playing Badminton into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully set GitLab status to 'Playing Badminton'. The dialog closed and I'm back on the main projects page. I should verify the status was actually set by checking the user dropdown",
+                                        "memory": "Successfully entered 'Playing Badminton' and clicked 'Set status'. Need to verify the status was saved by checking the user dropdown. Step 5/20",
+                                        "next_goal": "Open user dropdown to verify status shows 'Playing Badminton'"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 8
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "6",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "6",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 8: ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/', title='Projects \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\nSkip to content\nGitLab\n[0]<a Homepage/>\n[1]<a false;button/>\n[2]<input search;Search GitLab;text/>\n/\n[3]<a Create new.../>\n[4]<a Issues>13/>\n[5]<a Merge requests>0/>\n[6]<a To-Do List>11/>\n[7]<a Help/>\n[8]<a true/>\n[9]<img />\n[10]<a Byte Blaze\nBusy\n@byteblaze\n\ud83d\udcac\nPlaying Badminton/>\n[11]<button Edit status/>\n[12]<a Edit profile/>\n[13]<a Preferences/>\nNavigation redesign\nNew navigation\nToggle new navigation\n[14]<button switch/>\n[15]<a Sign out/>\n[16]<a Your work/>\n[17]<a Projects/>\n[18]<a Groups/>\n[19]<a Issues>Issues\n13/>\n[20]<a Merge requests/>\n[21]<a To-Do List>To-Do List\n11/>\n[22]<a Milestones/>\n[23]<a Snippets/>\n[24]<a Activity/>\n[25]<a button;Toggle sidebar>Collapse sidebar/>\n[26]<a Your work/>\n[27]<a Projects/>\nProjects\nExplore projects\nNew project\n[28]<a Yours\n17/>\n[29]<a Starred\n3/>\n[30]<input name;search;Filter by name/>\n[31]<button Language/>\nMost stars\n[32]<a All/>\n[33]<a Personal/>\n[34]<a A/>\n[35]<a The A11Y Project\n/\na11yproject.com/>\nMaintainer\nThe A11Y Project is a community-driven effort to make digital accessibility easier.\n22\n0\n3\n41\nUpdated\n15 minutes ago\n[36]<a D/>\n[37]<a Primer\n/\ndesign/>\nDeveloper\nPrimer Design Guidelines\n21\n0\n145\n21\nUpdated\n17 minutes ago\n[38]<a E/>\n[39]<a Byte Blaze\n/\nempathy-prompts/>\nMaintainer\n\ud83d\udca1\nIdeas to help consider Inclusive Design principles when making things for others to use.\n[40]<a Stars>7/>\n[41]<a Forks>0/>\n[42]<a Merge requests>0/>\n[43]<a Issues>8/>\nUpdated\n2 weeks ago\n[44]<a M/>\n[45]<a Byte Blaze\n/\nmillennials-to-snake-people/>\nMaintainer\n\ud83d\udc0d\nChrome extension that replaces occurrences of 'Millennials' with 'Snake People'\n[46]<a Pipeline: failed/>\n[47]<a Stars>6/>\n[48]<a Forks>0/>\n[49]<a Merge requests>17/>\n[50]<a Issues>4/>\nUpdated\n6 days ago\n[51]<a E/>\n[52]<a Byte Blaze\n/\nericwbailey.website/>\nMaintainer\n\ud83d\udcd0\nRepo for my personal website.\n[53]<a Pipeline: failed/>\n[54]<a Stars>2/>\n[55]<a Forks>0/>\n[56]<a Merge requests>0/>\n[57]<a Issues>0/>\nUpdated\n2 weeks ago\n[58]<a A/>\n[59]<a Byte Blaze\n/\na11y-webring.club/>\nMaintainer\n\ud83c\udf10\nA webring for digital accessibility practitioners.\n[60]<a Pipeline: failed/>\n[61]<a Stars>2/>\n[62]<a Forks>0/>\n[63]<a Merge requests>67/>\n[64]<a Issues>4/>\nUpdated\n2 weeks ago\n[65]<a A/>\n[66]<a Byte Blaze\n/\na11y-syntax-highlighting/>\nMaintainer\n\ud83d\udc84\nAccessible light and dark syntax highlighting themes\n[67]<a Pipeline: failed/>\n[68]<a Stars>1/>\n[69]<a Forks>0/>\n[70]<a Merge requests>3/>\n[71]<a Issues>2/>\nUpdated\n10 minutes ago\n[72]<a />\n[73]<img />\n[74]<a Byte Blaze\n/\naccessible-html-content-patterns/>\nMaintainer\n\u267f\n\ufe0f The full HTML5 Doctor Element Index as well as common markup patterns for quick reference.\n[75]<a Pipeline: failed/>\n[76]<a Stars>1/>\n[77]<a Forks>0/>\n[78]<a Merge requests>9/>\n[79]<a Issues>0/>\nUpdated\n10 minutes ago\n[80]<a T/>\n[81]<a Byte Blaze\n/\ntimeit/>\nMaintainer\nRails implementation of time tracking tool timeit\n[82]<a Pipeline: failed/>\n[83]<a Stars>0/>\n[84]<a Forks>0/>\n[85]<a Merge requests>0/>\n[86]<a Issues>0/>\nUpdated\n6 days ago\n[87]<a C/>\n[88]<a Byte Blaze\n/\nChatgpt/>\nOwner\n[89]<a Stars>0/>\n[90]<a Forks>0/>\n[91]<a Merge requests>0/>\n[92]<a Issues>0/>\nUpdated\n8 minutes ago\n[93]<a R/>\n[94]<a Byte Blaze\n/\nremove-board-movement-events-from-the-github-issue-timeline/>\nMaintainer\nThis extension can remove and restore the presence of timeline items generated by a project board event from GitHub's timeline.\n[95]<a Stars>0/>\n[96]<a Forks>0/>\n[97]<a Merge requests>0/>\n[98]<a Issues>0/>\nUpdated\n2 weeks ago\n[99]<a G/>\n[100]<a Byte Blaze\n/\ngimmiethat.space/>\nMaintainer\nI need some space.\n[101]<a Pipeline: failed/>\n[102]<a Stars>0/>\n[103]<a Forks>0/>\n[104]<a Merge requests>0/>\n[105]<a Issues>0/>\nUpdated\n1 week ago\n[106]<a D/>\n[107]<a Byte Blaze\n/\ndotfiles/>\nMaintainer\n\ud83e\udd16\nComputer setup\n[108]<a Stars>0/>\n[109]<a Forks>0/>\n[110]<a Merge requests>0/>\n[111]<a Issues>3/>\nUpdated\n1 week ago\n[112]<a S/>\n[113]<a Byte Blaze\n/\nsolarized-prism-theme/>\nMaintainer\nsolarized theme for prism.js\n[114]<a Pipeline: failed/>\n[115]<a Stars>0/>\n[116]<a Forks>0/>\n[117]<a Merge requests>0/>\n[118]<a Issues>1/>\nUpdated\n1 week ago\n[119]<a />\n[120]<img />\n[121]<a Byte Blaze\n/\ncloud-to-butt/>\nMaintainer\nChrome extension that replaces occurrences of 'the cloud' with 'my butt'\n[122]<a Stars>0/>\n[123]<a Forks>0/>\n[124]<a Merge requests>0/>\n[125]<a Issues>1/>\nUpdated\n15 minutes ago\n[126]<a 2/>\n[127]<a Byte Blaze\n/\n2019-nCov/>\nOwner\nUse Google Maps Timeline data to compare with COVID-19 patient history location.\n[128]<a Stars>0/>\n[129]<a Forks>0/>\n[130]<a Merge requests>0/>\n[131]<a Issues>0/>\nUpdated\n11 minutes ago\n[132]<a P/>\n[133]<a Byte Blaze\n/\nPyTorch-GAN/>\nOwner\nPyTorch implementations of Generative Adversarial Networks.\n[134]<a Stars>0/>\n[135]<a Forks>0/>\n[136]<a Merge requests>0/>\n[137]<a Issues>0/>\nUpdated\n7 minutes ago\n[End of page]\nCurrent step: 6/20Current date and time: 2025-12-06 18:25\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 5767,
+                "cumulative_input_token_count": 5767
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 8352,
+                    "prompt_tokens_cached": 6336,
+                    "completion_tokens": 181,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 8533,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - The user dropdown shows the status is now 'Playing Badminton' (visible in element 10). The task is complete",
+                                    "memory": "Successfully set GitLab status to 'Playing Badminton'. Verified in user dropdown that status shows correctly. Task completed. Step 6/20",
+                                    "next_goal": "Complete the task with done action"
+                                },
+                                "action": [
+                                    {
+                                        "done": {
+                                            "text": "Successfully set GitLab status to 'Playing Badminton'. The status is now visible in the user dropdown menu showing 'Playing Badminton' next to the user's name. The task is complete.",
+                                            "success": true
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "7",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "7",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 223
+            },
+            "controller_messages": {
+                "action_result": [],
+                "action_error": []
+            }
+        }
+    }
+}

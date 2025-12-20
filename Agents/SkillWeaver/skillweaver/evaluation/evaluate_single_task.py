@@ -42,6 +42,8 @@ from skillweaver.util.perfmon import monitor
 
 from .drift import DriftInjector
 
+import requests
+
 dotenv.load_dotenv()
 
 
@@ -75,6 +77,27 @@ async def run_test_case_with_webrover(
         video_dir=out_dir + "/video",
         headless=headless,
     )
+
+    # --- 新增代码开始：发送干扰信号 ---
+    proxy_url = "http://172.26.116.102:8080/?logging=StartingRun1"
+    
+    # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
+    # 这样 addon 脚本才能捕获到这个请求并重置状态
+    mitm_proxy = "http://127.0.0.1:8848" 
+    proxies = {
+        "http": mitm_proxy,
+        "https": mitm_proxy,
+    }
+
+    try:
+        # 发送请求，设置超时防止卡死
+        response = requests.get(proxy_url, proxies=proxies, timeout=5)
+        print(f"OK: Connect to {proxy_url}")
+    except requests.exceptions.ProxyError:
+        print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
+    except Exception as e:
+        print(f"Failed to send stop signal: {e}")
+    # --- 新增代码结束 ---
 
     # ===========================================================================
     # [Drift & Security Patch] 注入漂移脚本并强制绕过 CSP/HTTPS 错误
@@ -182,6 +205,27 @@ async def run_test_case_with_webrover(
     async def close_func():
         await browser.context.close()
         await browser.close()
+    
+    # --- 新增代码开始：发送停止干扰信号 ---
+    stop_url = "http://172.26.116.102:8080/?logging=EndingMyTest"
+    
+    # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
+    # 这样 addon 脚本才能捕获到这个请求并重置状态
+    mitm_proxy = "http://127.0.0.1:8848" 
+    proxies = {
+        "http": mitm_proxy,
+        "https": mitm_proxy,
+    }
+
+    try:
+        # 发送请求，设置超时防止卡死
+        response = requests.get(stop_url, proxies=proxies, timeout=5)
+        print(f"OK: Connect to {stop_url}")
+    except requests.exceptions.ProxyError:
+        print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
+    except Exception as e:
+        print(f"Failed to send stop signal: {e}")
+    # --- 新增代码结束 ---
 
     return (states, actions, page, cdp_session, close_func)
 

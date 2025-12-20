@@ -2,16 +2,12 @@ import os
 import json
 import argparse
 import subprocess
-from subprocess import Popen
-import concurrent.futures
-import threading
+import sys
+from subprocess import Popen, PIPE, STDOUT
+import multiprocessing
+from functools import partial
 
-# 用于防止多线程print输出混乱
-print_lock = threading.Lock()
-
-def safe_print(*args, **kwargs):
-    with print_lock:
-        print(*args, **kwargs)
+# --- 原有的辅助函数保持不变 ---
 
 def parse_task_ids(task_id_str: str) -> list[str]:
     chunks = [c.strip() for c in task_id_str.split(",")]
@@ -21,110 +17,297 @@ def parse_task_ids(task_id_str: str) -> list[str]:
         task_id_list.extend([str(i) for i in range(s, e+1)])
     return task_id_list
 
-# 将单个任务的处理逻辑提取出来
-def process_single_task(tid, website):
+def count_deepseek_calls(log_output: str) -> int:
+    if not log_output:
+        return 0
+    keyword = "HTTP Request: POST https://api.deepseek.com/chat/completions"
+    return log_output.count(keyword)
+
+def save_task_info(task_id, step1, step2, step3, step4):
+    """保存统计结果到 JSON 文件"""
+    total = step1 + step2 + step3 + step4
+    info_str = f"Task [{task_id}]: Total {total} (step1_solve: {step1}, step2_eval: {step2}, step3_cal: {step3}, step4_induce: {step4})"
+    
+    os.makedirs("./llm_info", exist_ok=True)
+    save_path = f"./llm_info/{task_id}.json"
+    
+    # 为了防止多进程同时写入同一个文件（虽然这里是按task_id分文件的，比较安全），
+    # 但print输出混杂，这里建议只保留文件写入，减少print
+    with open(save_path, 'w', encoding='utf-8') as f:
+        json.dump({"result": info_str}, f, ensure_ascii=False, indent=2)
+    
+    # 在多进程中，print 可能会乱序，但为了监控还是保留
+    print(f"\n>>> [STATS SAVED] {info_str}\n")
+
+def run_process_and_count(cmd, env=None, task_prefix=""):
+    """
+    运行子进程。增加 task_prefix 用于区分不同进程的日志输出。
+    """
+    # 简单的格式化打印，避免多进程日志完全混在一起分不清
+    cmd_str = ' '.join(cmd)
+    # print(f"{task_prefix} Executing: {cmd_str}") 
+    
+    process = Popen(cmd, stdout=PIPE, stderr=STDOUT, env=env, text=True, encoding='utf-8', errors='replace')
+    
+    full_log = []
     try:
-        # step 1: task solving
-        # 注意：这里去掉了 input() 阻塞，因为并行时无法交互
-        process = Popen([
-            "python", "run_demo.py",
-            "--task_name", f"myBenchmark.{tid}",
-            "--websites", website,
-            "--rename_to", f"myBenchmark.{tid}",
-            "--headless"
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) # 建议加上 text=True 以便直接处理字符串
-        
-        try:
-            stdout, stderr = process.communicate(timeout=3000)
-            safe_print(f"[{tid}] Step 1 completed successfully.")
-            # safe_print(stdout) # 输出可能太长，建议根据需要开启
-        except subprocess.TimeoutExpired as e:
-            process.kill()
-            stdout, stderr = process.communicate() # Clean up resources
-            safe_print(f"[{tid}] Process timed out after {e.timeout} seconds.")
-            safe_print(stderr)
-            return # 相当于原来的 continue
-
-        path = f"results/myBenchmark.{tid}/summary_info.json"
-        if not os.path.exists(path):
-            safe_print(f"[{tid}] Result file not found: {path}")
-            return
-
-        if json.load(open(path, 'r'))["n_steps"] < 3: 
-            safe_print(f"[{tid}] Skipped due to n_steps < 3")
-            return
-
-        # step 2: eval traj
-        process = Popen([
-            "python", "-m", "autoeval.evaluate_trajectory",
-            "--result_dir", f"results/myBenchmark.{tid}",
-        ])
+        for line in process.stdout:
+            # 在多进程下，建议注释掉实时 print，或者加上前缀，否则屏幕会非常乱
+            # print(f"{task_prefix} {line}", end='') 
+            full_log.append(line)
         process.wait()
+    except KeyboardInterrupt:
+        print(f"\n{task_prefix} Stopping process...")
+        process.kill()
+        process.wait()
+        raise
         
-        path = f"results/myBenchmark.{tid}/deepseek-chat_autoeval.json"
-        if not os.path.exists(path):
-            return
-            
-        is_correct = json.load(open(path))[0]["rm"]  # bool
-        if not is_correct: 
-            safe_print(f"[{tid}] Evaluation failed (rm=False)")
-            return
+    full_log_str = "".join(full_log)
+    count = count_deepseek_calls(full_log_str)
+    return count, full_log_str
 
-        process = Popen([
-            "python", "-m", "results.calc_valid_steps",
-            "--clean_and_store", "--result_dir", f"results/myBenchmark.{tid}",
-        ])
-        process.wait()  # output 'clean_steps.json'
+# --- 核心逻辑重构 ---
 
-        # step 3: induce actions
-        process = Popen([
-            "python", "-m", "induce.induce_actions",
-            "--website", website,
-            "--result_id_list", tid,
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        
+def process_single_task(tid, args, lock):
+    """
+    单个任务的处理逻辑。
+    args: 命令行参数
+    lock: 进程锁，用于保护 Step 4
+    """
+    task_prefix = f"[Task {tid}]"
+    print(f"{task_prefix} Starting...")
+
+    # 设置环境变量
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    
+    s1 = s2 = s3 = s4 = 0
+    
+    # --- Step 1: Solving (并行执行) ---
+    print(f"{task_prefix} Step 1: Solving...")
+    cmd1 = [
+        "python", "run_demo.py",
+        "--task_name", f"myBenchmark.{tid}",
+        "--websites", args.website,
+        "--rename_to", f"myBenchmark.{tid}",
+        "--headless"
+    ]
+    s1, _ = run_process_and_count(cmd1, env, task_prefix)
+    
+    # 检查 Step 1 结果
+    path = f"results/myBenchmark.{tid}/summary_info.json"
+    if not os.path.exists(path):
+        save_task_info(tid, s1, s2, s3, s4)
+        return
+    try:
+        if json.load(open(path, 'r')).get("n_steps", 0) < 3: 
+            save_task_info(tid, s1, s2, s3, s4)
+            return
+    except:
+        pass
+
+    # --- Step 2: Evaluating (并行执行) ---
+    print(f"{task_prefix} Step 2: Evaluating...")
+    cmd2 = [
+        "python", "-m", "autoeval.evaluate_trajectory",
+        "--result_dir", f"results/myBenchmark.{tid}",
+    ]
+    s2, _ = run_process_and_count(cmd2, env, task_prefix)
+    
+    # 检查 Eval 结果
+    path_eval = f"results/myBenchmark.{tid}/deepseek-chat_autoeval.json"
+    is_correct = False
+    if os.path.exists(path_eval):
         try:
-            stdout, stderr = process.communicate(timeout=1000)
-            safe_print(f"[{tid}] All steps completed.")
-            # safe_print(stdout)
-        except subprocess.TimeoutExpired as e:
-            process.kill()
-            stdout, stderr = process.communicate() 
-            safe_print(f"[{tid}] Step 3 timed out.")
-            safe_print(stderr)
+            data = json.load(open(path_eval))
+            if data and isinstance(data, list):
+                is_correct = data[0].get("rm", False)
+        except:
+            pass
+    
+    if not is_correct: 
+        save_task_info(tid, s1, s2, s3, s4)
+        return
 
-    except Exception as e:
-        safe_print(f"[{tid}] An error occurred: {e}")
+    # --- Step 3: Calculation (并行执行) ---
+    print(f"{task_prefix} Step 3: Calculating...")
+    cmd3 = [
+        "python", "-m", "results.calc_valid_steps",
+        "--clean_and_store", "--result_dir", f"results/myBenchmark.{tid}",
+    ]
+    s3, _ = run_process_and_count(cmd3, env, task_prefix)
 
-# %% ASI
-def run_asi_parallel(args):
-    task_id_list = parse_task_ids(args.task_ids)
-    total_tasks = len(task_id_list)
-    print(f"Starting processing {total_tasks} tasks with {args.workers} workers...")
+    # --- Step 4: Inducing (串行执行 - 加锁) ---
+    # 这是关键点！induce_action.py 会修改共享文件，必须加锁
+    print(f"{task_prefix} Step 4: Waiting for lock to Induce Actions...")
+    
+    with lock:
+        print(f"{task_prefix} >>> Acquired Lock. Running Induce Action...")
+        cmd4 = [
+            "python", "-m", "induce.induce_actions",
+            "--website", args.website,
+            "--result_id_list", tid,
+        ]
+        s4, _ = run_process_and_count(cmd4, env, task_prefix)
+        print(f"{task_prefix} <<< Released Lock.")
 
-    # 使用 ThreadPoolExecutor 因为这是调用子进程（IO密集型），不需要 ProcessPoolExecutor
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
-        # 提交所有任务
-        futures = {executor.submit(process_single_task, tid, args.website): tid for tid in task_id_list}
-        
-        # 等待完成并在完成后获取结果（如果有报错会在这里抛出）
-        for future in concurrent.futures.as_completed(futures):
-            tid = futures[future]
-            try:
-                future.result() # 这里会捕获函数内的异常
-            except Exception as exc:
-                safe_print(f"Task {tid} generated an exception: {exc}")
+    # --- Final Save ---
+    save_task_info(tid, s1, s2, s3, s4)
 
-if __name__ == "__main__":
+def process_single_task_fast(tid, args, lock):
+    """
+    只执行 Step 1: Solving。
+    Step 2, 3, 4 均设置为 0，但保持 JSON 格式一致。
+    """
+    task_prefix = f"[Task {tid}]"
+    print(f"{task_prefix} Starting FAST process (Step 1 Only)...")
+
+    # 设置环境变量
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    
+    s1 = s2 = s3 = s4 = 0
+    
+    # --- Step 1: Solving ---
+    print(f"{task_prefix} Step 1: Solving...")
+    cmd1 = [
+        "python", "run_demo.py",
+        "--task_name", f"myBenchmark.{tid}",
+        "--websites", args.website,
+        "--memory_path", f"workflows/{args.website}.txt",
+        "--rename_to", f"myBenchmark.{tid}",
+        "--headless"
+    ]
+    s1, _ = run_process_and_count(cmd1, env, task_prefix)
+    
+    # 注意：这里不需要像完整版那样检查结果是否成功
+    # 因为不需要决定是否继续 Step 2，只需记录 Step 1 消耗并保存即可
+    
+    # --- Final Save ---
+    # s2, s3, s4 保持为 0
+    save_task_info(tid, s1, s2, s3, s4)
+
+def process_single_task_awm(tid, args, lock):
+    """
+    单个任务的处理逻辑。
+    args: 命令行参数
+    lock: 进程锁，用于保护 Step 4
+    """
+    task_prefix = f"[Task {tid}]"
+    print(f"{task_prefix} Starting...")
+
+    # 设置环境变量
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    
+    s1 = s2 = s3 = s4 = 0
+    
+    # --- Step 1: Solving (并行执行) ---
+    print(f"{task_prefix} Step 1: Solving...(memory)")
+    cmd1 = [
+        "python", "run_demo.py",
+        "--task_name", f"myBenchmark.{tid}",
+        "--websites", args.website,
+        "--memory_path", f"workflows/{args.website}.txt",
+        "--rename_to", f"myBenchmark.{tid}",
+        "--headless"
+    ]
+    s1, _ = run_process_and_count(cmd1, env, task_prefix)
+    
+    # 检查 Step 1 结果
+    path = f"results/myBenchmark.{tid}/summary_info.json"
+    if not os.path.exists(path):
+        save_task_info(tid, s1, s2, s3, s4)
+        return
+    try:
+        if json.load(open(path, 'r')).get("n_steps", 0) < 3: 
+            save_task_info(tid, s1, s2, s3, s4)
+            return
+    except:
+        pass
+
+    # --- Step 2: Evaluating (并行执行) ---
+    print(f"{task_prefix} Step 2: Evaluating...")
+    cmd2 = [
+        "python", "-m", "autoeval.evaluate_trajectory",
+        "--result_dir", f"results/myBenchmark.{tid}",
+    ]
+    s2, _ = run_process_and_count(cmd2, env, task_prefix)
+    
+    # 检查 Eval 结果
+    path_eval = f"results/myBenchmark.{tid}/deepseek-chat_autoeval.json"
+    is_correct = False
+    if os.path.exists(path_eval):
+        try:
+            data = json.load(open(path_eval))
+            if data and isinstance(data, list):
+                is_correct = data[0].get("rm", False)
+        except:
+            pass
+    
+    if not is_correct: 
+        save_task_info(tid, s1, s2, s3, s4)
+        return
+
+    # --- Step 3: Calculation (并行执行) ---
+    print(f"{task_prefix} Step 3: Calculating...")
+    cmd3 = [
+        "python", "-m", "results.calc_valid_steps",
+        "--clean_and_store", "--result_dir", f"results/myBenchmark.{tid}",
+    ]
+    s3, _ = run_process_and_count(cmd3, env, task_prefix)
+
+    # --- Step 4: Inducing (串行执行 - 加锁) ---
+    # 这是关键点！induce_action.py 会修改共享文件，必须加锁
+    print(f"{task_prefix} Step 4: Waiting for lock to Induce Memory...")
+
+    with lock:
+        print(f"{task_prefix} >>> Acquired Lock. Running Induce Memory...")
+        cmd4 = [
+            "python", "-m", "induce.induce_memory",
+            "--website", args.website,
+            "--result_id_list", tid,
+        ]
+        s4, _ = run_process_and_count(cmd4, env, task_prefix)
+        print(f"{task_prefix} <<< Released Lock.")
+
+    # --- Final Save ---
+    save_task_info(tid, s1, s2, s3, s4)
+
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--website", type=str, required=True,
                         choices=["shopping", "admin", "reddit", "gitlab", "map"])
     parser.add_argument("--task_ids", type=str, required=True,
                         help="xxx-xxx,xxx-xxx")
-    # 新增 workers 参数，默认设为 4，根据机器性能调整
-    parser.add_argument("--workers", type=int, default=4,
-                        help="Number of parallel workers (default: 4)")
+    parser.add_argument("--workers", type=int, default=8, 
+                        help="Number of parallel processes")
+    # 新增参数 --fast
+    parser.add_argument("--fast", action="store_true", 
+                        help="If set, only runs Step 1 (Solving) and saves stats with other steps as 0.")
 
     args = parser.parse_args()
-    run_asi_parallel(args)
-    
+
+    task_id_list = parse_task_ids(args.task_ids)
+    print(f"Total tasks to process: {len(task_id_list)}")
+    if args.fast:
+        print("Mode: FAST (Step 1 only)")
+    else:
+        print("Mode: FULL (Steps 1-4)")
+
+    with multiprocessing.Manager() as manager:
+        lock = manager.Lock()
+        
+        # 根据参数选择使用的函数
+        target_func = process_single_task_fast if args.fast else process_single_task_awm
+        
+        func = partial(target_func, args=args, lock=lock)
+        
+        with multiprocessing.Pool(processes=args.workers) as pool:
+            pool.map(func, task_id_list)
+
+if __name__ == "__main__":
+    # 设置启动方法，spawn 在某些环境下更稳定，但在 Linux 上 fork 更快
+    # 如果遇到 pickling error，可以尝试取消注释下面这行
+    # multiprocessing.set_start_method('spawn')
+    main()
