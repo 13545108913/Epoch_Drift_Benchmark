@@ -84,7 +84,7 @@ def process_single_task(tid, args, lock):
     s1 = s2 = s3 = s4 = 0
     
     # --- Step 1: Solving (并行执行) ---
-    print(f"{task_prefix} Step 1: Solving...")
+    print(f"{task_prefix} Step 1: Solving(ASI)...")
     cmd1 = [
         "python", "run_demo.py",
         "--task_name", f"myBenchmark.{tid}",
@@ -174,7 +174,7 @@ def process_single_task_fast(tid, args, lock):
         "python", "run_demo.py",
         "--task_name", f"myBenchmark.{tid}",
         "--websites", args.website,
-        "--memory_path", f"workflows/{args.website}.txt",
+        # "--memory_path", f"workflows/{args.website}.txt",
         "--rename_to", f"myBenchmark.{tid}",
         "--headless"
     ]
@@ -280,7 +280,7 @@ def main():
                         choices=["shopping", "admin", "reddit", "gitlab", "map"])
     parser.add_argument("--task_ids", type=str, required=True,
                         help="xxx-xxx,xxx-xxx")
-    parser.add_argument("--workers", type=int, default=1, 
+    parser.add_argument("--workers", type=int, default=8, 
                         help="Number of parallel processes")
     # 新增参数 --fast
     parser.add_argument("--fast", action="store_true", 
@@ -299,7 +299,7 @@ def main():
         lock = manager.Lock()
         
         # 根据参数选择使用的函数
-        target_func = process_single_task_fast if args.fast else process_single_task_awm
+        target_func = process_single_task_fast if args.fast else process_single_task
         
         func = partial(target_func, args=args, lock=lock)
         
