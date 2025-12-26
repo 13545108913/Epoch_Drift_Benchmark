@@ -17,7 +17,7 @@ def read_json(file_path):
 # read addon and frequency from the config file
 data = {
 	"addon": 1,
-	"frequency": 0
+	"frequency": 1
 }
 
 # retrieve the addon and frequency settings from the dictionary, using default values of 0 if the keys are not present
@@ -34,15 +34,15 @@ if addon == 4:
 env_flags = {
     '127.0.0.1:9999': None,  # reddit
     '127.0.0.1:7770': None,  # shopping
-    '127.0.0.1:7780': None,  # shopping_admin 
+    'dockerized-magento.local': None,  # shopping_admin 
     '172.26.116.102:8080': None,  # gitlab
     '127.0.0.1:8888': None  # wikipedia
 }
 
 # regular expressions for starting and ending task urls
-start_url_logic = lambda key: re.compile(
-    rf'http://{key}/\?logging=Starting(.*)')
-end_url_logic = lambda key: re.compile(rf'http://{key}/\?logging=Ending(.*)')
+# 允许 http://key/任何路径/?logging=Starting...
+start_url_logic = lambda key: re.compile(rf'http://{key}.*\?logging=Starting(.*)')
+end_url_logic = lambda key: re.compile(rf'http://{key}.*\?logging=Ending(.*)')
 
 # set the flags for each environment
 for key in env_flags.keys():

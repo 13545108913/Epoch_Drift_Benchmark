@@ -2,55 +2,68 @@ import os
 from playwright.sync_api import sync_playwright
 
 def save_magento_auth():
-    # 1. 定义目标路径和凭据
     auth_dir = ".auth"
     auth_file = "shopping_admin_state.json"
     auth_path = os.path.join(auth_dir, auth_file)
     
-    target_url = "http://dockerized-magento.local/index.php/admin/"
-    username = "admin"
-    password = "password123"
+    # 确保这里的域名已经在 /etc/hosts 做了解析
+    target_url = "http://localhost:7780/admin/admin/"
+    
+    # 【注意】请确保这里填的是当前数据库里实际生效的密码
+    username = "admin" 
+    password = "admin1234" 
 
-    # 确保输出目录存在
     if not os.path.exists(auth_dir):
         os.makedirs(auth_dir)
 
     with sync_playwright() as p:
-        # 2. 启动浏览器 (headless=False 可以让你看到登录过程，方便调试)
         browser = p.chromium.launch(headless=False)
-        context = browser.new_context()
+        
+        # 优化：忽略 HTTPS 证书错误，防止因本地自签名证书导致脚本中断
+        context = browser.new_context(ignore_https_errors=True)
         page = context.new_page()
 
         print(f"正在访问: {target_url}")
-        page.goto(target_url)
-
-        # 3. 填写登录表单
-        # Magento 1.9 后台通常使用 id="username" 和 id="login" (或 name="login[password]")
-        # 如果你的主题不同，可能需要根据实际页面调整选择器
         try:
+            page.goto(target_url)
+
             print("正在输入凭据...")
+            # 等待用户名输入框出现
             page.wait_for_selector("#username", state="visible")
             page.fill("#username", username)
-            page.fill("#login", password)
             
-            # 点击登录按钮 (通常是 input type='submit' 或 class='form-button')
-            page.click("input[type='submit']")
+            # Magento 1.9 密码框 ID 通常是 "login"，但也可能是 name="login[password]"
+            # 这里做一个兼容处理，如果找不到 ID，就尝试找 name
+            if page.query_selector("#login"):
+                page.fill("#login", password)
+            else:
+                page.fill("input[name='login[password]']", password)
             
-            # 4. 等待登录成功
-            # 我们等待 URL 包含 'dashboard' 或者特定的 Dashboard 元素出现
+            # 点击登录
+            # page.click("input[type='submit']")
+
+            button_m1 = page.get_by_role("button", name="Login")
+
+            # 定义 M2 风格的按钮
+            button_m2 = page.get_by_role("button", name="Sign in")
+
+            # 结合两者，点击任意存在的那个
+            button_m1.or_(button_m2).click(timeout=60000)
+
+            
             print("正在等待登录跳转...")
-            page.wait_for_url("**/admin/dashboard/**", timeout=15000)
+            # 增加超时时间到 30秒，防止本地环境慢
+            page.wait_for_url("**/admin/dashboard/**", timeout=30000)
             print("登录成功！")
 
-            # 5. 保存状态到 JSON 文件
             context.storage_state(path=auth_path)
             print(f"认证状态已保存至: {auth_path}")
 
         except Exception as e:
             print(f"发生错误: {e}")
-            # 截图以便调试
             page.screenshot(path="error_screenshot.png")
-            print("已保存错误截图至 error_screenshot.png")
+            # 如果是超时，打印一下当前 URL 看看停在哪里了
+            print(f"当前停留页面: {page.url}")
 
         finally:
             browser.close()

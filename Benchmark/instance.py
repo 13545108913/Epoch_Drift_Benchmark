@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 
 import playwright.sync_api
@@ -298,7 +299,17 @@ class MyBenchmarkInstance:
                 page.locator("#login").fill(password)
 
                 # 3. 修正按钮定位 (HTML中 value="Login")
-                page.get_by_role("button", name="Login").click()
+                # page.get_by_role("button", name="Login").click()
+                # page.get_by_role("button", name=re.compile(r"Login|Sign in", re.IGNORECASE)).click()
+                # 定义 M1 风格的按钮
+                button_m1 = page.get_by_role("button", name="Login")
+
+                # 定义 M2 风格的按钮
+                button_m2 = page.get_by_role("button", name="Sign in")
+
+                # 结合两者，点击任意存在的那个
+                button_m1.or_(button_m2).click(timeout=60000)
+
                 page.goto(f"{base_url}/?logging=StartingRun1") 
 
             # ... (其他站点的登录逻辑同理，只需确保使用 base_url) ...

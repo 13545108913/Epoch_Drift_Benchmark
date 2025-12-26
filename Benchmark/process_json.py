@@ -2,7 +2,7 @@ import json
 
 # 定义输入和输出文件名
 input_file = 'test.raw.json'
-output_file = 'admin_tasks_processed.json'
+output_file = 'admin_tasks_v2.json'
 
 try:
     # --- 1. 读取原始JSON文件 ---
