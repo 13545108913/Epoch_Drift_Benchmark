@@ -7,7 +7,7 @@ from collections import defaultdict
 
 # ================= 配置区域 =================
 # 结果所在的根目录
-BASE_DIR = "results/gitlab_with_skills_v16_drift/gitlab"
+BASE_DIR = "results/admin_with_skills_v2_drift/shopping_admin"
 # 代码知识库路径
 KB_PATH = os.path.join(BASE_DIR, "kb_code.py")
 # 任务总数 (0 ~ 161)
@@ -70,6 +70,22 @@ def get_token_stats(task_dir):
         except Exception:
             pass
     return stats
+
+def get_task_score(task_dir):
+    """
+    获取任务得分 (从 eval.json 中读取 score)
+    """
+    eval_path = os.path.join(task_dir, "eval.json")
+    if os.path.exists(eval_path):
+        try:
+            with open(eval_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                # 获取分数，如果存在的话
+                if "score" in data:
+                    return float(data["score"])
+        except Exception:
+            pass
+    return None
 
 def find_line_number(content_lines, target_line_str):
     target_clean = target_line_str.strip()
@@ -180,21 +196,24 @@ def process_single_task(task_index, kb_lines, kb_func_names):
     """
     处理单个任务：
     1. 生成该任务的独立分析文件
-    2. 返回该任务的统计信息、错误列表、KB函数调用统计
+    2. 返回该任务的统计信息、错误列表、KB函数调用统计、以及得分
     """
     task_name = f"task_{task_index}"
     task_dir = os.path.join(BASE_DIR, task_name)
     
     if not os.path.exists(task_dir):
-        return None, [], {}
+        return None, [], {}, None
 
     # 1. 获取Token统计
     token_stats = get_token_stats(task_dir)
     
-    # 2. 获取所有 Action 文件
+    # 2. 获取任务得分 (新增)
+    task_score = get_task_score(task_dir)
+
+    # 3. 获取所有 Action 文件
     action_files = sorted(glob.glob(os.path.join(task_dir, "*_action.json")))
     
-    # 3. 分析报错
+    # 4. 分析报错
     errors = []
     for af in action_files:
         step_name = os.path.basename(af).split('_')[0]
@@ -210,14 +229,19 @@ def process_single_task(task_index, kb_lines, kb_func_names):
             error_info['task'] = task_name 
             errors.append(error_info)
             
-    # 4. 统计 KB 函数使用情况 (新增功能)
+    # 5. 统计 KB 函数使用情况
     kb_usage = count_kb_usage(action_files, kb_func_names)
 
-    # 5. 写入单任务报告
+    # 6. 写入单任务报告
     report_lines = []
     report_lines.append(f"Analysis Report for {task_name}")
     report_lines.append("=" * 50)
-    report_lines.append("[1] LLM Token Statistics")
+    
+    # 写入分数
+    score_display = task_score if task_score is not None else "N/A (No eval.json found)"
+    report_lines.append(f"[0] Task Score: {score_display}")
+
+    report_lines.append("\n[1] LLM Token Statistics")
     report_lines.append(f"Calls: {token_stats['llm_call_count']}, Total Tokens: {token_stats['total_tokens']}")
     
     report_lines.append("\n[2] KB Function Usage (Local)")
@@ -244,7 +268,7 @@ def process_single_task(task_index, kb_lines, kb_func_names):
     except Exception:
         pass
 
-    return token_stats, errors, kb_usage
+    return token_stats, errors, kb_usage, task_score
 
 def main():
     print(f"Starting analysis for {TASK_COUNT} tasks...")
@@ -261,6 +285,12 @@ def main():
         "total_tokens": 0
     }
     
+    # 分数统计累加器
+    global_score_stats = {
+        "total_score": 0.0,
+        "scored_tasks_count": 0
+    }
+    
     # 全局 KB 函数调用计数
     global_kb_usage = defaultdict(int)
     
@@ -269,12 +299,17 @@ def main():
 
     for i in range(TASK_COUNT):
         # 处理单个任务
-        stats, errors, kb_usage = process_single_task(i, kb_lines, kb_func_names)
+        stats, errors, kb_usage, score = process_single_task(i, kb_lines, kb_func_names)
         
         if stats is not None:
             global_stats["processed_tasks"] += 1
             global_stats["total_calls"] += stats["llm_call_count"]
             global_stats["total_tokens"] += stats["total_tokens"]
+            
+            # 统计分数
+            if score is not None:
+                global_score_stats["total_score"] += score
+                global_score_stats["scored_tasks_count"] += 1
             
             # 累加 KB 函数调用
             for func, count in kb_usage.items():
@@ -301,11 +336,23 @@ def main():
     
     summary_lines.append(f"Total Tasks Processed : {num_tasks}")
     summary_lines.append("-" * 30)
+    
+    # 1.1 分数统计 (新增)
+    scored_count = global_score_stats["scored_tasks_count"]
+    total_score = global_score_stats["total_score"]
+    avg_score = total_score / scored_count if scored_count > 0 else 0.0
+    
+    summary_lines.append("EVALUATION SCORE STATISTICS")
+    summary_lines.append(f"Tasks with Scores     : {scored_count}")
+    summary_lines.append(f"Total Score Sum       : {total_score:.2f}")
+    summary_lines.append(f"Average Score         : {avg_score:.4f}")
+    summary_lines.append("-" * 30)
+
     summary_lines.append(f"Average LLM Calls     : {avg_calls:.2f}")
     summary_lines.append(f"Average Tokens Used   : {avg_tokens:.2f}")
     summary_lines.append("\n")
     
-    # 2. KB 函数调用统计 (新增板块)
+    # 2. KB 函数调用统计
     summary_lines.append("KB FUNCTION USAGE STATISTICS (Average calls per task)")
     summary_lines.append("-" * 60)
     summary_lines.append(f"{'Function Name':<40} | {'Total Calls':<12} | {'Avg/Task':<10}")
@@ -348,6 +395,7 @@ def main():
         with open(summary_path, 'w', encoding='utf-8') as f:
             f.write("\n".join(summary_lines))
         print(f"\nGlobal summary saved to: {summary_path}")
+        print(f"Average Score: {avg_score:.4f}")
         print(f"Individual task reports saved in each task folder.")
     except Exception as e:
         print(f"Failed to save global summary: {e}")

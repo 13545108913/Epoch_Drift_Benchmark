@@ -79,7 +79,7 @@ async def run_test_case_with_webrover(
     )
 
     # --- 新增代码开始：发送干扰信号 ---
-    proxy_url = "http://172.26.116.102:8080/?logging=StartingRun1"
+    proxy_url = "http://dockerized-magento.local/admin/?logging=StartingRun1"
     
     # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
     # 这样 addon 脚本才能捕获到这个请求并重置状态
@@ -91,7 +91,7 @@ async def run_test_case_with_webrover(
 
     try:
         # 发送请求，设置超时防止卡死
-        response = requests.get(proxy_url, proxies=proxies, timeout=5)
+        response = requests.get(proxy_url, proxies=proxies, timeout=20)
         print(f"OK: Connect to {proxy_url}")
     except requests.exceptions.ProxyError:
         print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
@@ -102,7 +102,7 @@ async def run_test_case_with_webrover(
     # ===========================================================================
     # [Drift & Security Patch] 注入漂移脚本并强制绕过 CSP/HTTPS 错误
     # ===========================================================================
-    with_drift = False
+    with_drift = True
     drift_intensity = 'high'
     drift_type = 'all'
 
@@ -207,7 +207,7 @@ async def run_test_case_with_webrover(
         await browser.close()
     
     # --- 新增代码开始：发送停止干扰信号 ---
-    stop_url = "http://172.26.116.102:8080/?logging=EndingMyTest"
+    stop_url = "http://dockerized-magento.local/admin/?logging=EndingMyTest"
     
     # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
     # 这样 addon 脚本才能捕获到这个请求并重置状态
@@ -219,7 +219,7 @@ async def run_test_case_with_webrover(
 
     try:
         # 发送请求，设置超时防止卡死
-        response = requests.get(stop_url, proxies=proxies, timeout=5)
+        response = requests.get(stop_url, proxies=proxies, timeout=20)
         print(f"OK: Connect to {stop_url}")
     except requests.exceptions.ProxyError:
         print("Error: Could not connect to mitmproxy on port 8848. Is it running?")

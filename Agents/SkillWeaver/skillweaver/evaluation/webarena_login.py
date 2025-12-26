@@ -24,24 +24,24 @@ async def webarena_renew_comb(comb: dict[str, str], path: str):
     comb = {k: v[7:] if v.startswith("http://") else v for k, v in comb.items()}
 
     # --- 新增代码开始：发送停止干扰信号 ---
-    stop_url = "http://172.26.116.102:8080/?logging=EndingMyTest"
+    # stop_url = "http://dockerized-magento.local/admin/?logging=EndingMyTest"
     
-    # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
-    # 这样 addon 脚本才能捕获到这个请求并重置状态
-    mitm_proxy = "http://127.0.0.1:8848" 
-    proxies = {
-        "http": mitm_proxy,
-        "https": mitm_proxy,
-    }
+    # # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
+    # # 这样 addon 脚本才能捕获到这个请求并重置状态
+    # mitm_proxy = "http://127.0.0.1:8848" 
+    # proxies = {
+    #     "http": mitm_proxy,
+    #     "https": mitm_proxy,
+    # }
 
-    try:
-        # 发送请求，设置超时防止卡死
-        response = requests.get(stop_url, proxies=proxies, timeout=5)
-        print(f"OK: Connect to {stop_url}")
-    except requests.exceptions.ProxyError:
-        print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
-    except Exception as e:
-        print(f"Failed to send stop signal: {e}")
+    # try:
+    #     # 发送请求，设置超时防止卡死
+    #     response = requests.get(stop_url, proxies=proxies, timeout=20)
+    #     print(f"OK: Connect to {stop_url}")
+    # except requests.exceptions.ProxyError:
+    #     print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
+    # except Exception as e:
+    #     print(f"Failed to send stop signal: {e}")
     # --- 新增代码结束 ---
 
     # Returns the filename.
@@ -85,12 +85,30 @@ async def webarena_renew_comb(comb: dict[str, str], path: str):
                 password = ACCOUNTS["shopping_admin"]["password"]
                 print(f"Logging into {key} at {host}")
                 print(f"user: {username}, pass: {password}")
-                await page.goto(f"http://{host}/admin")
-                await page.get_by_placeholder("user name").fill(username)
-                await page.get_by_placeholder("password").fill(password)
-                await page.get_by_role("button", name="Sign in").click()
+                await page.goto(f"http://{host}")
+                # await page.get_by_placeholder("user name").fill(username)
+                # await page.get_by_placeholder("password").fill(password)
+                # await page.get_by_role("button", name="Sign in").click()
+                # 1. 输入用户名
+                await page.locator("#username").fill(username)
+
+                # 2. 输入密码 (HTML中 id="login")
+                await page.locator("#login").fill(password)
+
+                # 3. 点击登录按钮
+                # 定义 M1 风格的按钮 (get_by_role 不需要 await)
+                button_m1 = page.get_by_role("button", name="Login")
+
+                # 定义 M2 风格的按钮 (get_by_role 不需要 await)
+                button_m2 = page.get_by_role("button", name="Sign in")
+
+                # 结合两者，点击任意存在的那个 (click 需要 await)
+                await button_m1.or_(button_m2).click(timeout=60000)
                 # Wait for the request to finish.
                 await page.wait_for_load_state("networkidle")
+
+                # await page.goto("http://dockerized-magento.local/admin/?logging=StartingRun1")
+                # await page.goto("http://dockerized-magento.local/admin/")
 
             if key == "gitlab":
                 username = ACCOUNTS["gitlab"]["username"]

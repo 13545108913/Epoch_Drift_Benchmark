@@ -180,7 +180,7 @@ async def make_browser(
         viewport={"width": width, "height": height},
         locale=locale,
         record_video_dir=video_dir,
-        proxy={"server": "http://127.0.0.1:8848"},
+        # proxy={"server": "http://127.0.0.1:8848"},
         # record_har_path=har_path,
         # geolocation=geolocation,
     )

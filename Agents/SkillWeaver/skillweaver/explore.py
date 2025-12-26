@@ -505,21 +505,19 @@ def cli(
             #         )
             # ================= 修改开始 =================
             # 既然你是远程环境，直接指定地址，不要让它去连本地的 5125 端口
-            target_url = os.getenv("GITLAB", "http://172.26.116.102:8080")
+            # ================= 修改开始 =================
             
-            # 如果你输入的 website 是 "gitlab"，我们手动配置连接
+            # 1. GitLab 处理逻辑
             if website == "gitlab":
+                target_url = os.getenv("GITLAB", "http://172.26.116.102:8080")
                 print(f"正在连接远程 GitLab: {target_url}")
                 
                 base_urls = [target_url] * num_workers
                 storage_states = []
 
-                # 尝试自动登录生成 Cookie (前提是你的远程环境也是标准的 WebArena 镜像，账号密码没变)
-                # 如果自动登录失败，你可以将下面这段 try-except 注释掉，并将 storage_states 设为 [None] * num_workers
                 for i in range(num_workers):
-                    print(f"Worker {i}: 正在尝试自动登录...")
+                    print(f"Worker {i}: 正在尝试自动登录 GitLab...")
                     try:
-                        # 传入 "gitlab" 键名，让脚本知道用 gitlab 的默认账号密码去登录你的 URL
                         state = login_subprocess({"gitlab": target_url})
                         storage_states.append(state)
                         print(f"Worker {i}: 登录成功！")
@@ -527,7 +525,6 @@ def cli(
                         print(f"Worker {i}: 自动登录失败，将以未登录状态继续。错误: {e}")
                         storage_states.append(None)
 
-                # 直接开始探索，不需要 async with containers(...)
                 await explore(
                     agent_lm=agent_lm,
                     success_check_lm=success_check_lm,
@@ -544,6 +541,44 @@ def cli(
                     return_home_every_n_iterations=1,
                     num_workers=num_workers,
                 )
+
+            # 2. [新增] Shopping Admin 处理逻辑
+            elif website == "shopping_admin":
+                target_url = "http://dockerized-magento.local/index.php/admin/"
+                print(f"正在连接 Shopping Admin: {target_url}")
+
+                base_urls = [target_url] * num_workers
+                storage_states = []
+
+                for i in range(num_workers):
+                    print(f"Worker {i}: 正在尝试自动登录 Shopping Admin...")
+                    try:
+                        # 传入 "shopping_admin" 作为 key，以便 login_subprocess 查找对应的账号密码
+                        state = login_subprocess({"shopping_admin": target_url})
+                        storage_states.append(state)
+                        print(f"Worker {i}: 登录成功！")
+                    except Exception as e:
+                        print(f"Worker {i}: 自动登录失败，将以未登录状态继续。错误: {e}")
+                        storage_states.append(None)
+
+                await explore(
+                    agent_lm=agent_lm,
+                    success_check_lm=success_check_lm,
+                    api_synthesis_lm=api_synthesis_lm,
+                    base_urls=base_urls,
+                    storage_states=storage_states,
+                    iterations=iterations,
+                    store_dir=os.path.abspath(out_dir),
+                    is_live_website=False,
+                    initial_knowledge_base=initial_knowledge_base,
+                    allow_recovery=allow_recovery,
+                    explore_schedule=explore_schedule,
+                    allow_retrieval_module=allow_retrieval_module,
+                    return_home_every_n_iterations=1,
+                    num_workers=num_workers,
+                )
+
+            # 3. 其他通用网站处理逻辑
             else:
                 await explore(
                     agent_lm=agent_lm,
