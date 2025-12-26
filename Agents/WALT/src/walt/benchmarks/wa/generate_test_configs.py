@@ -24,7 +24,7 @@ def main() -> None:
     print(f"MAP: {MAP}")
     
     
-    with open("test_configs/gitlab_tasks_final_v16.json", "r") as f:
+    with open("test_configs/admin_tasks_final_v2.json", "r") as f:
         raw = f.read()
         
     # Replace URL placeholders with environment variables

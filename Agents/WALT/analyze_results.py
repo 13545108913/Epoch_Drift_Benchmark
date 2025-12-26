@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import List
 
 # --- 配置路径 ---
-BASE_DIR = "outputs/wa_gitlab_v16"
+BASE_DIR = "outputs/wa_shopping_admin_v2_drift"
 PERFORMANCE_DIR = os.path.join(BASE_DIR, "performance")
 TRAJECTORY_DIR = os.path.join(BASE_DIR, "trajectory")
-KB_TOOLS_DIR = "walt-tools/gitlab"
+KB_TOOLS_DIR = "walt-tools/shopping_admin"
 
 # --- 1. 工具发现与加载模块 (保持不变) ---
 def _discover_tool_files(tool_dir: str, tool_type: str = "base") -> List[Path]:
@@ -68,7 +68,7 @@ def analyze_performance():
                 file_count += 1
         except Exception: pass
     if file_count > 0:
-        print(f"分析文件: {file_count} | 平均 Score: {mean(scores):.4f} | 平均 Tokens: {mean(input_tokens):.2f}")
+        print(f"分析文件: {file_count} | 平均 Score: {mean(scores):.4f} | 平均 Tokens: {mean(input_tokens):.2f} | 数量: {file_count * mean(scores)}")
     print("-" * 30 + "\n")
 
 # --- 3. Trajectory 分析 (核心修改部分) ---
@@ -145,7 +145,7 @@ def analyze_trajectory(kb_functions: set):
     # --- 输出结果 ---
     if step_counts:
         print(f"分析文件总数: {total_files_processed}")
-        print(f"平均 Step 数: {mean(step_counts):.3f}")
+        print(f"平均 Step 数: {mean(step_counts):.2f}")
         
         print("\n=== 知识库函数平均调用次数 (Per Task) ===")
         # 仅显示调用过的，或者全部显示

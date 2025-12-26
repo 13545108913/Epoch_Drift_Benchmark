@@ -395,7 +395,7 @@ def config() -> argparse.Namespace:
         help="Maximum number of concurrent tasks per process",
     )
     parser.add_argument("--test_start_idx", type=int, default=0)
-    parser.add_argument("--test_end_idx", type=int, default=80)
+    parser.add_argument("--test_end_idx", type=int, default=114)
     parser.add_argument("--force_login_every_task", action="store_true")
     parser.add_argument("--run_as_debug_mode", action="store_true")
     parser.add_argument(
@@ -407,7 +407,7 @@ def config() -> argparse.Namespace:
     parser.add_argument(
         "--task_retries",
         type=int,
-        default=1,  # Retry failed tasks once
+        default=0,  # Retry failed tasks once
         help="Number of retries for failed tasks (default: 1)",
     )
 
