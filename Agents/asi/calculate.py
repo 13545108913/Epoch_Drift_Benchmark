@@ -4,9 +4,11 @@ import re
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
 
-def analyze_webarena_results(result_dir: str = "./results", llm_info_dir: str = "./llm_info") -> Dict:
+OUTPUT_FILE = "analyze/webarena_statistics_admin_v1_drift.json"
+
+def analyze_webarena_results(result_dir: str = "./admin_results/results_v2_drift", llm_info_dir: str = "./admin_llm_info/llm_info_v2_drift") -> Dict:
     """
-    分析WebArena任务运行结果，包含LLM调用统计
+    分析WebArena任务运行结果，包含LLM调用统计 (Token及调用次数)
     
     Args:
         result_dir: 结果目录路径
@@ -36,7 +38,7 @@ def analyze_webarena_results(result_dir: str = "./results", llm_info_dir: str = 
     failed_scores = []
     
     # LLM调用统计列表 (存储字典)
-    # 结构: {"total": int, "step1": int, "step2": int, "step3": int, "step4": int}
+    # 新结构: {"calls": int, "prompt_tokens": int, "completion_tokens": int, "total_tokens": int}
     all_llm_usage = []
     successful_llm_usage = []
     failed_llm_usage = []
@@ -55,9 +57,9 @@ def analyze_webarena_results(result_dir: str = "./results", llm_info_dir: str = 
             
             # 文件路径
             autoeval_file = task_dir / "deepseek-chat_autoeval.json"
-            cleaned_steps_file = task_dir / "cleaned_steps.json" # 用于 step3 统计
             summary_file = task_dir / "summary_info.json"
-            llm_file = llm_info_path / f"{task_id}.json" # LLM info 文件
+            # 修改：更新 LLM info 文件路径格式
+            llm_file = llm_info_path / f"myBenchmark.{task_id}.json" 
             
             # 1. 获取步骤数、分数和错误信息
             n_steps = None
@@ -89,41 +91,30 @@ def analyze_webarena_results(result_dir: str = "./results", llm_info_dir: str = 
                 except (json.JSONDecodeError, KeyError):
                     pass
             
-            # 2. 获取 LLM 调用信息并应用逻辑
+            # 2. 获取 LLM 调用信息并应用新逻辑
             llm_data = None
             if llm_file.exists():
                 try:
                     with open(llm_file, 'r', encoding='utf-8') as f:
-                        llm_json = json.load(f)
-                        result_str = llm_json.get("result", "")
-                        # 解析字符串: "Task [0]: Total 2 (step1_solve: 2, step2_eval: 0, step3_cal: 0, step4_induce: 0)"
-                        # 使用正则提取
-                        match = re.search(r"step1_solve:\s*(\d+).*?step2_eval:\s*(\d+).*?step3_cal:\s*(\d+).*?step4_induce:\s*(\d+)", result_str)
+                        # 修改：读取列表格式的 JSON 数据
+                        llm_items = json.load(f)
                         
-                        if match:
-                            s1 = int(match.group(1))
-                            s2 = int(match.group(2))
-                            s3 = int(match.group(3))
-                            s4 = int(match.group(4))
+                        if isinstance(llm_items, list):
+                            calls_count = len(llm_items)
+                            prompt_tokens_sum = 0
+                            completion_tokens_sum = 0
+                            total_tokens_sum = 0
                             
-                            # --- 应用自定义统计逻辑 ---
-                            # 如果存在 deepseek-chat_autoeval.json，则 step2_eval + 1
-                            if autoeval_file.exists():
-                                s2 += 1
-                            
-                            # 如果存在 cleaned_steps.json，则 step3_cal + 1
-                            if cleaned_steps_file.exists():
-                                s3 += 1
-                            
-                            # 重新计算 Total
-                            total_calls = s1 + s2 + s3 + s4
+                            for item in llm_items:
+                                prompt_tokens_sum += item.get("prompt_tokens", 0)
+                                completion_tokens_sum += item.get("completion_tokens", 0)
+                                total_tokens_sum += item.get("total_tokens", 0)
                             
                             llm_data = {
-                                "total": total_calls,
-                                "step1_solve": s1,
-                                "step2_eval": s2,
-                                "step3_cal": s3,
-                                "step4_induce": s4
+                                "calls": calls_count,
+                                "prompt_tokens": prompt_tokens_sum,
+                                "completion_tokens": completion_tokens_sum,
+                                "total_tokens": total_tokens_sum
                             }
                             all_llm_usage.append(llm_data)
                 except Exception as e:
@@ -176,12 +167,13 @@ def analyze_webarena_results(result_dir: str = "./results", llm_info_dir: str = 
             "max": max(data_list)
         }
     
-    # LLM 专用统计函数 (处理字典列表)
+    # LLM 专用统计函数 (修改为统计 Token 和 Calls)
     def calculate_llm_stats(usage_list: List[Dict]) -> Dict:
         if not usage_list:
             return {}
         
-        keys = ["total", "step1_solve", "step2_eval", "step3_cal", "step4_induce"]
+        # 修改：更新统计 Key
+        keys = ["calls", "prompt_tokens", "completion_tokens", "total_tokens"]
         stats = {}
         for key in keys:
             values = [d[key] for d in usage_list]
@@ -244,16 +236,15 @@ def print_statistics(stats: Dict):
     print("\n" + "-"*20 + " 分数统计 (Score) " + "-"*20)
     print_sub_stats("所有任务", stats["score_statistics"]["all_tasks"])
 
-    # --- LLM 调用统计 (新增) ---
-    print("\n" + "-"*20 + " LLM 调用次数统计 " + "-"*20)
+    # --- LLM 调用统计 (更新) ---
+    print("\n" + "-"*20 + " LLM Token & 调用统计 " + "-"*20)
     llm_stats = stats["llm_statistics"]["all_tasks"]
     if llm_stats:
-        print(f"  统计样本数: {llm_stats['total']['count']}")
-        print(f"  [Total] 平均: {llm_stats['total']['mean']} (Max: {llm_stats['total']['max']})")
-        print(f"  [Step1 Solve]  平均: {llm_stats['step1_solve']['mean']}")
-        print(f"  [Step2 Eval]   平均: {llm_stats['step2_eval']['mean']} (包含自动修正)")
-        print(f"  [Step3 Cal]    平均: {llm_stats['step3_cal']['mean']} (包含自动修正)")
-        print(f"  [Step4 Induce] 平均: {llm_stats['step4_induce']['mean']}")
+        print(f"  统计样本数: {llm_stats['calls']['count']}")
+        print(f"  [API Calls]         平均: {llm_stats['calls']['mean']} (Max: {llm_stats['calls']['max']})")
+        print(f"  [Total Tokens]      平均: {llm_stats['total_tokens']['mean']} (Max: {llm_stats['total_tokens']['max']})")
+        print(f"  [Prompt Tokens]     平均: {llm_stats['prompt_tokens']['mean']}")
+        print(f"  [Completion Tokens] 平均: {llm_stats['completion_tokens']['mean']}")
     else:
         print("  无 LLM 统计数据")
 
@@ -263,8 +254,10 @@ def print_statistics(stats: Dict):
     if stats['error_statistics']['error_messages']:
         print(f"  首个错误示例: {stats['error_statistics']['error_messages'][0]['err_msg']}")
 
-def save_statistics(stats: Dict, output_file: str = "analyze/webarena_statistics_admin_v1_drift.json"):
+def save_statistics(stats: Dict, output_file: str = OUTPUT_FILE):
     try:
+        # 确保输出目录存在
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(stats, f, indent=2, ensure_ascii=False)
         print(f"\n统计结果已保存到: {output_file}")
@@ -273,13 +266,15 @@ def save_statistics(stats: Dict, output_file: str = "analyze/webarena_statistics
 
 def main():
     print("正在分析WebArena运行结果...")
-    # 假设 llm_info 文件夹在当前目录下，如果位置不同请修改此处
     try:
-        stats = analyze_webarena_results()
+        # 你可以在这里传入你的实际路径
+        stats = analyze_webarena_results() 
         print_statistics(stats)
-        save_statistics(stats)
+        # save_statistics(stats)
     except Exception as e:
         print(f"错误: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
