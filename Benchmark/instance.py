@@ -220,7 +220,7 @@ logger = logging.getLogger(__name__)
 AVAILABLE_VERSIONS = ["v1", "v2"] 
 
 # 定义站点名称
-SITE_NAMES = ("GITLAB", "SHOPPING_ADMIN", )
+SITE_NAMES = ("GITLAB", "SHOPPING_ADMIN", "WORDPRESS", )
 
 class MyBenchmarkInstance:
     """
@@ -310,6 +310,9 @@ class MyBenchmarkInstance:
                 # 结合两者，点击任意存在的那个
                 button_m1.or_(button_m2).click(timeout=60000)
 
+                page.goto(f"{base_url}/?logging=StartingRun1") 
+            
+            case "wordpress":
                 page.goto(f"{base_url}/?logging=StartingRun1") 
 
             # ... (其他站点的登录逻辑同理，只需确保使用 base_url) ...

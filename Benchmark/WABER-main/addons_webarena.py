@@ -36,7 +36,8 @@ env_flags = {
     '127.0.0.1:7770': None,  # shopping
     'dockerized-magento.local': None,  # shopping_admin 
     '172.26.116.102:8080': None,  # gitlab
-    '127.0.0.1:8888': None  # wikipedia
+    '127.0.0.1:8888': None,  # wikipedia
+    'localhost:7780': None,
 }
 
 # regular expressions for starting and ending task urls

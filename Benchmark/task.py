@@ -82,7 +82,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
 
         import os
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        json_file_path = os.path.join(current_dir, 'admin_tasks_final_v1.json')
+        json_file_path = os.path.join(current_dir, 'admin_tasks_final_v2.json')
         with open(json_file_path, "r", encoding="utf-8") as f:
             all_configs_str = f.read()
 
