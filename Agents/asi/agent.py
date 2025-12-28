@@ -89,7 +89,7 @@ class DemoAgent(Agent):
         if not (use_html or use_axtree):
             raise ValueError(f"Either use_html or use_axtree must be set to True.")
 
-        custom_actions = ACTION_DICT["general"] + ACTION_DICT["webarena"] + ACTION_DICT["admin"]
+        custom_actions = ACTION_DICT["general"] + ACTION_DICT["webarena"]
         
 
         self.action_set = CustomActionSet(

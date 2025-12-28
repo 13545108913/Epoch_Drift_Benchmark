@@ -182,7 +182,7 @@ https://github.com/ServiceNow/AgentLab"""
         os.replace(exp_args.exp_dir, f"results/{args.rename_to}")
 
     # --- 新增代码开始：发送停止干扰信号 ---
-    stop_url = "http://dockerized-magento.local/admin/?logging=EndingMyTest"
+    stop_url = "http://localhost:7780/admin/?logging=EndingMyTest"
     
     # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
     # 这样 addon 脚本才能捕获到这个请求并重置状态
