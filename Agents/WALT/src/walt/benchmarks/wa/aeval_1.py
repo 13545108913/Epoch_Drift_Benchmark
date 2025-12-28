@@ -394,7 +394,7 @@ def config() -> argparse.Namespace:
         default=16,
         help="Maximum number of concurrent tasks per process",
     )
-    parser.add_argument("--test_start_idx", type=int, default=60)
+    parser.add_argument("--test_start_idx", type=int, default=0)
     parser.add_argument("--test_end_idx", type=int, default=114)
     parser.add_argument("--force_login_every_task", action="store_true")
     parser.add_argument("--run_as_debug_mode", action="store_true")
@@ -837,7 +837,7 @@ async def evaluate_task_core(
 
 
         # --- 新增代码开始：发送干扰信号 ---
-        proxy_url = "http://172.26.116.102:8080/?logging=StartingRun1"
+        proxy_url = "http://localhost:7780/admin/?logging=StartingRun1"
         
         # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
         # 这样 addon 脚本才能捕获到这个请求并重置状态
@@ -1283,7 +1283,7 @@ async def evaluate_task_core(
         gc.collect()
 
     # --- 新增代码开始：发送停止干扰信号 ---
-    stop_url = "http://172.26.116.102:8080/?logging=EndingMyTest"
+    stop_url = "http://localhost:7780/admin/?logging=EndingMyTest"
     
     # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
     # 这样 addon 脚本才能捕获到这个请求并重置状态

@@ -82,7 +82,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
 
         import os
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        json_file_path = os.path.join(current_dir, 'admin_tasks_final_v2.json')
+        json_file_path = os.path.join(current_dir, 'wordpress_task/wordpress_tasks_final.json')
         with open(json_file_path, "r", encoding="utf-8") as f:
             all_configs_str = f.read()
 
@@ -100,6 +100,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
         replacements = {
             "__GITLAB__": self.webarena_instance.urls["gitlab"][self.site_version],
             "__SHOPPING_ADMIN__": self.webarena_instance.urls["shopping_admin"][self.site_version],
+            "__WORDPRESS__": self.webarena_instance.urls["wordpress"][self.site_version],
         }
         
         for pattern, target_url in replacements.items():

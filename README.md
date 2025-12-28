@@ -70,7 +70,7 @@ Password: a_very_secure_password_123!
 ```bash
 $env:BASE_URL="http://172.26.116.102"              
 $env:WA_SHOPPING="http://localhost:7770/"
-$env:WA_SHOPPING_ADMIN="http://localhost:7780/admin"
+$env:WA_SHOPPING_ADMIN="http://dockerized-magento.local/admin"
 $env:WA_REDDIT="http://localhost:9999"
 $env:WA_GITLAB="http://localhost:8080"
 $env:WA_WIKIPEDIA="http://localhost:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
@@ -78,7 +78,7 @@ $env:WA_MAP="http://localhost:3000"
 $env:WA_HOMEPAGE="http://localhost:4399"
          
 $env:SHOPPING="http://localhost:7770/"
-$env:SHOPPING_ADMIN="http://localhost:7780/admin"
+$env:SHOPPING_ADMIN="http://dockerized-magento.local/admin"
 $env:REDDIT="http://localhost:9999"
 $env:GITLAB="http://localhost:8080"
 $env:WIKIPEDIA="http://localhost:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
@@ -93,25 +93,29 @@ $env:WA_GITLAB_V2="http://localhost:8080"
 ```bash
 BASE_URL="http://172.26.116.102"                                                                                     
 export WA_SHOPPING="$BASE_URL:7770/"
-export WA_SHOPPING_ADMIN="http://dockerized-magento.local/admin"
+export WA_SHOPPING_ADMIN="http://localhost:7780/admin"
 export WA_REDDIT="$BASE_URL:9999"
 export WA_GITLAB="$BASE_URL:8080"
 export WA_WIKIPEDIA="$BASE_URL:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
 export WA_MAP="$BASE_URL:3000"
 export WA_HOMEPAGE="$BASE_URL:4399"
+export WA_WORDPRESS="http://localhost:8000"
 
 export SHOPPING="$BASE_URL:7770/"
-export SHOPPING_ADMIN="http://dockerized-magento.local/admin"
+export SHOPPING_ADMIN="http://localhost:7780/admin"
 export REDDIT="$BASE_URL:9999"
 export GITLAB="$BASE_URL:8080"
 export WIKIPEDIA="$BASE_URL:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
 export MAP="$BASE_URL:3000"
 export HOMEPAGE="$BASE_URL:4399"
+export WORDPRESS="http://localhost:8000"
 
 export WA_GITLAB_V1="$BASE_URL:8080"
 export WA_GITLAB_V2="$BASE_URL:8080"
-export WA_SHOPPING_ADMIN_V1="http://dockerized-magento.local/admin"
-export WA_SHOPPING_ADMIN_V2="http://dockerized-magento.local/admin"
+export WA_SHOPPING_ADMIN_V1="http://localhost:7780/admin"
+export WA_SHOPPING_ADMIN_V2="http://localhost:7780/admin"
+export WA_WORDPRESS_V1="http://localhost:8000"
+export WA_WORDPRESS_V2="http://localhost:8000"
 ```
 
 ### Magento
@@ -148,6 +152,14 @@ tar -xzvf magento-full-backup.tar.gz -C my-magento
 cd my-magento
 
 ./magento start
+```
+
+```bash
+docker load --input shopping_admin_final_0719.tar
+docker run --name shopping_admin -p 7780:80 -d shopping_admin_final_0719
+docker exec shopping_admin /var/www/magento2/bin/magento setup:store-config:set --base-url="http://localhost:7780" # no trailing slash
+docker exec shopping_admin mysql -u magentouser -pMyPassword magentodb -e  'UPDATE core_config_data SET value="http://localhost:7780/" WHERE path = "web/secure/base_url";'
+docker exec shopping_admin /var/www/magento2/bin/magento cache:flush
 ```
 
 #### Magento 2.4
@@ -219,7 +231,12 @@ python run_online_parallel.py --website gitlab --task_ids 0-161 --fast
 ```bash
 python -m skillweaver.explore gitlab logs/explore-gitlab
 
+
+python -m skillweaver.explore shopping_admin logs/explore-admin
+
 python -m skillweaver.evaluation.evaluate_benchmark gitlab results/gitlab_with_skills_v12_waber_3 --knowledge-base-path-prefix logs/explore-gitlab/iter_159/kb_post --pool-size 1
+
+python -m skillweaver.evaluation.evaluate_benchmark shopping_admin results/admin_with_skills_v2_waber --knowledge-base-path-prefix logs/explore-admin/iter_159/kb_post --pool-size 1
 
 python -m skillweaver.evaluation.evaluate_single_task --task_id 8 --out_dir results/gitlab_with_skills_v12 --knowledge_base_path_prefix logs/explore-gitlab/iter_159/kb_post
 ```
@@ -235,6 +252,9 @@ python run_myBenchmark_muse.py
 walt discover --url http://172.26.116.102:8080 --llm "deepseek-chat" --planner-llm "deepseek-chat" --max-processes 8 --auth-file /Users/chenboyu/Desktop/Epoch_Drift_Benchmark/Agents/WALT/gitlab_state.json
 
 python src/walt/benchmarks/wa/aeval.py --config experiment_configs/wa_with_tools.yaml --tool_dir walt-tools/gitlab_v12/ --expose_tool_actions
+
+
+walt discover --url http://dockerized-magento.local/admin --llm "deepseek-chat" --planner-llm "deepseek-chat" --max-processes 8 --auth-file /Users/chenboyu/Desktop/Epoch_Drift_Benchmark/Agents/WALT/shopping_admin_state.json
 ```
 
 ## Drift脚本
@@ -474,7 +494,7 @@ git clone 的比对逻辑需要修改
 ```
 2.4也要改: 59, 126
 
-删除: 4, 5, 6, 17, 22, 23, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 45, 46, 61, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 87, 88, 89, 90-94, 101, 112-116, 117-121, 132-135, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175-178, 180, 181
+删除: 4, 5, 6, 17, 22, 23, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 45, 46, 61, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 87, 88, 89, 90, 91, 92, 93, 94, 101, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 132, 133, 134, 135, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 178, 180, 181
 ```
 
 ### git clone 的command需要修改（不一定为ssh://git@172.26.116.102:2223/eriklindernoren/PyTorch-GAN.git）
@@ -488,6 +508,13 @@ git clone 的比对逻辑需要修改
 | SkillWeaver | 18.06%   | 15.07%   | 12.63%    | 17.90%    | 13.75%    |
 | WALT        | 27.78%   | 19.75%   |  0.00%    | 25.93%    | 23.46%    |
 
+| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         | 57.89%   |  18.42%  |   19.30%   |  28.07%   |  23.68%   |
+| ASI         | 50.00%   |  28.07%  |   18.42%   |  37.72%   |  19.30%   |
+| SkillWeaver | 15.38%   |  8.25%  |   11.36%   |  16.81%   |   2.04%  |
+| WALT        | 28.95%   |  8.77%  |   0.00%   |  49.12%   |   37.72%  |
+
 ### LLM调用次数
 | 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
 |:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
@@ -495,6 +522,13 @@ git clone 的比对逻辑需要修改
 | ASI         | 7.68    | 8.03     | 9.37    | 9.00    | 9.39     |
 | SkillWeaver | 14.14   | 15.07    | 34.24   | 21.85   | 23.68    |
 | WALT        | 8.69    | 8.90     |  0      | 8.65    | 8.78     |
+
+| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         |  6.85  |  8.28  |   9.36   |  6.82   |   7.42   |
+| ASI         |  7.19  |  8.30  |   8.93   |  7.50   |   7.15  |
+| SkillWeaver |  11.56  |  19.13  |   18.32   |  8.23   |   8.84  |
+| WALT        | 17.44   |  25.40  |   0.00   |  15.83   |   16.62   |
 
 ### Skill调用次数
 | 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |

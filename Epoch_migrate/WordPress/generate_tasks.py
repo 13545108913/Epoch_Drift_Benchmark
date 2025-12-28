@@ -5,7 +5,7 @@ import os
 # ================= 配置 =================
 INPUT_FILE = 'diverse_real_world_data.json'
 OUTPUT_FILE = 'benchmark_tasks.json'
-TASKS_PER_TEMPLATE = 6  # 每个模版生成的任务数量
+TASKS_PER_TEMPLATE = 8  # 每个模版生成的任务数量
 # =======================================
 
 def load_data():
@@ -38,7 +38,14 @@ def generate_tasks(articles):
             "start_url": "__WORDPRESS__",
             "intent_template": template,
             "instantiation_dict": params,
-            "intent": intent
+            "intent": intent,
+            "eval": {
+                "eval_types": ["url_match"],
+                "reference_answers": None,
+                "reference_url": "__WORDPRESS__",
+                "program_html": [],
+                "url_note": "GOLD in PRED"
+            }
         })
         task_id_counter += 1
 
@@ -96,8 +103,8 @@ def generate_tasks(articles):
     # ---------------------------------------------------------
     template_4 = "Navigate to the {{category}} category page."
     # 循环使用现有分类
-    for _ in range(TASKS_PER_TEMPLATE):
-        cat = random.choice(categories)
+    for i in range(len(categories)):
+        cat = categories[i]
         add_task(template_4, {"category": f"'{cat}'"})
 
     # ---------------------------------------------------------
@@ -106,8 +113,8 @@ def generate_tasks(articles):
     template_5 = "Find the link to the {{element}} and click it."
     elements = ["Next Post", "Previous Post", "Home", "About", "RSS Feed", "Comments"]
     
-    for _ in range(TASKS_PER_TEMPLATE):
-        element = random.choice(elements)
+    for i in range(6):
+        element = elements[i]
         add_task(template_5, {"element": f"'{element}'"})
 
     # ---------------------------------------------------------
@@ -115,12 +122,26 @@ def generate_tasks(articles):
     # ---------------------------------------------------------
     template_6 = "Go to the {{title}} post and leave a comment saying: {{content}}."
     comments = [
-        "Great article!", 
-        "Thanks for sharing.", 
-        "Agent Report: Found it", 
-        "Interesting perspective.", 
-        "Could you elaborate on this?",
-        "Test comment for benchmark."
+        # 积极反馈
+        "Great article!",
+        "Excellent write-up!",
+        "Very informative post.",
+        "Well written and easy to understand.",
+        "This is exactly what I was looking for.",
+        
+        # 感谢类
+        "Thanks for sharing.",
+        "Thank you for this helpful guide.",
+        "Appreciate the detailed explanation.",
+        "Thanks, this solved my problem.",
+        "Grateful for this resource.",
+        
+        # 观点类
+        "Interesting perspective.",
+        "Never thought about it this way.",
+        "This gives me a new angle to consider.",
+        "Fascinating approach.",
+        "Unique viewpoint.",
     ]
     
     selected_titles_6 = random.sample(titles, min(len(titles), TASKS_PER_TEMPLATE))
@@ -145,6 +166,115 @@ def generate_tasks(articles):
             "element": f"'{section}'",
             "adj": adj
         })
+
+    # ... (保留原有的 Template 1-7 代码) ...
+
+    # =========================================================
+    # 数据预处理扩展 (为新任务准备数据)
+    # =========================================================
+    # 提取或生成标签 (Tags)
+    all_tags = []
+    for a in articles:
+        # 如果JSON里有tags字段则读取，否则从标题里提取单词作为伪标签
+        if 'tags' in a and isinstance(a['tags'], list):
+            all_tags.extend(a['tags'])
+        else:
+            all_tags.extend([w for w in a.get('title', '').split() if len(w) > 5])
+    
+    # 去重并提供兜底数据
+    unique_tags = list(set(all_tags))
+    if not unique_tags: unique_tags = ["news", "update", "featured", "tech"]
+
+    # 提取作者 (Authors) - 默认为 admin
+    authors = list(set([a.get('author') for a in articles if a.get('author')]))
+    if not authors: authors = ["admin", "editor"]
+
+    # =========================================================
+    # 新增扩展模版 (Template 8 - 13)
+    # =========================================================
+
+    # ---------------------------------------------------------
+    # Template 8: Tag Navigation (标签云/标签页测试)
+    # "Navigate to the tag archive for {{tag}} and verify if the page title contains the tag name."
+    # ---------------------------------------------------------
+    template_8 = "Navigate to the tag archive for {{tag}} and verify if the page title contains the tag name."
+    for _ in range(TASKS_PER_TEMPLATE):
+        tag = random.choice(unique_tags)
+        # 简单的清洗
+        tag = ''.join(e for e in tag if e.isalnum())
+        add_task(template_8, {"tag": f"'{tag}'"})
+
+    # ---------------------------------------------------------
+    # Template 9: Author Archives (作者归档页测试)
+    # "Click on the author name {{author}} on any post to view all articles written by them."
+    # ---------------------------------------------------------
+    # template_9 = "Click on the author name {{author}} on any post to view all articles written by them."
+    # for _ in range(TASKS_PER_TEMPLATE):
+    #     author = random.choice(authors)
+    #     add_task(template_9, {"author": f"'{author}'"})
+
+    # ---------------------------------------------------------
+    # Template 10: Pagination (分页导航测试)
+    # "Scroll to the bottom of the homepage and navigate to page {{page_num}} of the blog feed."
+    # ---------------------------------------------------------
+    template_10 = "Scroll to the bottom of the homepage and navigate to page {{page_num}} of the blog feed."
+    # 假设博客有至少3页
+    page_nums = ["2", "3", "4", "5", "6"] 
+    for i in range(len(page_nums)):
+        page_num = page_nums[i]
+        add_task(template_10, {"page_num": page_num})
+
+    # ---------------------------------------------------------
+    # Template 11: Contact Form Interaction (非评论类表单)
+    # "Navigate to the 'Contact' page and submit a message with subject {{subject}} and body {{body}}."
+    # ---------------------------------------------------------
+    # template_11 = "Navigate to the 'Contact' page and submit a message with subject {{subject}} and body {{body}}."
+    # subjects = ["Inquiry", "Feedback", "Support Request", "Hello"]
+    # bodies = [
+    #     "I would like to know more about your services.", 
+    #     "I found a bug on your website.", 
+    #     "Just wanted to say hi!", 
+    #     "Please update your contact info."
+    # ]
+    
+    # for _ in range(TASKS_PER_TEMPLATE):
+    #     subj = random.choice(subjects)
+    #     body = random.choice(bodies)
+    #     add_task(template_11, {
+    #         "subject": f"'{subj}'",
+    #         "body": f"'{body}'"
+    #     })
+
+    # ---------------------------------------------------------
+    # Template 12: Content Verification (阅读理解/视觉验证)
+    # "Open the article {{title}} and check if it contains an image with the alt text {{alt_text}}."
+    # ---------------------------------------------------------
+    # 注意：这个任务假设Agent有能力检查DOM属性。如果没有真实Alt text数据，这里用通用词模拟。
+    template_12 = "Open the article {{title}} and check if it contains an image related to {{keyword}}."
+    
+    selected_titles_12 = random.sample(titles, min(len(titles), TASKS_PER_TEMPLATE))
+    for title in selected_titles_12:
+        # 简单地取标题里的一个词作为假设的图片关键词
+        words = title.split()
+        keyword = words[-1] if words else "image"
+        add_task(template_12, {
+            "title": f"'{title}'",
+            "keyword": f"'{keyword}'"
+        })
+
+    # ---------------------------------------------------------
+    # Template 13: Sidebar/Widget Date Navigation (归档微件)
+    # "Find the 'Archives' widget and click on the link for {{month_year}}."
+    # ---------------------------------------------------------
+    template_13 = "Find the 'Archives' widget and click on the link for {{month_year}}."
+    # 生成最近几个月的日期字符串
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    years = ["2023", "2024", "2025"]
+    
+    for _ in range(TASKS_PER_TEMPLATE):
+        month = random.choice(months)
+        year = random.choice(years)
+        add_task(template_13, {"month_year": f"'{month} {year}'"})
 
     return tasks
 
