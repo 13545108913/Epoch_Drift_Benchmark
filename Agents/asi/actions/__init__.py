@@ -19,7 +19,7 @@ from browsergym.core.action.functions import (
 
 # %% Import Induced Actions
 
-from actions import shopping, admin, reddit, map, gitlab
+from actions import shopping, admin, reddit, map, gitlab, wordpress
 
 def get_functions(module, prefix='actions.') -> list:
     functions = []
@@ -44,6 +44,7 @@ ACTION_DICT = {
     "reddit": get_functions(reddit),
     "gitlab": get_functions(gitlab),
     "map": get_functions(map),
+    "wordpress": get_functions(wordpress),
     "general": [],
 }
 
@@ -54,5 +55,6 @@ RETRIEVABLE_ACTIONS_DICT = {
     "reddit": [],
     "gitlab": [],
     "map": [],
+    "wordpress": [],
     "general": [],
 }

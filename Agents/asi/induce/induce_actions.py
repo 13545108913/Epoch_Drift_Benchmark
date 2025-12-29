@@ -319,7 +319,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--template_id", type=str, default=None)
     parser.add_argument("--website", type=str, required=True,
-                        choices=["shopping", "admin", "reddit", "gitlab", "map"])
+                        choices=["shopping", "admin", "reddit", "gitlab", "map", "wordpress"])
     parser.add_argument("--config_dir", type=str, default="config_files")
     parser.add_argument("--results_dir", type=str, default="results")
     parser.add_argument("--result_id_list", type=str, nargs="+", default=None, help="E.g., '110 111'.")

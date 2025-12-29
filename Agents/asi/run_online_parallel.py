@@ -277,10 +277,10 @@ def process_single_task_awm(tid, args, lock):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--website", type=str, required=True,
-                        choices=["shopping", "admin", "reddit", "gitlab", "map"])
+                        choices=["shopping", "admin", "reddit", "gitlab", "map", "wordpress"])
     parser.add_argument("--task_ids", type=str, required=True,
                         help="xxx-xxx,xxx-xxx")
-    parser.add_argument("--workers", type=int, default=1, 
+    parser.add_argument("--workers", type=int, default=8, 
                         help="Number of parallel processes")
     # 新增参数 --fast
     parser.add_argument("--fast", action="store_true", 
@@ -299,7 +299,7 @@ def main():
         lock = manager.Lock()
         
         # 根据参数选择使用的函数
-        target_func = process_single_task_fast if args.fast else process_single_task
+        target_func = process_single_task_fast if args.fast else process_single_task_awm
         
         func = partial(target_func, args=args, lock=lock)
         

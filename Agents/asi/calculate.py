@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple, Any
 
 OUTPUT_FILE = "analyze/webarena_statistics_admin_v1_drift.json"
 
-def analyze_webarena_results(result_dir: str = "./admin_results/results_v2_drift", llm_info_dir: str = "./admin_llm_info/llm_info_v2_drift") -> Dict:
+def analyze_webarena_results(result_dir: str = "./results", llm_info_dir: str = "./llm_info") -> Dict:
     """
     分析WebArena任务运行结果，包含LLM调用统计 (Token及调用次数)
     

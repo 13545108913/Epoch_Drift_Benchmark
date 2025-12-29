@@ -79,7 +79,7 @@ def parse_args():
 
     parser.add_argument(
         "--websites", type=str, nargs='+', default=[],
-        choices=["shopping", "admin", "reddit", "gitlab", "map"],
+        choices=["shopping", "admin", "reddit", "gitlab", "map", "wordpress"],
         help="Name of the website(s) to run the agent on. Used to define agent's action space.",
     )
     parser.add_argument(
@@ -182,23 +182,23 @@ https://github.com/ServiceNow/AgentLab"""
         os.replace(exp_args.exp_dir, f"results/{args.rename_to}")
 
     # --- 新增代码开始：发送停止干扰信号 ---
-    stop_url = "http://localhost:7780/admin/?logging=EndingMyTest"
+    # stop_url = "http://localhost:7780/admin/?logging=EndingMyTest"
     
-    # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
-    # 这样 addon 脚本才能捕获到这个请求并重置状态
-    mitm_proxy = "http://127.0.0.1:8848" 
-    proxies = {
-        "http": mitm_proxy,
-        "https": mitm_proxy,
-    }
+    # # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
+    # # 这样 addon 脚本才能捕获到这个请求并重置状态
+    # mitm_proxy = "http://127.0.0.1:8848" 
+    # proxies = {
+    #     "http": mitm_proxy,
+    #     "https": mitm_proxy,
+    # }
 
-    try:
-        # 发送请求，设置超时防止卡死
-        response = requests.get(stop_url, proxies=proxies, timeout=5)
-    except requests.exceptions.ProxyError:
-        print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
-    except Exception as e:
-        print(f"Failed to send stop signal: {e}")
+    # try:
+    #     # 发送请求，设置超时防止卡死
+    #     response = requests.get(stop_url, proxies=proxies, timeout=5)
+    # except requests.exceptions.ProxyError:
+    #     print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
+    # except Exception as e:
+    #     print(f"Failed to send stop signal: {e}")
     # --- 新增代码结束 ---
 
 if __name__ == "__main__":

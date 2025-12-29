@@ -11,10 +11,11 @@ REDDIT = f"{BASE_URL}:9999"
 GITLAB = f"{BASE_URL}:8081"
 MAP = f"{BASE_URL}:3000"
 WIKIPEDIA = f"{BASE_URL}:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
+WORDPRESS = "http://localhost:8000"
 
 
 def main() -> None:
-    with open("./admin_tasks_final_v1.json", "r") as f:
+    with open("./wordpress_tasks_final.json", "r") as f:
         raw = f.read()
     raw = raw.replace("__GITLAB__", GITLAB)
     raw = raw.replace("__REDDIT__", REDDIT)
@@ -22,6 +23,7 @@ def main() -> None:
     raw = raw.replace("__SHOPPING_ADMIN__", SHOPPING_ADMIN)
     raw = raw.replace("__WIKIPEDIA__", WIKIPEDIA)
     raw = raw.replace("__MAP__", MAP)
+    raw = raw.replace("__WORDPRESS__", WORDPRESS)
     with open("./test.json", "w") as f:
         f.write(raw)
     # split to multiple files
