@@ -16,6 +16,7 @@ from walt.browser_use.custom.evaluators.wa.env_config import (
     SHOPPING,
     SHOPPING_ADMIN,
     WIKIPEDIA,
+    WORDPRESS,
 )
 from walt.browser_use.custom.evaluators.wa.openai_utils import (
     generate_from_openai_chat_completion,

@@ -14,6 +14,7 @@ def main() -> None:
     SHOPPING_ADMIN = os.environ.get("SHOPPING_ADMIN", "http://localhost:7780/admin")
     WIKIPEDIA = os.environ.get("WIKIPEDIA", "http://localhost:8888")
     MAP = os.environ.get("MAP", "http://localhost:3000")
+    WORDPRESS = os.environ.get("WORDPRESS", "http://localhost:8000")
     
     print("Generating WebArena test configs...")
     print(f"GITLAB: {GITLAB}")
@@ -22,9 +23,10 @@ def main() -> None:
     print(f"SHOPPING_ADMIN: {SHOPPING_ADMIN}")
     print(f"WIKIPEDIA: {WIKIPEDIA}")
     print(f"MAP: {MAP}")
+    print(f"WORDPRESS: {WORDPRESS}")
     
     
-    with open("test_configs/admin_tasks_final_v2.json", "r") as f:
+    with open("test_configs/wordpress_tasks_final.json", "r") as f:
         raw = f.read()
         
     # Replace URL placeholders with environment variables
@@ -34,6 +36,7 @@ def main() -> None:
     raw = raw.replace("__SHOPPING_ADMIN__", SHOPPING_ADMIN)
     raw = raw.replace("__WIKIPEDIA__", WIKIPEDIA)
     raw = raw.replace("__MAP__", MAP)
+    raw = raw.replace("__WORDPRESS__", WORDPRESS)
     
     # Write the processed config file
     with open("test_configs/test.json", "w") as f:

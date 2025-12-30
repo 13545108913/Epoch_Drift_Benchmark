@@ -26,7 +26,8 @@ import os
 import traceback
 import time
 import shutil
-
+from drift import DriftInjector
+from anomaly import InterferenceController
 
 def classify_task_error(error_type: str, error_message: str) -> str:
     """
@@ -395,7 +396,7 @@ def config() -> argparse.Namespace:
         help="Maximum number of concurrent tasks per process",
     )
     parser.add_argument("--test_start_idx", type=int, default=0)
-    parser.add_argument("--test_end_idx", type=int, default=114)
+    parser.add_argument("--test_end_idx", type=int, default=79)
     parser.add_argument("--force_login_every_task", action="store_true")
     parser.add_argument("--run_as_debug_mode", action="store_true")
     parser.add_argument(
@@ -779,7 +780,7 @@ async def evaluate_task_core(
         # Select planner based on image presence (VWA-style logic)
         if len(images) > 0:
             planner_llm = planner_llm_with_vision
-            use_vision_for_planner = True
+            use_vision_for_planner = False
         else:
             planner_llm = planner_llm_wo_vision
             use_vision_for_planner = False
@@ -794,7 +795,16 @@ async def evaluate_task_core(
             is_headless = True
         else:
             is_headless = False
-        browser_config = BrowserConfig(headless=is_headless)
+        # browser_config = BrowserConfig(headless=is_headless)
+        # 添加 Chrome 启动参数来禁用 Web 安全策略
+        browser_config = BrowserConfig(
+            headless=is_headless,
+            extra_chromium_args=[
+                "--disable-web-security",           # 彻底禁用同源策略和 CSP
+                "--ignore-certificate-errors",      # 忽略 HTTPS 错误
+                "--disable-features=IsolateOrigins,site-per-process" # 防止 iframe 跨域隔离问题
+            ]
+        )
         browser = WABrowser(browser_config)
         if args.sleep_after_execution != 0:
             this_task_logger.warning("sleep_after_execution > 0 not implemented!")
@@ -825,6 +835,127 @@ async def evaluate_task_core(
 
         env = WAEnv(browser=browser, context=context)
         await env.areset(options={"config_file": config_file})
+
+
+        # --- 新增代码开始：发送干扰信号 ---
+        proxy_url = "http://localhost:7780/admin/?logging=StartingRun1"
+        
+        # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
+        # 这样 addon 脚本才能捕获到这个请求并重置状态
+        mitm_proxy = "http://127.0.0.1:8848" 
+        proxies = {
+            "http": mitm_proxy,
+            "https": mitm_proxy,
+        }
+
+        try:
+            # 发送请求，设置超时防止卡死
+            response = requests.get(proxy_url, proxies=proxies, timeout=5)
+            print(f"OK: Connect to {proxy_url}")
+        except requests.exceptions.ProxyError:
+            print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
+        except Exception as e:
+            print(f"Failed to send stop signal: {e}")
+        # --- 新增代码结束 ---
+
+        # =========================================================================
+        # [NEW] Drift Injection Logic
+        # =========================================================================
+        with_drift = False
+        with_waber = False
+        drift_intensity = 'high'
+        drift_type = 'all'
+
+        if with_waber:
+            controller = InterferenceController(
+                addon_mode=1
+            )
+            # 挂载干扰逻辑
+            page = await context.get_current_page()
+            await page.route("**/*", controller.route_handler)
+            await page.goto("http://localhost:8000/?logging=StartingRun1", timeout=60000, wait_until="domcontentloaded") 
+
+        if with_drift:
+            try:
+                # 1. 获取当前 Page 对象
+                # 注意：context.get_current_page() 返回的是 Playwright Page 对象
+                page = await context.get_current_page()
+                
+                # 2. 建立 CDP Session (关键步骤)
+                # 这允许我们直接向 Chrome 发送底层调试指令
+                cdp_session = await page.context.new_cdp_session(page)
+                
+                # 3. 强制禁用 CSP (Content Security Policy)
+                # 这样你的 <style> 和 JS 修改就不会被网站的安全策略拦截
+                await cdp_session.send("Page.enable")
+                await cdp_session.send("Page.setBypassCSP", {"enabled": True})
+                
+                # 4. (可选) 忽略 HTTPS 证书错误
+                # 如果测试环境是自签名的，这一步可以防止红色警告拦截页面
+                await cdp_session.send("Security.enable")
+                await cdp_session.send("Security.setIgnoreCertificateErrors", {"ignore": True})
+                
+                this_task_logger.info("🛡️ Security Bypass Active: CSP disabled, HTTPS errors ignored via CDP.")
+
+            except Exception as e:
+                # 即使失败也不要在此时阻断流程，记录警告即可
+                this_task_logger.warning(f"⚠️ Failed to enforce security bypass via CDP: {e}")
+
+            
+            injector = DriftInjector()
+            drift_script = injector.generate_drift_script(
+                drift_type=drift_type, 
+                intensity=drift_intensity
+            )
+            
+            try:
+                # 获取当前 Playwright 的 Page 对象
+                # 注意：context.get_current_page() 通常返回 Playwright Page 对象
+                page = await context.get_current_page()
+                
+                # 1. 立即在当前页面执行 (针对 SPA 或初始加载页面)
+                await page.evaluate(drift_script)
+                
+                # 2. 添加为 init_script (针对页面刷新或跳转，确保 Drift 持续生效)
+                # page.context 是 Playwright 的 Context 对象
+                await page.context.add_init_script(drift_script)
+                
+                this_task_logger.info(
+                    f"⚠️ DRIFT INJECTED | Type: {drift_type} | "
+                    f"Intensity: {drift_intensity} | Seed: 42"
+                )
+            except Exception as e:
+                this_task_logger.error(f"Failed to inject drift script: {e}")
+
+            # [调试/验证] 检查注入是否成功
+            try:
+                # 1. 截图
+                debug_dir = os.path.join(args.result_dir, "debug_drift")
+                os.makedirs(debug_dir, exist_ok=True)
+                screenshot_path = os.path.join(debug_dir, f"{task_id}_verified.png")
+                page = await context.get_current_page()
+                await page.screenshot(path=screenshot_path)
+                
+                # 2. 运行简单的 JS 探针
+                probe_result = await page.evaluate("""() => {
+                    return {
+                        seed_set: window.__drift_seed !== undefined,
+                        style_injected: !!document.getElementById('drift-style-injected'),
+                        drift_classes: document.querySelectorAll('.drift-c').length
+                    }
+                }""")
+                
+                this_task_logger.info(f"🔎 Drift Verification for {task_id}: {probe_result}")
+                
+                if not probe_result['style_injected']:
+                    this_task_logger.error("❌ Drift Style NOT detected! CSP might be blocking it.")
+                else:
+                    this_task_logger.info("✅ Drift successfully active.")
+                    
+            except Exception as verify_err:
+                this_task_logger.warning(f"Could not verify drift status: {verify_err}")
+        
+        # =========================================================================
 
         # reload the narrative memory; since we run in asyncio, the access to the narrative memory should be thread-safe
         # so we need to lock the access to the narrative memory
@@ -900,6 +1031,11 @@ async def evaluate_task_core(
                 - Most questions expect a text answer expect it to be concise and to the point, no longer than 1 sentence.
                 - If you are unsure about what a task is specifically asking for, it is ok to return a more comprehensive answer (but still try to keep it concise).
             """
+        else:
+            extend_system_message += """
+                - Most questions expect a text answer expect it to be concise and to the point, no longer than 1 sentence.
+                - If you are unsure about what a task is specifically asking for, it is ok to return a more comprehensive answer (but still try to keep it concise).
+            """
 
         if args.expose_multimodal_actions:
             from walt.browser_use.custom.skills import register_generic_skills
@@ -914,12 +1050,17 @@ async def evaluate_task_core(
             "gitlab",
             "map",
             "wikipedia",
+            "wordpress",
         ], f"Invalid split for WebArena: {split}"
 
         # Register tool actions if enabled
+        tool_count_1 = 0
         if args.expose_tool_actions:
             # Resolve tool directory path (handle relative paths)
-            tool_dir = Path(args.tool_dir) 
+            tool_dir = Path(args.tool_dir)
+            # if not os.path.isabs(tool_dir):
+            #     # Make relative paths relative to the script directory
+            #     tool_dir = Path(__file__).parent / tool_dir
 
             tool_count = register_tools(
                 controller,
@@ -928,6 +1069,8 @@ async def evaluate_task_core(
                 this_task_logger,
                 fallback_to_agent=args.fallback_to_agent,
             )
+            
+            tool_count_1 = tool_count
 
             if tool_count > 0:
                 extend_system_message += f"""
@@ -1008,7 +1151,17 @@ async def evaluate_task_core(
             register_done_callback=(verify_with_judge_callback if args.verify_with_judge else None),
         )
 
+        debug_dir = os.path.join(args.result_dir, "debug_drift")
+        os.makedirs(debug_dir, exist_ok=True)
+        screenshot_path = os.path.join(debug_dir, f"{task_id}_verified_1.png")
+        page = await context.get_current_page()
+        await page.screenshot(path=screenshot_path)
+
         history, current_page = await agent.run(max_steps=args.max_steps)
+
+        screenshot_path = os.path.join(debug_dir, f"{task_id}_verified_2.png")
+        page = await context.get_current_page()
+        await page.screenshot(path=screenshot_path)
 
         # extracted_content
         final_result = history.final_result()
@@ -1018,9 +1171,9 @@ async def evaluate_task_core(
         evaluator = evaluator_router(config_file)
         score = await evaluator(trajectory=trajectory, config_file=config_file, page=current_page)
         if int(score) == 1:
-            this_task_logger.info(f"[Result] (PASS) {config_file}")
+            this_task_logger.info(f"[Result] (PASS) {config_file} hh {tool_count_1}")
         else:
-            this_task_logger.info(f"[Result] (FAIL) {config_file}")
+            this_task_logger.info(f"[Result] (FAIL) {config_file} hh {tool_count_1}")
 
         jsonfied_trajectory = agent.get_jsonfied_trajectory()
         trajectory_path = os.path.join(args.result_dir, "trajectory")
@@ -1144,6 +1297,28 @@ async def evaluate_task_core(
         import gc
 
         gc.collect()
+
+    # --- 新增代码开始：发送停止干扰信号 ---
+    stop_url = "http://localhost:7780/admin/?logging=EndingMyTest"
+    
+    # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
+    # 这样 addon 脚本才能捕获到这个请求并重置状态
+    mitm_proxy = "http://127.0.0.1:8848" 
+    proxies = {
+        "http": mitm_proxy,
+        "https": mitm_proxy,
+    }
+
+    try:
+        # 发送请求，设置超时防止卡死
+        response = requests.get(stop_url, proxies=proxies, timeout=5)
+        print(f"OK: Connect to {stop_url}")
+    except requests.exceptions.ProxyError:
+        print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
+    except Exception as e:
+        print(f"Failed to send stop signal: {e}")
+    # --- 新增代码结束 ---
+
     return score, token_usage_data
 
 

@@ -8,6 +8,7 @@ GITLAB = os.environ.get("WA_GITLAB", "")
 WIKIPEDIA = os.environ.get("WA_WIKIPEDIA", "")
 MAP = os.environ.get("WA_MAP", "")
 HOMEPAGE = os.environ.get("WA_HOMEPAGE", "")
+WORDPRESS = os.environ.get("WA_WORDPRESS", "")
 
 assert (
     REDDIT
@@ -17,6 +18,7 @@ assert (
     and WIKIPEDIA
     and MAP
     and HOMEPAGE
+    and WORDPRESS
 ), (
     f"Please setup the URLs to each site. Current: \n"
     + f"Reddit: {REDDIT}\n"
@@ -26,6 +28,7 @@ assert (
     + f"Wikipedia: {WIKIPEDIA}\n"
     + f"Map: {MAP}\n"
     + f"Homepage: {HOMEPAGE}\n"
+    + f"Wordpress: {WORDPRESS}\n"
 )
 
 
@@ -48,4 +51,5 @@ URL_MAPPINGS = {
     WIKIPEDIA: "http://wikipedia.org",
     MAP: "http://openstreetmap.org",
     HOMEPAGE: "http://homepage.com",
+    WORDPRESS: "http://localhost:8000",
 }

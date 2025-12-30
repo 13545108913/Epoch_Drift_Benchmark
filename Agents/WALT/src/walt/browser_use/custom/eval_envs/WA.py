@@ -103,6 +103,12 @@ class WABrowserContext(BrowserContextBugFix):
             # Connect to existing Chrome instance instead of creating new one
             context = browser.contexts[0]
         else:
+            # 获取配置中的路径
+            storage_state = self.config.storage_state
+
+            # 如果路径是空字符串，将其强制设为 None，这样 Playwright 会忽略它
+            if storage_state == "":
+                storage_state = None
             # Original code for creating new context
             context = await browser.new_context(
                 viewport=self.config.browser_window_size,
@@ -116,7 +122,7 @@ class WABrowserContext(BrowserContextBugFix):
                 locale=self.config.locale,
                 device_scale_factor=1,
                 geolocation=self.config.geolocation,
-                storage_state=self.config.storage_state,
+                storage_state=storage_state,
                 # proxy={"server": "http://127.0.0.1:8848"},
             )
 
