@@ -580,11 +580,15 @@ def cli(
 
             # 3. 其他通用网站处理逻辑
             else:
+                target_url = "http://localhost:8000"
+                print(f"正在连接 Wordpress: {target_url}")
+
+                base_urls = [target_url] * num_workers
                 await explore(
                     agent_lm=agent_lm,
                     success_check_lm=success_check_lm,
                     api_synthesis_lm=api_synthesis_lm,
-                    base_urls=["http://" + website] * num_workers,
+                    base_urls=base_urls,
                     storage_states=[None] * num_workers,
                     iterations=iterations,
                     store_dir=os.path.abspath(out_dir),

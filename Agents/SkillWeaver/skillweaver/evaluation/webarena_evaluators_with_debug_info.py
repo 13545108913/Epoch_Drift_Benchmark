@@ -1,5 +1,6 @@
-"""base class for evaluation (LLM-Enhanced Async Version)"""
+"""base class for evaluation"""
 
+# answer string match
 import asyncio
 import collections
 import html
@@ -7,32 +8,18 @@ import json
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any, List, Union
 
-from openai import AsyncOpenAI  # 新增依赖
+from nltk.tokenize import word_tokenize
 from playwright.async_api import CDPSession, Page
 from typing_extensions import TypedDict
 
-# 保持原有的 SkillWeaver 引用
 from skillweaver.environment import State
 from skillweaver.evaluation.webarena_config import _resolve_start_url
-from skillweaver.util.perfmon import monitor
 from skillweaver.evaluation.webarena_helper_functions import (
-    PseudoPage, 
-    # 下面这些辅助函数在 LLM 版中可能用不到，但为了兼容性保留
-    gitlab_get_project_member_role, 
-    llm_fuzzy_match, 
-    llm_ua_match,
-    reddit_get_post_url, 
-    shopping_get_latest_order_url,
+    PseudoPage, gitlab_get_project_member_role, llm_fuzzy_match, llm_ua_match,
+    reddit_get_post_url, shopping_get_latest_order_url,
     shopping_get_sku_latest_review_author,
-    shopping_get_sku_latest_review_rating
-)
-
-# --- DeepSeek Configuration ---
-DEEPSEEK_API_KEY = "sk-41fae6597fd14d6fa2c5c4068c0e5760"
-DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEEPSEEK_MODEL = "deepseek-chat"
+    shopping_get_sku_latest_review_rating)
 
 Trajectory = tuple[list[State], list[dict]]
 
@@ -45,54 +32,6 @@ class CheckResult(TypedDict):
 class Outcome(TypedDict):
     score: float
     checks: list[CheckResult]
-
-
-class LLMJudge:
-    """Helper class to handle DeepSeek API calls asynchronously."""
-    def __init__(self):
-        self.client = AsyncOpenAI(
-            api_key=DEEPSEEK_API_KEY,
-            base_url=DEEPSEEK_BASE_URL
-        )
-
-    async def check(self, system_prompt: str, user_prompt: str) -> CheckResult:
-        """
-        Sends request to LLM and parses the result into a CheckResult.
-        We ask the LLM to return JSON to make parsing robust.
-        """
-        try:
-            response = await self.client.chat.completions.create(
-                model=DEEPSEEK_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0.0,
-                response_format={"type": "json_object"} # DeepSeek supports JSON mode
-            )
-            content = response.choices[0].message.content
-            result_json = json.loads(content)
-
-            cmpl_tokens = response.usage.completion_tokens  # type: ignore
-            prompt_tokens = response.usage.prompt_tokens  # type: ignore
-
-            monitor.log_token_usage("general", "openai:" + DEEPSEEK_MODEL, prompt_tokens, cmpl_tokens)
-            
-            # Normalize keys just in case
-            success = result_json.get("success", result_json.get("correct", False))
-            reason = result_json.get("reason", "No reason provided by LLM.")
-            
-            return {"success": bool(success), "reason": reason}
-            
-        except Exception as e:
-            # Fallback for API errors
-            return {
-                "success": False, 
-                "reason": f"LLM Evaluation Failed: {str(e)}"
-            }
-
-# Global instance
-llm_judge = LLMJudge()
 
 
 class Evaluator(object):
@@ -110,9 +49,10 @@ class Evaluator(object):
 
 
 class StringEvaluator(Evaluator):
-    """
-    Check whether the answer is correct using DeepSeek LLM.
-    Replaces rigid exact_match/must_include with semantic verification.
+    """Check whether the answer is correct with:
+    exact match: the answer is exactly the same as the reference answer
+    must include: each phrase in the reference answer must be included in the answer
+    fuzzy match: the answer is similar to the reference answer, using LLM judge
     """
 
     @staticmethod
@@ -124,6 +64,32 @@ class StringEvaluator(Evaluator):
             answer = answer[1:-1]
         return answer.lower()
 
+    @staticmethod
+    def exact_match(ref: str, pred: str) -> float:
+        return float(
+            StringEvaluator.clean_answer(pred) == StringEvaluator.clean_answer(ref)
+        )
+
+    @staticmethod
+    def must_include(ref: str, pred: str, tokenize: bool = False) -> float:
+        clean_ref = StringEvaluator.clean_answer(ref)
+        clean_pred = StringEvaluator.clean_answer(pred)
+        # tokenize the answer if the ref is a single word
+        # prevent false positive (e.g, 0)
+        if tokenize and len(clean_ref) == 1 and len(word_tokenize(clean_ref)) == 1:
+            tok_pred = word_tokenize(clean_pred)
+            return float(clean_ref in tok_pred)
+        else:
+            return float(clean_ref in clean_pred)
+
+    @staticmethod
+    def fuzzy_match(ref: str, pred: str, intent: str) -> float:
+        return llm_fuzzy_match(pred, ref, intent)
+
+    @staticmethod
+    def ua_match(ref: str, pred: str, intent: str) -> float:
+        return llm_ua_match(pred, ref, intent)
+
     async def __call__(
         self,
         trajectory: Trajectory,
@@ -134,65 +100,90 @@ class StringEvaluator(Evaluator):
         with open(config_file, "r") as f:
             configs = json.load(f)
 
-        _, actions = trajectory
+        states, actions = trajectory
 
-        # Extract Prediction
         if actions[-1].get("terminate_with_result"):
             pred = self.clean_answer(actions[-1]["terminate_with_result"])
         elif actions[-1].get("name") == "terminate":
             pred = self.clean_answer(actions[-1]["args"]["result"])
         else:
+            # Was likely truncated.
             return {
                 "score": 0,
-                "checks": [{
-                    "reason": "Last action was non-terminal (likely truncated)",
-                    "success": False,
-                }],
+                "checks": [
+                    {
+                        "reason": "Last action was non-terminal (likely truncated)",
+                        "success": False,
+                    }
+                ],
             }
 
-        # Gather References
-        intent = configs.get("intent", "No intent provided")
-        reference_answers = []
-        eval_config = configs["eval"].get("reference_answers", {})
-        
-        # Flatten all reference types (exact, fuzzy, must_include) into a single list of criteria
-        if isinstance(eval_config, dict):
-            for key, val in eval_config.items():
-                if isinstance(val, list):
-                    reference_answers.extend(val)
-                elif isinstance(val, str):
-                    reference_answers.append(val)
-        
-        # Handle N/A logic
-        string_note = configs["eval"].get("string_note", "")
-        if string_note and string_note != "N/A":
-             reference_answers.append(f"Or satisfy logic: {string_note}")
+        score = 1.0
 
-        # Construct Prompt
-        system_prompt = (
-            "You are a strict judge evaluating a Web Agent's performance. "
-            "Compare the Agent's Prediction against the Reference Answers and the User Intent.\n"
-            "Return a JSON object with two keys:\n"
-            "- 'success': boolean (true if the prediction is semantically correct or strictly satisfies the conditions)\n"
-            "- 'reason': string (a brief explanation)\n\n"
-            "Rules:\n"
-            "1. Ignore case and minor formatting issues.\n"
-            "2. If the answer is 'N/A' and the agent explains effectively why it failed (and it matches the scenario), mark as true."
-        )
+        checks = []
+        for approach, value in configs["eval"]["reference_answers"].items():
+            match approach:
+                case "exact_match":
+                    if not self.exact_match(ref=value, pred=pred):
+                        score = 0
+                        checks.append(
+                            {
+                                "success": False,
+                                "reason": f"Exact match failed between ref={repr(value)} and pred={repr(pred)}",
+                            }
+                        )
 
-        user_prompt = (
-            f"User Intent: {intent}\n"
-            f"Reference Answer(s): {reference_answers}\n"
-            f"Agent Prediction: {pred}\n"
-        )
-
-        # Call LLM
-        check_result = await llm_judge.check(system_prompt, user_prompt)
-        
-        return {
-            "score": 1.0 if check_result["success"] else 0.0,
-            "checks": [check_result]
-        }
+                case "must_include":
+                    assert isinstance(value, list)
+                    for must_value in value:
+                        if not self.must_include(
+                            ref=must_value,
+                            pred=pred,
+                            tokenize=(len(value) == 1),
+                        ):
+                            score = 0
+                            checks.append(
+                                {
+                                    "success": False,
+                                    "reason": f"Must include failed between ref={repr(must_value)} (of {repr(value)}) and pred={repr(pred)}",
+                                }
+                            )
+                case "fuzzy_match":
+                    intent = configs["intent"]
+                    if value == "N/A":
+                        # if the instruction only asks the model to generate N/A when encountering an unachievable task
+                        # without more concrete reasons
+                        score *= self.exact_match(ref=value, pred=pred)
+                        # if the instruction also asks the model to generate the reason why the task is unachievable
+                        # this should be the default as it will prevent false positive N/A`
+                        if score != 1:
+                            score = bool(
+                                self.ua_match(
+                                    intent=intent,
+                                    ref=configs["eval"]["string_note"],
+                                    pred=pred,
+                                )
+                            )
+                            checks.append(
+                                {
+                                    "success": score,
+                                    "reason": f"ua_match for intent={repr(intent)}, ref={repr(configs['eval']['string_note'])}, pred={repr(pred)}",
+                                }
+                            )
+                    else:
+                        assert isinstance(value, list)
+                        for reference in value:
+                            if not self.fuzzy_match(
+                                ref=reference, pred=pred, intent=intent
+                            ):
+                                score = 0
+                                checks.append(
+                                    {
+                                        "success": False,
+                                        "reason": f"fuzzy_match for ref={repr(reference)}, pred={repr(pred)}, intent={repr(intent)}",
+                                    }
+                                )
+        return {"score": score, "checks": checks}
 
 
 def clean_url(url: str) -> str:
@@ -201,8 +192,30 @@ def clean_url(url: str) -> str:
     return url
 
 
+def parse_url(url: str) -> tuple[str, dict[str, list[str]]]:
+    """Parse a URL into its base, path, and query components."""
+    parsed_url = urllib.parse.urlparse(url)
+    base_path = parsed_url.netloc + parsed_url.path
+    query = urllib.parse.parse_qs(parsed_url.query)
+    return base_path, query
+
+
+def parse_urls(
+    urls: list[str],
+) -> tuple[list[str], dict[str, set[str]]]:
+    """Parse a list of URLs."""
+    base_paths = []
+    queries = collections.defaultdict(set)
+    for url in urls:
+        base_path, query = parse_url(url)
+        base_paths.append(base_path)
+        for k, v in query.items():
+            queries[k].update(v)
+    return base_paths, queries
+
+
 class URLEvaluator(Evaluator):
-    """Check URL matching using LLM semantic understanding"""
+    """Check URL matching"""
 
     async def __call__(
         self,
@@ -214,55 +227,62 @@ class URLEvaluator(Evaluator):
         with open(config_file, "r") as f:
             configs = json.load(f)
 
-        states, _ = trajectory
-        
-        # Current State
-        actual_url = clean_url(states[-1].url)
-        
-        # Reference Config
-        ref_url_raw = configs["eval"]["reference_url"]
-        intent = configs.get("intent", "Navigate to the correct page.")
-        
-        # Pre-process references (resolve base URLs if needed)
-        # We keep the logic of splitting |OR| to show the LLM valid options
-        possible_urls = ref_url_raw.split(" |OR| ")
-        resolved_refs = []
-        for u in possible_urls:
-            try:
-                # Attempt to resolve if it's a relative path logic, otherwise keep string
-                resolved = _resolve_start_url(u) 
-                resolved_refs.append(clean_url(resolved))
-            except:
-                resolved_refs.append(u)
+        states, actions = trajectory
+        checks: list[CheckResult] = []
 
-        system_prompt = (
-            "You are evaluating if a Web Agent reached the correct URL. "
-            "Return a JSON object with {'success': bool, 'reason': str}.\n"
-            "Rules:\n"
-            "1. Ignore session IDs, tracking params (utm_*, etc.), and random hashes.\n"
-            "2. Focus on domain, path, and key query parameters (like product ID).\n"
-            "3. If the User Intent implies being on a specific page type, and the Actual URL matches that type, mark true."
-        )
+        url = states[-1].url
+        pred = clean_url(url)
+        ref_urls = configs["eval"]["reference_url"].split(" |OR| ")
+        ref_urls = [_resolve_start_url(url) for url in ref_urls]
+        ref_urls = [clean_url(url) for url in ref_urls]
+        matching_rule = configs["eval"].get("url_note", "GOLD in PRED")
+        if matching_rule == "GOLD in PRED":
+            ref_base_paths, ref_queries = parse_urls(ref_urls)
+            pred_base_paths, pred_query = parse_url(pred)
 
-        user_prompt = (
-            f"User Intent: {intent}\n"
-            f"Allowed Reference URL(s): {resolved_refs}\n"
-            f"Actual URL: {actual_url}\n"
-        )
+            base_score = float(
+                any(
+                    [
+                        ref_base_path in pred_base_paths
+                        for ref_base_path in ref_base_paths
+                    ]
+                )
+            )
+            checks.append(
+                {
+                    "success": bool(base_score),
+                    "reason": f"pred_base_paths={repr(pred_base_paths)} and ref_base_paths={repr(ref_base_paths)} "
+                    + ("intersect" if base_score else "don't intersect"),
+                }
+            )
+            query_score = 1.0
+            for k, possible_values in ref_queries.items():
+                query_score *= float(
+                    any(
+                        possible_ref_value in pred_query.get(k, [])
+                        for possible_ref_value in possible_values
+                    )
+                )
+            if len(ref_queries) > 0:
+                checks.append(
+                    {
+                        "success": bool(query_score),
+                        "reason": (
+                            "query parameter check failed",
+                            "query parameter check succeeded",
+                        )[int(query_score)],
+                    }
+                )
+            score = base_score * query_score
 
-        check_result = await llm_judge.check(system_prompt, user_prompt)
+        else:
+            raise ValueError(f"Unknown matching rule: {matching_rule}")
 
-        return {
-            "score": 1.0 if check_result["success"] else 0.0,
-            "checks": [check_result]
-        }
+        return {"score": score, "checks": checks}
 
 
 class HTMLContentEvaluator(Evaluator):
-    """
-    Check whether the contents appear in the page using LLM.
-    Keeps Playwright for extraction, uses LLM for verification.
-    """
+    """Check whether the contents appear in the page"""
 
     async def __call__(
         self,
@@ -275,105 +295,100 @@ class HTMLContentEvaluator(Evaluator):
             configs = json.load(f)
 
         targets = configs["eval"]["program_html"]
-        
-        overall_score = 1.0
-        checks: list[CheckResult] = []
 
+        score = 1.0
+        checks: list[CheckResult] = []
         for target in targets:
-            # --- 1. Navigation & Extraction Logic (Keep Strict Python/JS) ---
-            target_url: str = target["url"]
+            target_url: str = target["url"]  # which url to check
             if target_url.startswith("func"):
                 func = target_url.split("func:")[1]
                 func = func.replace("__last_url__", page.url)
-                try:
-                    target_url = eval(func)
-                except Exception as e:
-                     checks.append({"success": False, "reason": f"Failed to eval target url func: {e}"})
-                     return {"score": 0.0, "checks": checks}
+                target_url = eval(func)
 
-            locator: str = target["locator"]
+            locator: str = target["locator"]  # js element locator
 
-            # navigate
+            # navigate to that url
             if target_url != "last":
-                try:
-                    target_url = _resolve_start_url(target_url)
-                    await page.goto(target_url)
-                    await page.wait_for_load_state("load")
-                    await asyncio.sleep(3) 
-                except Exception as e:
-                    checks.append({"success": False, "reason": f"Navigation failed: {e}"})
-                    overall_score = 0.0
-                    continue
+                target_url = _resolve_start_url(target_url)
+                await page.goto(target_url)
+                await page.wait_for_load_state("load")
+                await asyncio.sleep(3)  # TODO [shuyanzh]: fix this hard-coded sleep
 
-            # Extract content
-            selected_element = ""
-            try:
-                if not locator.strip():
-                    selected_element = await page.content()
-                elif locator.startswith("document.") or locator.startswith("[...document."):
-                    if "prep_actions" in target:
+            # empty, use the full page
+            if not locator.strip():
+                selected_element = await page.content()
+            # use JS to select the element
+            elif locator.startswith("document.") or locator.startswith("[...document."):
+                if "prep_actions" in target:
+                    try:
                         for prep_action in target["prep_actions"]:
                             await page.evaluate(f"() => {prep_action}")
-                    val = await page.evaluate(f"() => {locator}")
-                    selected_element = str(val) if val else ""
-                elif locator.startswith("func:"):
-                    func = locator.split("func:")[1]
-                    func = func.replace("__page__", "page")
-                    # Note: eval here is risky but part of original logic. 
-                    # Ideally this func needs 'page' in local scope or wrapped properly.
-                    # Assuming the environment allows this eval execution context.
-                    selected_element = eval(func) 
-                else:
-                    # Fallback standard locator
-                    if await page.locator(locator).count() > 0:
-                        selected_element = await page.locator(locator).first.inner_text()
-            except Exception as e:
-                checks.append({"success": False, "reason": f"Content extraction failed: {e}"})
-                overall_score = 0.0
-                continue
+                    except Exception:
+                        pass
+                try:
+                    selected_element = str(await page.evaluate(f"() => {locator}"))
+                    if not selected_element:
+                        selected_element = ""
+                except Exception:
+                    # the page is wrong, return empty
+                    selected_element = ""
+            # run program to call API
+            elif locator.startswith("func:"):  # a helper function
+                func = locator.split("func:")[1]
+                func = func.replace("__page__", "page")
+                selected_element = eval(func)
+            else:
+                raise ValueError(f"Unknown locator: {locator}")
 
-            selected_element = html.unescape(str(selected_element))
-            
-            # --- 2. LLM Evaluation Logic ---
-            
-            # Gather requirements
-            required_contents = []
+            selected_element = html.unescape(selected_element)
+
             if "exact_match" in target["required_contents"]:
-                required_contents.append(f"Exact match: {target['required_contents']['exact_match']}")
-            if "must_include" in target["required_contents"]:
-                val = target["required_contents"]["must_include"]
-                if isinstance(val, list):
-                    required_contents.extend([f"Must include: {v}" for v in val])
-                else:
-                    required_contents.append(f"Must include: {val}")
+                required_contents = target["required_contents"]["exact_match"]
+                cur_score = StringEvaluator.exact_match(
+                    ref=required_contents, pred=selected_element
+                )
+                if not cur_score:
+                    score = 0
+                    checks.append(
+                        {
+                            "success": False,
+                            "reason": f"Exact match failed between ref={repr(required_contents)} and pred={repr(selected_element)}",
+                        }
+                    )
 
-            if not required_contents:
-                continue
+                score *= float(cur_score)
+                # print(f"[exact match] {cur_score}, selected element: {selected_element}, required contents: {required_contents}")
+            elif "must_include" in target["required_contents"]:
+                required_contents = target["required_contents"]["must_include"]
+                assert isinstance(required_contents, list)
+                for content in required_contents:
+                    content_or = content.split(" |OR| ")
+                    cur_score = any(
+                        [
+                            StringEvaluator.must_include(
+                                ref=content,
+                                pred=selected_element,
+                                tokenize=False,
+                            )
+                            for content in content_or
+                        ]
+                    )
+                    if not cur_score:
+                        score = 0
+                        checks.append(
+                            {
+                                "success": False,
+                                "reason": f"Must include failed between ref={repr(content)} (of {repr(content_or)}) and pred={repr(selected_element)}",
+                            }
+                        )
 
-            # Truncate if content is too massive (e.g. full HTML) to save tokens/avoid errors
-            # 15k chars is usually safe for modern contexts, adjust as needed.
-            truncated_content = selected_element[:15000] + ("..." if len(selected_element) > 15000 else "")
-
-            system_prompt = (
-                "You are verifying if specific information is present in extracted web text. "
-                "Return a JSON object with {'success': bool, 'reason': str}."
-            )
-            
-            user_prompt = (
-                f"Requirements: {required_contents}\n"
-                f"Extracted Text: {truncated_content}\n\n"
-                f"Is the required information present in the text?"
-            )
-
-            check_result = await llm_judge.check(system_prompt, user_prompt)
-            
-            checks.append(check_result)
-            if not check_result["success"]:
-                overall_score = 0.0
-            
-            # Restore state if needed (optional optimization, original script didn't explicitly go back)
-
-        return {"score": overall_score, "checks": checks}
+                    score *= float(cur_score)
+                    # print(f"[must include] {cur_score}, selected element: {selected_element}, required contents: {content_or}")
+            else:
+                raise ValueError(
+                    f"Unknown required_contents: {target['required_contents'].keys()}"
+                )
+        return {"score": score, "checks": checks}
 
 
 class EvaluatorComb:
@@ -393,11 +408,6 @@ class EvaluatorComb:
             result = await evaluator(trajectory, config_file, page, client)
             score *= result["score"]
             checks += result["checks"]
-            
-            # Optional: Fail fast
-            if score == 0.0:
-                break
-                
         return {"score": score, "checks": checks}
 
 

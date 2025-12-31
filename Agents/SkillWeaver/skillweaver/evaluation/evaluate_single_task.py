@@ -41,6 +41,7 @@ from skillweaver.lm import LM
 from skillweaver.util.perfmon import monitor
 
 from .drift import DriftInjector
+from .anomaly import InterferenceController
 
 import requests
 
@@ -103,8 +104,17 @@ async def run_test_case_with_webrover(
     # [Drift & Security Patch] 注入漂移脚本并强制绕过 CSP/HTTPS 错误
     # ===========================================================================
     with_drift = False
+    with_waber = False
     drift_intensity = 'high'
     drift_type = 'all'
+
+    if with_waber:
+        controller = InterferenceController(
+            addon_mode=1
+        )
+        # 挂载干扰逻辑
+        context = browser.context
+        await context.route("**/*", controller.route_handler)
 
     if with_drift:
         # 1. 准备漂移脚本内容

@@ -80,7 +80,7 @@ def evaluate_benchmark(
         str,
         typer.Argument(
             click_type=click.Choice(
-                ["reddit", "webarena", "map", "shopping", "shopping_admin", "gitlab"]
+                ["reddit", "webarena", "map", "shopping", "shopping_admin", "gitlab", "wordpress"]
             )
         ),
     ],
