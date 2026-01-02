@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List
 
 # --- 配置路径 ---
-BASE_DIR = "outputs/wa_shopping_admin_v2_drift"
+BASE_DIR = "outputs_admin/wa_wordpress_v2_drift"
 PERFORMANCE_DIR = os.path.join(BASE_DIR, "performance")
 TRAJECTORY_DIR = os.path.join(BASE_DIR, "trajectory")
 KB_TOOLS_DIR = "walt-tools/shopping_admin"
