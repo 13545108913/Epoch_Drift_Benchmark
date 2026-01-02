@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", function popupHandler() {
 
             // remove event listener when we remove pop-up so if we want to intercept again it can
             document.removeEventListener("DOMContentLoaded", popupHandler);
-            localStorage.removeItem("popupClosed");
+            
         });
     }
 });
@@ -93,58 +93,46 @@ document.addEventListener("DOMContentLoaded", function popupHandler() {
 class InterferenceController:
     def __init__(self, addon_mode=1, target_keys=None):
         self.addon = addon_mode
+        # 定义需要干扰的目标域名/IP
         self.target_keys = target_keys if target_keys else [
-            '172.26.116.102:8080', 'localhost:8000', '172.26.116.102:8081', 'dockerized-magento.local', 'localhost:7780'
+            '172.26.116.102:8080', 'localhost:8000', '172.26.116.102:8081', 
+            'dockerized-magento.local', 'localhost:7780', '127.0.0.1:8000'
         ]
-        self.active_env = None 
+        
+        # 【修改点 1】不再使用 active_env 来开关，而是逻辑上视为“始终开启”
+        # start_patterns 和 end_patterns 保留仅用于日志记录，不再控制开关
         self.start_patterns = {
             key: re.compile(rf'http://{key}.*\?logging=Starting(.*)') for key in self.target_keys
-        }
-        self.end_patterns = {
-            key: re.compile(rf'http://{key}.*\?logging=Ending(.*)') for key in self.target_keys
         }
 
     def log(self, msg):
         print(f"[Controller] {msg}")
 
-    # 注意：这里改为了 async def
     async def route_handler(self, route: Route):
         request = route.request
         url = request.url
         
-        # --- 1. 状态检查与切换逻辑 ---
+        # --- 1. 日志记录 (可选) ---
+        # 即使默认开启，我们也可以记录一下有没有收到 Start 信号，但不影响逻辑
         for key in self.target_keys:
-            start_match = self.start_patterns[key].search(url)
-            if start_match:
-                decoded = unquote(start_match.group(1))
-                self.log(f"🟢 Task START detected for {key}. Msg: {decoded}")
-                self.active_env = key 
-                await route.continue_() # await
-                return
+            if self.start_patterns[key].search(url):
+                self.log(f"ℹ️ Signal detected in URL (Just logging): {url}")
 
-            end_match = self.end_patterns[key].search(url)
-            if end_match:
-                decoded = unquote(end_match.group(1))
-                self.log(f"🔴 Task END detected for {key}. Msg: {decoded}")
-                self.active_env = None 
-                await route.continue_() # await
-                return
-
-        # --- 2. 监听弹窗关闭信号 ---
+        # --- 2. 监听弹窗关闭信号 (必须保留) ---
+        # 这是为了防止弹窗关闭后重复弹出，或者用于后端统计
         if "/popup-closed" in url and request.method == "POST":
             self.log("✅ Popup closed signal received.")
-            await route.fulfill(status=200, body="OK") # await
+            await route.fulfill(status=200, body="OK")
             return
 
-        # --- 3. 干扰注入逻辑 ---
-        if self.active_env:
-            if self.active_env not in url:
-                await route.continue_()
-                return
+        # --- 3. 【核心修改】判定是否需要干扰 ---
+        # 逻辑：如果当前 URL 包含任何一个 target_keys，就直接判定为需要干扰
+        is_target_site = any(key in url for key in self.target_keys)
 
+        if is_target_site:
             # === Addon 2: 500 Error ===
             if self.addon == 2:
-                self.log(">>> Injecting 500 Error")
+                self.log(f">>> Injecting 500 Error for: {url}")
                 await route.fulfill(
                     status=500,
                     content_type="text/html",
@@ -154,42 +142,42 @@ class InterferenceController:
 
             # === Addon 3: Network Delay ===
             if self.addon == 3:
-                self.log(">>> Injecting 10s Delay")
-                # 关键修改：使用 asyncio.sleep 而不是 time.sleep，避免阻塞
-                await asyncio.sleep(10) 
-                await route.continue_() 
+                self.log(f">>> Injecting 10s Delay for: {url}")
+                await asyncio.sleep(10)
+                await route.continue_()
                 return
 
             # === Addon 1: Popup (修改响应体) ===
             if self.addon == 1:
-                try:
-                    # 关键修改：await route.fetch()
-                    response = await route.fetch()
-                    content_type = response.headers.get("content-type", "")
-                    
-                    if "text/html" in content_type:
-                        # 这是一个异步方法，需要 await text()
-                        body = await response.text()
-                        if "</html>" in body:
-                            self.log(f">>> Injecting Popup JS into HTML: {url}")
-                            new_body = body.replace("</html>", OVERLAY_JS + "</html>")
-                            await route.fulfill(response=response, body=new_body)
-                            return
-                    
-                    # 关键修复：如果不是 HTML (如 CSS/JS/Images)，
-                    # 必须把刚才 fetch 到的原样还回去！
-                    # 不能用 route.continue_()，因为 fetch() 已经接管了请求。
-                    await route.fulfill(response=response)
-                    return
-
-                except Exception as e:
-                    self.log(f"Error fetching original response: {e}")
-                    # 出错了尝试放行
+                # 排除静态资源，防止给图片或 CSS 注入 HTML
+                resource_type = request.resource_type
+                if resource_type == "document": 
                     try:
-                        await route.continue_()
-                    except:
-                        pass
-                    return
+                        response = await route.fetch()
+                        # 确保只对 HTML 注入
+                        content_type = response.headers.get("content-type", "")
+                        
+                        if "text/html" in content_type:
+                            body = await response.text()
+                            if "</html>" in body:
+                                self.log(f">>> Injecting Popup JS into HTML: {url}")
+                                # 注入 JS 到 body 结束前
+                                new_body = body.replace("</html>", OVERLAY_JS + "</html>")
+                                await route.fulfill(response=response, body=new_body)
+                                return
+                        
+                        # 如果不是 HTML，原样返回
+                        await route.fulfill(response=response)
+                        return
 
-        # 默认放行
+                    except Exception as e:
+                        self.log(f"Error fetching original response: {e}")
+                        # 失败时放行
+                        try:
+                            await route.continue_()
+                        except:
+                            pass
+                        return
+        
+        # 如果不是目标站点，或者资源类型不需要处理，直接放行
         await route.continue_()

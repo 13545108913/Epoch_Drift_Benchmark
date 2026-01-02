@@ -77,10 +77,17 @@ async def run_test_case_with_webrover(
         storage_state_path,
         video_dir=out_dir + "/video",
         headless=headless,
+        args=[
+            # === 必须添加以下参数 ===
+            "--disable-web-security",  # 禁用同源策略，最关键
+            "--disable-features=IsolateOrigins,site-per-process,BlockInsecurePrivateNetworkRequests", # 禁用私有网络请求拦截
+            "--disable-site-isolation-trials"
+            # =======================
+        ]
     )
 
     # --- 新增代码开始：发送干扰信号 ---
-    proxy_url = "http://localhost:7780/admin/?logging=StartingRun1"
+    proxy_url = "http://172.26.116.102:8081/?logging=StartingRun1"
     
     # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
     # 这样 addon 脚本才能捕获到这个请求并重置状态
@@ -104,7 +111,7 @@ async def run_test_case_with_webrover(
     # [Drift & Security Patch] 注入漂移脚本并强制绕过 CSP/HTTPS 错误
     # ===========================================================================
     with_drift = False
-    with_waber = False
+    with_waber = True
     drift_intensity = 'high'
     drift_type = 'all'
 
@@ -217,7 +224,7 @@ async def run_test_case_with_webrover(
         await browser.close()
     
     # --- 新增代码开始：发送停止干扰信号 ---
-    stop_url = "http://localhost:7780/admin/?logging=EndingMyTest"
+    stop_url = "http://172.26.116.102:8081/?logging=EndingMyTest"
     
     # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
     # 这样 addon 脚本才能捕获到这个请求并重置状态

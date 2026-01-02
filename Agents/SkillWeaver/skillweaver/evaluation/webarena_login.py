@@ -155,7 +155,8 @@ async def webarena_renew_comb(comb: dict[str, str], path: str):
                 # ----------------------------------------------------
                 # END: 关键修改部分
                 # ----------------------------------------------------
-                
+                await page.goto("http://172.26.116.102:8081/?logging=StartingRun1")
+                await page.goto("http://172.26.116.102:8081")
                 await asyncio.sleep(8)
 
         await browser.context.storage_state(path=path)
