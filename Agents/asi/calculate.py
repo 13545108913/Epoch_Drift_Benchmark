@@ -5,8 +5,9 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Any
 
 OUTPUT_FILE = "analyze/webarena_statistics_admin_v1_drift.json"
+suffix = "_waber"
 
-def analyze_webarena_results(result_dir: str = "./results", llm_info_dir: str = "./llm_info") -> Dict:
+def analyze_webarena_results(result_dir: str = f"admin_results/results_v2{suffix}", llm_info_dir: str = f"admin_llm_info/llm_info_v2{suffix}") -> Dict:
     """
     分析WebArena任务运行结果，包含LLM调用统计 (Token及调用次数)
     
