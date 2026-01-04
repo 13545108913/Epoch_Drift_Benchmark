@@ -1,5 +1,9 @@
 import os
 import argparse
+import shutil
+import sys
+import time
+import requests
 
 # locally defined agent
 from agent import DemoAgentArgs
@@ -7,7 +11,14 @@ from patch_with_custom_exec import patch_with_custom_exec
 
 # browsergym experiments utils
 from browsergym.experiments import EnvArgs, ExpArgs, get_exp_result
+import sys
+import os
 
+# 仍然需要添加根目录
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, project_root)
+
+from Benchmark.init import register_myBenchmark
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -25,8 +36,7 @@ def parse_args():
     parser.add_argument(
         "--model_name",
         type=str,
-        default="litellm/neulab/claude-3-5-sonnet-20241022",
-        choices=["litellm/neulab/claude-3-5-sonnet-20241022", "litellm/neulab/gpt-4o-2024-05-13", "gpt-4o"],
+        default=os.getenv("my_model"),
         help="OpenAI model name.",
     )
     parser.add_argument(
@@ -62,13 +72,13 @@ def parse_args():
     parser.add_argument(
         "--use_screenshot",
         type=str2bool,
-        default=False,
+        default=True,
         help="Use screenshot in the agent's observation space.",
     )
 
     parser.add_argument(
         "--websites", type=str, nargs='+', default=[],
-        choices=["shopping", "admin", "reddit", "gitlab", "map"],
+        choices=["shopping", "admin", "reddit", "gitlab", "map", "wordpress"],
         help="Name of the website(s) to run the agent on. Used to define agent's action space.",
     )
     parser.add_argument(
@@ -104,6 +114,8 @@ https://github.com/ServiceNow/AgentLab"""
     )
 
     args = parse_args()
+    register_myBenchmark()
+
     if args.rename_to is None:
         args.rename_to = args.task_name
 
@@ -126,6 +138,8 @@ https://github.com/ServiceNow/AgentLab"""
         websites=args.websites,
         actions=tuple(actions),
         memory=args.memory_path,
+        output_dir="llm_info/",
+        task_name=args.task_name
     )
     
     patch_with_custom_exec(agent_args)
@@ -163,8 +177,28 @@ https://github.com/ServiceNow/AgentLab"""
         print(f"{key}: {val}")
     
     if args.rename_to is not None:
-        os.rename(exp_args.exp_dir, f"results/{args.rename_to}")
+        # os.rename(exp_args.exp_dir, f"results/{args.rename_to}")
+        os.replace(exp_args.exp_dir, f"results/{args.rename_to}")
 
+    # --- 新增代码开始：发送停止干扰信号 ---
+    # stop_url = "http://localhost:7780/admin/?logging=EndingMyTest"
+    
+    # # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
+    # # 这样 addon 脚本才能捕获到这个请求并重置状态
+    # mitm_proxy = "http://127.0.0.1:8848" 
+    # proxies = {
+    #     "http": mitm_proxy,
+    #     "https": mitm_proxy,
+    # }
+
+    # try:
+    #     # 发送请求，设置超时防止卡死
+    #     response = requests.get(stop_url, proxies=proxies, timeout=5)
+    # except requests.exceptions.ProxyError:
+    #     print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
+    # except Exception as e:
+    #     print(f"Failed to send stop signal: {e}")
+    # --- 新增代码结束 ---
 
 if __name__ == "__main__":
     main()

@@ -46,7 +46,7 @@ import json
 
 def if_add_result(result_dir: str) -> bool:
     """Decide if to add the result to the induction input list."""
-    autoeval_path = os.path.join(result_dir, "gpt-4o_autoeval.json")
+    autoeval_path = os.path.join(result_dir, "autoeval.json")
     if os.path.exists(autoeval_path) and json.load(open(autoeval_path))[0]["rm"] != True:
             return False
     else:
@@ -61,10 +61,10 @@ def get_result_dirs(
     template_id: str = None, config_dir: str = None,
 ) -> str:
     if template_id is None:
-        if result_id_list is None: # add all webarena.* under `results_dir`
-            result_dir_list = [os.path.join(results_dir) for d in os.listdir(results_dir) if d.startswith("webarena.")]
+        if result_id_list is None: # add all myBenchmark.* under `results_dir`
+            result_dir_list = [os.path.join(results_dir) for d in os.listdir(results_dir) if d.startswith("myBenchmark.")]
         else:
-            result_dir_list = [f"webarena.{rid}" for rid in result_id_list]
+            result_dir_list = [f"myBenchmark.{rid}" for rid in result_id_list]
             result_dir_list = [rd for rd in result_dir_list if rd in os.listdir(results_dir)]
             result_dir_list = [os.path.join(results_dir, rd) for rd in result_dir_list]
     else: # find config files of template_id
@@ -75,7 +75,7 @@ def get_result_dirs(
         ]
         result_dir_list = []
         for cid in config_ids:
-            rdir = os.path.join(results_dir, f"webarena.{cid}")
+            rdir = os.path.join(results_dir, f"myBenchmark.{cid}")
             if if_add_result(rdir):
                 result_dir_list.append(rdir)
         # if len(result_dir_list) < 1: return []
@@ -221,7 +221,7 @@ def parse_tests(response: str, action_names: list[str]) -> list[str]:
     if "rewritten trajectories" in response.lower():
         index = response.lower().index("rewritten trajectories")
         response = response[index:].lstrip()
-    tests = extract_code_pieces(response, start="```python", end="```", do_split=False)
+    tests = extract_code_pieces(response, start="```", end="```", do_split=False)
     tests = [t for t in tests if "def " not in t]
     tests = [clean_test(t, action_names) for t in tests]
     return tests

@@ -69,7 +69,7 @@ class Evaluator:
         return msg_dict, msg_str, prompt
 
     def eval_vision(self, info, client):
-        assert client.startswith("gpt-4v") or client.startswith("gpt-4o")
+        assert client.startswith("gpt-4v") or client.startswith("gpt-4o") or client.startswith("gpt-5")
         action_history = ""
         for idx, act in enumerate(info["actions"]):
             action_history += f"{idx+1}: {act}\n"

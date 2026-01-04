@@ -28,7 +28,7 @@ The current page shows a product that can store up to 40 Nintendo Switch game ca
 ```send_msg_to_user('The "Game Card Holder Storage Case for Nintendo Switch Games or PS Vita Game Case or SD Memory Cards, Black" can store up to 40 Nintendo Switch game cards, which will fit all 31 of your cards. The price is $11.99.')```
 
 ## Reusable Functions
-```
+```python
 def search_product(search_bar_id: str | int, product_name: str):
     """Search for a product in the search bar.
     
@@ -78,7 +78,7 @@ I need to send this information to the user, using the `send_msg_to_user` action
 ```send_msg_to_user("The billing address for order #00178 is: Emma Lopez, 101 S San Mateo Dr, San Mateo, California, 94010, United States")```
 
 ## Reusable Functions
-```
+```python
 def navigate_to_order_history(account_id: str):
     """Navigate from homepage to order history page.
     

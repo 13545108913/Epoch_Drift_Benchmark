@@ -21,7 +21,7 @@ def run_vanilla():
         # step 1: task solving
         process = Popen([
             "python", "run_demo.py",
-            "--task_name", f"webarena.{tid}",
+            "--task_name", f"myBenchmark.{tid}",
             "--headless",
         ])
         try:
@@ -42,7 +42,7 @@ def run_awm():
         # step 1: task solving
         process = Popen([
             "python", "run_demo.py",
-            "--task_name", f"webarena.{tid}",
+            "--task_name", f"myBenchmark.{tid}",
             "--memory_path", f"workflows/{args.website}.txt",
             "--headless",
         ])
@@ -52,10 +52,10 @@ def run_awm():
         # step 2: eval traj
         process = Popen([
             "python", "-m", "autoeval.evaluate_trajectory",
-            "--result_dir", f"results/webarena.{tid}",
+            "--result_dir", f"results/myBenchmark.{tid}",
         ])
         process.wait()
-        path = f"results/webarena.{tid}/gpt-4o-2024-05-13_autoeval.json"
+        path = f"results/myBenchmark.{tid}/autoeval.json"
         is_correct = json.load(open(path))[0]["rm"]  # bool
         if not is_correct: continue
         # input("[2] Completed evaluated trajectory (true)")
@@ -63,7 +63,7 @@ def run_awm():
         # step 3: induce workflows
         process = Popen([
             "python", "-m", "results.calc_valid_steps",
-            "--clean_and_store", "--result_dir", f"results/webarena.{tid}",
+            "--clean_and_store", "--result_dir", f"results/myBenchmark.{tid}",
         ])
         process.wait()  # output 'clean_steps.json'
         # input("[3.1] Completed clean trajectory")
@@ -86,7 +86,7 @@ def run_asi():
         # step 1: task solving
         process = Popen([
             "python", "run_demo.py",
-            "--task_name", f"webarena.{tid}",
+            "--task_name", f"myBenchmark.{tid}",
             "--websites", args.website,
             "--headless"
         ])
@@ -101,22 +101,22 @@ def run_asi():
             print(stderr)
             continue
         # input("[1] Completed task solving")
-        path = f"results/webarena.{tid}/summary_info.json"
+        path = f"results/myBenchmark.{tid}/summary_info.json"
         if json.load(open(path, 'r'))["n_steps"] < 3: continue
 
         # step 2: eval traj
         process = Popen([
             "python", "-m", "autoeval.evaluate_trajectory",
-            "--result_dir", f"results/webarena.{tid}",
+            "--result_dir", f"results/myBenchmark.{tid}",
         ])
         process.wait()
-        path = f"results/webarena.{tid}/gpt-4o-2024-05-13_autoeval.json"
+        path = f"results/myBenchmark.{tid}/autoeval.json"
         is_correct = json.load(open(path))[0]["rm"]  # bool
         if not is_correct: continue
         # input("[2.1] Completed evaluated trajectory (true)")
         process = Popen([
             "python", "-m", "results.calc_valid_steps",
-            "--clean_and_store", "--result_dir", f"results/webarena.{tid}",
+            "--clean_and_store", "--result_dir", f"results/myBenchmark.{tid}",
         ])
         process.wait()  # output 'clean_steps.json'
         # input("[2.2] Completed clean trajectory")
@@ -148,7 +148,7 @@ def run_veri_program():
         # step 1: task solving with memory input
         process = Popen([
             "python", "run_demo.py", "--headless",
-            "--task_name", f"webarena.{tid}",
+            "--task_name", f"myBenchmark.{tid}",
             "--memory_path", f"workflows/{args.website}.txt",
         ])
         try:
@@ -162,22 +162,22 @@ def run_veri_program():
             print(stderr)
             continue
         # input("[1] Completed task solving")
-        path = f"results/webarena.{tid}/summary_info.json"
+        path = f"results/myBenchmark.{tid}/summary_info.json"
         if json.load(open(path, 'r'))["n_steps"] < 3: continue
 
         # step 2: eval traj
         process = Popen([
             "python", "-m", "autoeval.evaluate_trajectory",
-            "--result_dir", f"results/webarena.{tid}",
+            "--result_dir", f"results/myBenchmark.{tid}",
         ])
         process.wait()
-        path = f"results/webarena.{tid}/gpt-4o-2024-05-13_autoeval.json"
+        path = f"results/myBenchmark.{tid}/autoeval.json"
         is_correct = json.load(open(path))[0]["rm"]  # bool
         if not is_correct: continue
         # input("[2.1] Completed evaluated trajectory (true)")
         process = Popen([
             "python", "-m", "results.calc_valid_steps",
-            "--clean_and_store", "--result_dir", f"results/webarena.{tid}",
+            "--clean_and_store", "--result_dir", f"results/myBenchmark.{tid}",
         ])
         process.wait()  # output 'clean_steps.json'
         # input("[2.2] Completed clean trajectory")
@@ -216,7 +216,7 @@ def run_mem_asi():
         # step 1: task solving
         process = Popen([
             "python", "run_demo.py",
-            "--task_name", f"webarena.{tid}",
+            "--task_name", f"myBenchmark.{tid}",
             "--websites", args.website,
             "--headless"
         ])
@@ -231,22 +231,22 @@ def run_mem_asi():
             print(stderr)
             continue
         # input("[1] Completed task solving")
-        path = f"results/webarena.{tid}/summary_info.json"
+        path = f"results/myBenchmark.{tid}/summary_info.json"
         if json.load(open(path, 'r'))["n_steps"] < 3: continue
 
         # step 2: eval traj
         process = Popen([
             "python", "-m", "autoeval.evaluate_trajectory",
-            "--result_dir", f"results/webarena.{tid}",
+            "--result_dir", f"results/myBenchmark.{tid}",
         ])
         process.wait()
-        path = f"results/webarena.{tid}/gpt-4o-2024-05-13_autoeval.json"
+        path = f"results/myBenchmark.{tid}/autoeval.json"
         is_correct = json.load(open(path))[0]["rm"]  # bool
         if not is_correct: continue
         # input("[2.1] Completed evaluated trajectory (true)")
         process = Popen([
             "python", "-m", "results.calc_valid_steps",
-            "--clean_and_store", "--result_dir", f"results/webarena.{tid}",
+            "--clean_and_store", "--result_dir", f"results/myBenchmark.{tid}",
         ])
         process.wait()  # output 'clean_steps.json'
         # input("[2.2] Completed clean trajectory")
@@ -276,12 +276,12 @@ def run_mem_asi():
         if new_nlines == nlines: task_abbr = tid
         else: task_abbr = f"{tid}_test"
 
-        output_path = f"results/webarena.{task_abbr}/cleaned_steps.json"
+        output_path = f"results/myBenchmark.{task_abbr}/cleaned_steps.json"
         if not os.path.exists(output_path):
             process = Popen([
                 "python", "-m", "results.calc_valid_steps",
                 "--clean_and_store",
-                "--result_dir", f"results/webarena.{task_abbr}",
+                "--result_dir", f"results/myBenchmark.{task_abbr}",
             ])
             process.wait()  # output 'clean_steps.json'
             # input("[4.1] Completed clean trajectory")
@@ -304,7 +304,7 @@ if __name__ == "__main__":
     parser.add_argument("--experiment", type=str, required=True,
                         choices=["vanilla", "awm", "asi", "mem_asi", "veri_program", "veri_text"])
     parser.add_argument("--website", type=str, required=True,
-                        choices=["shopping", "admin", "reddit", "gitlab", "map"])
+                        choices=["shopping", "admin", "reddit", "gitlab", "map", "wordpress"])
     parser.add_argument("--task_ids", type=str, required=True,
                         help="xxx-xxx,xxx-xxx")
 
