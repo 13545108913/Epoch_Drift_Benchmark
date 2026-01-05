@@ -88,7 +88,7 @@ class DemoAgent(Agent):
         if not (use_html or use_axtree):
             raise ValueError(f"Either use_html or use_axtree must be set to True.")
 
-        custom_actions = ACTION_DICT["general"] + ACTION_DICT["webarena"] + ACTION_DICT["wordpress"]
+        custom_actions = ACTION_DICT["general"] + ACTION_DICT["webarena"] + ACTION_DICT["gitlab"]
 
         self.action_set = CustomActionSet(
             subsets=["custom"],
