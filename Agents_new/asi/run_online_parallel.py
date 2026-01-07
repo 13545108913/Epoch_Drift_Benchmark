@@ -283,7 +283,7 @@ def main():
                         choices=["shopping", "admin", "reddit", "gitlab", "map", "wordpress"])
     parser.add_argument("--task_ids", type=str, required=True,
                         help="xxx-xxx,xxx-xxx")
-    parser.add_argument("--workers", type=int, default=6, 
+    parser.add_argument("--workers", type=int, default=8, 
                         help="Number of parallel processes")
     # 新增参数 --fast
     parser.add_argument("--fast", action="store_true", 
