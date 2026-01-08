@@ -15,7 +15,7 @@ WIKIPEDIA = f"{BASE_URL}:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiw
 
 
 def main() -> None:
-    with open("./admin_tasks_final_v1.json", "r") as f:
+    with open("./wordpress_tasks_final.json", "r") as f:
         raw = f.read()
     raw = raw.replace("__GITLAB__", GITLAB)
     raw = raw.replace("__REDDIT__", REDDIT)

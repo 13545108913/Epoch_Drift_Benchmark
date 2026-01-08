@@ -177,7 +177,7 @@ def process_single_task_fast(tid, args, lock):
         "python", "run_demo.py",
         "--task_name", f"myBenchmark.{tid}",
         "--websites", args.website,
-        # "--memory_path", f"workflows/{args.website}.txt",
+        "--memory_path", f"workflows/{args.website}.txt",
         "--rename_to", f"myBenchmark.{tid}",
         "--headless"
     ]
@@ -302,7 +302,7 @@ def main():
         lock = manager.Lock()
         
         # 根据参数选择使用的函数
-        target_func = process_single_task_fast if args.fast else process_single_task
+        target_func = process_single_task_fast if args.fast else process_single_task_awm
         
         func = partial(target_func, args=args, lock=lock)
         
