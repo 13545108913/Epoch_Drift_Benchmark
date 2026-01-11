@@ -22,6 +22,7 @@ from skillweaver.environment import State, apply_patches, make_browser
 from skillweaver.evaluation.load_test_cases import (
     get_test_case_config_file_path_vwa,
     get_test_case_config_file_path_webarena,
+    get_test_case_config_file_path_myBenchmark
 )
 from skillweaver.evaluation.vwa_evaluators import (
     evaluator_router as evaluator_router_vwa,
@@ -36,8 +37,13 @@ from skillweaver.evaluation.webarena_evaluators_with_debug_info import (
 from skillweaver.evaluation.webarena_login import login_subprocess
 from skillweaver.knowledge_base.knowledge_base import KnowledgeBase, load_knowledge_base
 from skillweaver.lm import LM
-from skillweaver.openai_cua.attempt_task import attempt_task as attempt_task_cua
+# from skillweaver.openai_cua.attempt_task import attempt_task as attempt_task_cua
 from skillweaver.util.perfmon import monitor
+
+from .drift import DriftInjector
+from .anomaly import InterferenceController
+
+import requests
 
 dotenv.load_dotenv()
 
@@ -71,7 +77,74 @@ async def run_test_case_with_webrover(
         storage_state_path,
         video_dir=out_dir + "/video",
         headless=headless,
+        args=[
+            # === 必须添加以下参数 ===
+            "--disable-web-security",  # 禁用同源策略，最关键
+            "--disable-features=IsolateOrigins,site-per-process,BlockInsecurePrivateNetworkRequests", # 禁用私有网络请求拦截
+            "--disable-site-isolation-trials"
+            # =======================
+        ]
     )
+
+    # ===========================================================================
+    # [Drift & Security Patch] 注入漂移脚本并强制绕过 CSP/HTTPS 错误
+    # ===========================================================================
+    with_drift = False
+    with_waber = True
+    drift_intensity = 'high'
+    drift_type = 'all'
+
+    if with_waber:
+        controller = InterferenceController(
+            addon_mode=1
+        )
+        # 挂载干扰逻辑
+        context = browser.context
+        await context.route("**/*", controller.route_handler)
+
+    if with_drift:
+        # 1. 准备漂移脚本内容
+        drift_script = None
+        if drift_intensity and drift_intensity != "none":
+            print(f"🌪️ Injecting Drift: Intensity={drift_intensity}, Type={drift_type}")
+            injector = DriftInjector()
+            drift_script = injector.generate_drift_script(drift_type, drift_intensity)
+
+        # 2. 定义一个 helper 函数，用于通过 CDP 强制修改页面安全策略
+        async def secure_page_context(page):
+            try:
+                # 建立 CDP 会话
+                client = await page.context.new_cdp_session(page)
+                await client.send('Page.enable')
+                # 强制绕过 CSP (允许我们注入 <style> 和 inline scripts)
+                await client.send('Page.setBypassCSP', {'enabled': True})
+                # 忽略 HTTPS 证书错误
+                await client.send('Security.enable')
+                await client.send('Security.setIgnoreCertificateErrors', {'ignore': True})
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to set CDP security bypass: {e}")
+
+        # 3. 应用补丁
+        context = browser.context
+        
+        # A. 注入漂移脚本 (Playwright 层面)
+        if drift_script:
+            await context.add_init_script(drift_script)
+
+        # B. 为现有页面应用 CDP 补丁
+        if browser.active_page:
+            await secure_page_context(browser.active_page)
+            if drift_script:
+                await browser.active_page.reload(wait_until='domcontentloaded') # 刷新以确保生效
+
+        # C. 监听新页面事件：确保未来打开的所有 Tab/Popup 也被绕过
+        # 注意：我们需要用 lambda 或 wrapper 捕获当前的 loop 变量，但在 async 中直接定义 handler 即可
+        async def on_page_created(page):
+            await secure_page_context(page)
+        
+        context.on("page", on_page_created)
+
+    # ===========================================================================
 
     if not headless:
         # Give time to resize the window
@@ -86,7 +159,7 @@ async def run_test_case_with_webrover(
     # Attempt the task.
     if lm.model == "computer-use-preview":
         function_retrieval_lm = LM("gpt-4o")
-        (states, actions, outcome_type, outcome_value) = await attempt_task_cua(
+        (states, actions, outcome_type, outcome_value) = await attempt_task(
             browser,
             agent_lm_name=lm.model,
             function_retrieval_lm=function_retrieval_lm,
@@ -128,6 +201,7 @@ async def run_test_case_with_webrover(
     async def close_func():
         await browser.context.close()
         await browser.close()
+    
 
     return (states, actions, page, cdp_session, close_func)
 
@@ -141,7 +215,8 @@ def evaluate_single_task(
         "vwa_reddit",
         "vwa_classifieds",
         "vwa_shopping",
-    ] = "webarena",
+        "myBenchmark",
+    ] = "myBenchmark",
     knowledge_base_path_prefix: Optional[str] = None,
     temperature: float = 0.3,
     allow_recovery: bool = False,
@@ -160,6 +235,12 @@ def evaluate_single_task(
             config = json.load(f)
         sites = config["sites"]
         task_string = config["intent"]
+    elif set_name == "myBenchmark":
+        config_file_path = get_test_case_config_file_path_myBenchmark(task_id)
+        with open(config_file_path) as f:
+            config = json.load(f)
+        sites = config["sites"]
+        task_string = config["intent"]
     else:
         config_file_path = get_test_case_config_file_path_vwa(set_name[4:], task_id)  # type: ignore
         with open(config_file_path) as f:
@@ -168,6 +249,7 @@ def evaluate_single_task(
         task_string = config["intent"]
 
     if knowledge_base_path_prefix is not None:
+        print(f"Load Knowledge Base from {knowledge_base_path_prefix}!")
         knowledge_base = load_knowledge_base(knowledge_base_path_prefix)
     else:
         knowledge_base = KnowledgeBase()
@@ -305,6 +387,28 @@ def evaluate_single_task(
                                 ),
                                 "checks": [],
                             }
+                    elif set_name == "myBenchmark":
+                        if use_debugger_eval:
+                            evaluator = evaluator_router_debug_webarena(
+                                config_file_path
+                            )
+                            result = await evaluator(
+                                (states, actions),  # type: ignore
+                                config_file_path,
+                                page,
+                                cdp_session,
+                            )
+                        else:
+                            evaluator = evaluator_router_webarena(config_file_path)
+                            result = {
+                                "score": await evaluator(
+                                    (states, actions),  # type: ignore
+                                    config_file_path,
+                                    page,
+                                    cdp_session,
+                                ),
+                                "checks": [],
+                            }
                     else:
                         evaluator = evaluator_router_vwa(config_file_path)
                         result = {
@@ -387,8 +491,8 @@ def main():
     parser.add_argument(
         "--set_name",
         type=str,
-        default="webarena",
-        help="Name of the task set. Must be one of 'webarena', 'vwa_reddit', 'vwa_classifieds', 'vwa_shopping'.",
+        default="myBenchmark",
+        help="Name of the task set. Must be one of 'webarena', 'vwa_reddit', 'vwa_classifieds', 'vwa_shopping', 'myBenchmark.",
     )
     parser.add_argument(
         "--setup_backend_apis",
@@ -400,6 +504,11 @@ def main():
         action="store_true",
         help="Disables 'headless' mode for browser (default: False)",
     )
+    parser.add_argument(
+        "--agent_type",
+        type=str,
+        help="useless",
+    )
 
     args = parser.parse_args()
 
@@ -408,7 +517,8 @@ def main():
         "vwa_reddit",
         "vwa_classifieds",
         "vwa_shopping",
-    ], f"Invalid set name: {args.set_name}. Must be one of 'webarena', 'vwa_reddit', 'vwa_classifieds', 'vwa_shopping'."
+        "myBenchmark",
+    ], f"Invalid set name: {args.set_name}. Must be one of 'webarena', 'vwa_reddit', 'vwa_classifieds', 'vwa_shopping', 'myBenchmark'."
     headless = not args.headed
 
     evaluate_single_task(

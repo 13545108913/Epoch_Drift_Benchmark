@@ -70,8 +70,25 @@ class Browser:
             self.temp_dir.name, f"screenshot_full{scount}.png"
         )
         screenshot_path = os.path.join(self.temp_dir.name, f"screenshot{scount}.png")
-        await page.screenshot(full_page=True, path=screenshot_path_full, timeout=15000)
-        await page.screenshot(full_page=False, path=screenshot_path, timeout=15000)
+        await page.wait_for_load_state('domcontentloaded')  # 只等待DOM加载
+        await page.screenshot(full_page=True, path=screenshot_path_full, timeout=30000)
+        await page.screenshot(full_page=False, path=screenshot_path, timeout=30000)
+
+        # await page.screenshot(
+        #     full_page=True, 
+        #     path=screenshot_path_full, 
+        #     timeout=15000,
+        #     animations="disabled",  # 禁用 CSS 动画 (Drift 可能引入了旋转动画)
+        #     caret="hide"
+        # )
+        # await page.screenshot(
+        #     full_page=False, 
+        #     path=screenshot_path, 
+        #     timeout=15000,
+        #     animations="disabled",
+        #     caret="hide"
+        # )
+        
         screenshot = PIL.Image.open(screenshot_path)
         screenshot_full = PIL.Image.open(screenshot_path_full)
 
@@ -81,7 +98,18 @@ class Browser:
         return (screenshot, screenshot_full)
 
     async def _observe(self) -> State:
-        await self.active_page.wait_for_load_state("load")
+        # await self.active_page.wait_for_load_state("load")
+        # ================= 修改开始 =================
+        try:
+            # 1. 尝试等待 "domcontentloaded" (比 "load" 更快，不等待图片/CSS完全加载)
+            # 将超时时间缩短，不要死等
+            await self.active_page.wait_for_load_state("domcontentloaded", timeout=5000)
+        except Exception:
+            # 2. 如果超时，打印警告但不要崩溃
+            # 对于 Agent 来说，只要能获取到 axtree，页面没加载完也无所谓
+            print("⚠️ Warning: wait_for_load_state timed out, proceeding anyway...")
+            pass
+        # ================= 修改结束 =================
         return State(
             id=unique_id(),
             url=self.active_page.url,
@@ -152,6 +180,7 @@ async def make_browser(
         viewport={"width": width, "height": height},
         locale=locale,
         record_video_dir=video_dir,
+        # proxy={"server": "http://127.0.0.1:8848"},
         # record_har_path=har_path,
         # geolocation=geolocation,
     )
@@ -159,7 +188,13 @@ async def make_browser(
     context.set_default_navigation_timeout(navigation_timeout)
     # BUG in Playwright:
     page = await context.new_page()
-    await page.goto(start_url)  # state_url
+    # await page.goto(start_url)  # state_url
+    # 修改为：
+    await page.goto(
+        start_url, 
+        timeout=60000,              # 将超时从 16s 增加到 60s
+        wait_until='domcontentloaded' # 只要 DOM 加载完就算成功，不用等所有图片/脚本
+    )
     content = await page.content()
     await aprint("went to", start_url)
     return Browser(browser, context, page, screen_size=(height, width))

@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from skillweaver.evaluation.load_test_cases import (
     load_test_cases_webarena,
     load_test_cases_vwa,
+    load_test_cases_myBenchmark
 )
 from skillweaver.knowledge_base.knowledge_base import load_knowledge_base
 
@@ -79,7 +80,7 @@ def evaluate_benchmark(
         str,
         typer.Argument(
             click_type=click.Choice(
-                ["reddit", "webarena", "map", "shopping", "shopping_admin", "gitlab"]
+                ["reddit", "webarena", "map", "shopping", "shopping_admin", "gitlab", "wordpress"]
             )
         ),
     ],
@@ -87,7 +88,7 @@ def evaluate_benchmark(
     time_limit: int = 10,
     knowledge_base_path_prefix: str | None = None,
     lm_name: str = "gpt-4o",
-    pool_size: int = 8,
+    pool_size: int = 6,
     use_debugger_eval: Annotated[
         bool,
         typer.Option(
@@ -106,11 +107,11 @@ def evaluate_benchmark(
         str,
         typer.Option(
             click_type=click.Choice(
-                ["webarena", "vwa_reddit", "vwa_shopping", "vwa_classifieds"]
+                ["webarena", "vwa_reddit", "vwa_shopping", "vwa_classifieds", "myBenchmark"]
             ),
-            help="The name of the test case set. Can either be WebArena, or any of the VisualWebArena site-specific evaluation sets (must be one of: 'webarena', 'vwa_reddit', 'vwa_shopping', or 'vwa_classifieds').",
+            help="The name of the test case set. Can either be WebArena, or any of the VisualWebArena site-specific evaluation sets (must be one of: 'webarena', 'vwa_reddit', 'vwa_shopping', or 'vwa_classifieds', 'myBenchmark').",
         ),
-    ] = "webarena",
+    ] = "myBenchmark",
     agent_type: Annotated[
         str,
         typer.Option(
@@ -136,9 +137,12 @@ def evaluate_benchmark(
         test_cases = load_test_cases_vwa("shopping")
     elif set_name == "vwa_classifieds":
         test_cases = load_test_cases_vwa("classifieds")
+    elif set_name == "myBenchmark":
+        test_cases = load_test_cases_myBenchmark()
 
+    # selected_tasks = list(range(68, 162))
     if selected_tasks is not None and selected_tasks != "reduced_set":
-        task_ids = [int(x) for x in selected_tasks.split(",")]
+        task_ids = [int(x) for x in selected_tasks]
         test_cases = [tc for tc in test_cases if tc["task_id"] in task_ids]
 
     out_dir = os.path.join(out_dir, site)

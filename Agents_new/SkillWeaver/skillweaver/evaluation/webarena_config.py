@@ -15,6 +15,7 @@ WIKIPEDIA = os.getenv(
 )
 HOMEPAGE = os.getenv("HOMEPAGE", f"{host}:4399")
 CLASSIFIEDS = os.getenv("CLASSIFIEDS", f"{host}:9980")
+WORDPRESS = os.getenv("WORDPRESS", f"{host}:8000")
 
 SITES = {
     "SHOPPING": SHOPPING,
@@ -25,6 +26,7 @@ SITES = {
     "WIKIPEDIA": WIKIPEDIA,
     "HOMEPAGE": HOMEPAGE,
     "CLASSIFIEDS": CLASSIFIEDS,
+    "WORDPRESS": WORDPRESS,
 }
 
 # From WebArena site.
@@ -35,7 +37,7 @@ ACCOUNTS = {
         "username": "emma.lopez@gmail.com",
         "password": "Password.123",
     },
-    "shopping_admin": {"username": "admin", "password": "password123"},
+    "shopping_admin": {"username": "admin", "password": "admin1234"},
     "shopping_site_admin": {"username": "admin", "password": "admin1234"},
 }
 

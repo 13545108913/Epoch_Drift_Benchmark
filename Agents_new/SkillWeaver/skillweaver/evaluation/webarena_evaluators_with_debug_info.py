@@ -310,8 +310,8 @@ class HTMLContentEvaluator(Evaluator):
             # navigate to that url
             if target_url != "last":
                 target_url = _resolve_start_url(target_url)
-                await page.goto(target_url)
-                await page.wait_for_load_state("load")
+                await page.goto(target_url, wait_until='domcontentloaded', timeout=60000)
+                await page.wait_for_load_state("domcontentloaded", timeout=5000)
                 await asyncio.sleep(3)  # TODO [shuyanzh]: fix this hard-coded sleep
 
             # empty, use the full page

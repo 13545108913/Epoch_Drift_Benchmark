@@ -36,6 +36,21 @@ def load_test_cases_webarena(selected_tasks: list[int] | None = None):
 
     return test_cases
 
+def load_test_cases_myBenchmark(selected_tasks: list[int] | None = None):
+    test_case_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "test_cases/test.myBenchmark.raw.json")
+    )
+    with open(test_case_path) as f:
+        test_cases = json.load(f)
+
+    if selected_tasks is not None:
+        test_cases = [test_cases[i] for i in selected_tasks if i < len(test_cases)]
+
+    if not os.path.exists(os.path.dirname(test_case_path) + "/split_myBenchmark/0.json"):
+        _split_test_cases(test_cases, "split_myBenchmark")
+
+    return test_cases
+
 
 def get_test_case_config_file_path_webarena(task_id: int):
     test_case_path = os.path.abspath(
@@ -44,6 +59,16 @@ def get_test_case_config_file_path_webarena(task_id: int):
     if not os.path.exists(test_case_path):
         # Trigger splitting of test cases
         load_test_cases_webarena()
+
+    return test_case_path
+
+def get_test_case_config_file_path_myBenchmark(task_id: int):
+    test_case_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), f"test_cases/split_myBenchmark/{task_id}.json")
+    )
+    if not os.path.exists(test_case_path):
+        # Trigger splitting of test cases
+        load_test_cases_myBenchmark()
 
     return test_case_path
 
