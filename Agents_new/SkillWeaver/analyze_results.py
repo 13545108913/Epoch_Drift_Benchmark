@@ -7,7 +7,7 @@ from collections import defaultdict
 
 # ================= 配置区域 =================
 # 结果所在的根目录
-BASE_DIR = "results_admin/admin_with_skills_v2_waber/shopping_admin"
+BASE_DIR = "results_wordpress/wordpress_with_skills_v2_waber/wordpress"
 
 # 代码知识库路径
 KB_PATH = os.path.join(BASE_DIR, "kb_code.py")
