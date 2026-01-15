@@ -93,7 +93,7 @@ $env:WA_GITLAB_V2="http://localhost:8080"
 ```bash
 BASE_URL="http://172.26.116.102"                                                                                     
 export WA_SHOPPING="$BASE_URL:7770/"
-export WA_SHOPPING_ADMIN="http://localhost:7780/admin"
+export WA_SHOPPING_ADMIN="http://dockerized-magento.local/admin"
 export WA_REDDIT="$BASE_URL:9999"
 export WA_GITLAB="$BASE_URL:8080"
 export WA_WIKIPEDIA="$BASE_URL:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
@@ -102,7 +102,7 @@ export WA_HOMEPAGE="$BASE_URL:4399"
 export WA_WORDPRESS="http://localhost:8000"
 
 export SHOPPING="$BASE_URL:7770/"
-export SHOPPING_ADMIN="http://localhost:7780/admin"
+export SHOPPING_ADMIN="http://dockerized-magento.local/admin"
 export REDDIT="$BASE_URL:9999"
 export GITLAB="$BASE_URL:8080"
 export WIKIPEDIA="$BASE_URL:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
@@ -112,10 +112,19 @@ export WORDPRESS="http://localhost:8000"
 
 export WA_GITLAB_V1="$BASE_URL:8080"
 export WA_GITLAB_V2="$BASE_URL:8080"
-export WA_SHOPPING_ADMIN_V1="http://localhost:7780/admin"
-export WA_SHOPPING_ADMIN_V2="http://localhost:7780/admin"
+export WA_SHOPPING_ADMIN_V1="http://dockerized-magento.local/admin"
+export WA_SHOPPING_ADMIN_V2="http://dockerized-magento.local/admin"
 export WA_WORDPRESS_V1="http://localhost:8000"
 export WA_WORDPRESS_V2="http://localhost:8000"
+
+export my_api_key="sk-wFOxHykWS5f5hcWXjEYwty5eriAiMvrcvHwdyVCXzvChY8g6"
+export my_base_url="https://yunwu.ai/v1"
+export my_model="gpt-5-mini-2025-08-07"
+
+export with_drift='false'
+export with_waber='true'
+
+export OPENAI_API_KEY="sk-wFOxHykWS5f5hcWXjEYwty5eriAiMvrcvHwdyVCXzvChY8g6"
 ```
 
 ### Magento
@@ -231,14 +240,17 @@ python run_online_parallel.py --website gitlab --task_ids 0-161 --fast
 ```bash
 python -m skillweaver.explore gitlab logs/explore-gitlab
 
-
 python -m skillweaver.explore shopping_admin logs/explore-admin
 
-python -m skillweaver.evaluation.evaluate_benchmark gitlab results/gitlab_with_skills_v12_waber_3 --knowledge-base-path-prefix logs/explore-gitlab/iter_159/kb_post --pool-size 1
+python -m skillweaver.explore wordpress logs/explore-wordpress
 
-python -m skillweaver.evaluation.evaluate_benchmark shopping_admin results/admin_with_skills_v2_waber --knowledge-base-path-prefix logs/explore-admin/iter_159/kb_post --pool-size 1
+python -m skillweaver.evaluation.evaluate_benchmark gitlab results/gitlab_with_skills_v12_waber --knowledge-base-path-prefix logs/explore-gitlab/iter_159/kb_post --pool-size 8
 
-python -m skillweaver.evaluation.evaluate_single_task --task_id 8 --out_dir results/gitlab_with_skills_v12 --knowledge_base_path_prefix logs/explore-gitlab/iter_159/kb_post
+python -m skillweaver.evaluation.evaluate_benchmark shopping_admin results/admin_with_skills_v1 --knowledge-base-path-prefix logs/explore-admin/iter_159/kb_post --pool-size 8
+
+python -m skillweaver.evaluation.evaluate_benchmark wordpress results/wordpress_with_skills_v2_waber --knowledge-base-path-prefix logs/explore-wordpress/iter_159/kb_post --pool-size 6
+
+python -m skillweaver.evaluation.evaluate_single_task --task_id 4 --out_dir results/gitlab_with_skills_v16_waber --knowledge_base_path_prefix logs/explore-gitlab/iter_159/kb_post
 ```
 
 ### MUSE
@@ -251,10 +263,13 @@ python run_myBenchmark_muse.py
 ```bash
 walt discover --url http://172.26.116.102:8080 --llm "deepseek-chat" --planner-llm "deepseek-chat" --max-processes 8 --auth-file /Users/chenboyu/Desktop/Epoch_Drift_Benchmark/Agents/WALT/gitlab_state.json
 
+
 python src/walt/benchmarks/wa/aeval.py --config experiment_configs/wa_with_tools.yaml --tool_dir walt-tools/gitlab_v12/ --expose_tool_actions
 
 
-walt discover --url http://dockerized-magento.local/admin --llm "deepseek-chat" --planner-llm "deepseek-chat" --max-processes 8 --auth-file /Users/chenboyu/Desktop/Epoch_Drift_Benchmark/Agents/WALT/shopping_admin_state.json
+walt discover --url https://dockerized-magento.local/admin --llm "gpt-5-mini" --planner-llm "gpt-5-mini" --max-processes 1
+
+walt discover --url http://172.26.116.102:8080 --llm "gpt-5-mini" --planner-llm "gpt-5-mini" --max-processes 1
 ```
 
 ## Drift脚本
@@ -501,34 +516,49 @@ git clone 的比对逻辑需要修改
 
 ## 运行结果
 ### 成功率
-| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
-|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
-| AWM         | 25.93%   | 18.52%   | 6.79%    | 25.31%    | 22.16%    |
-| ASI         | 30.25%   | 20.99%   | 14.20%    | 34.57%    | 25.31%    |
-| SkillWeaver | 18.06%   | 15.07%   | 12.63%    | 17.90%    | 13.75%    |
-| WALT        | 27.78%   | 19.75%   |  0.00%    | 25.93%    | 23.46%    |
+| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift | v2_waber |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         | 25.93%   | 18.52%   | 6.79%    | 25.31%    | 22.16%    | 10.56%|
+| ASI         | 30.25%   | 20.99%   | 14.20%    | 34.57%    | 25.31%    | 10.69%|
+| SkillWeaver | 18.06%   | 15.07%   | 12.63%    | 17.90%    | 13.75%    | 3.29%|
+| WALT        | 27.78%   | 19.75%   |  0.00%    | 25.93%    | 23.46%    | 0.00%|
 
-| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
-|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
-| AWM         | 57.89%   |  18.42%  |   19.30%   |  28.07%   |  23.68%   |
-| ASI         | 50.00%   |  28.07%  |   18.42%   |  37.72%   |  19.30%   |
-| SkillWeaver | 15.38%   |  8.25%  |   11.36%   |  16.81%   |   2.04%  |
-| WALT        | 28.95%   |  8.77%  |   0.00%   |  49.12%   |   37.72%  |
+| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift | v2_waber |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         | 57.89%   |  18.42%  |   19.30%   |  28.07%   |  23.68%   | 7.89%|
+| ASI         | 50.00%   |  28.07%  |   18.42%   |  37.72%   |  19.30%   | 16.67%|
+| SkillWeaver | 15.38%   |  8.25%  |   11.36%   |  16.81%   |   2.04%  | 5.41%|
+| WALT        | 28.95%   |  8.77%  |   0.00%   |  49.12%   |   37.72%  | 0.00% |
+
+| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift | v2_waber |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         | 79.75%   |  82.28%  |   44.30%   |  67.09%   |  63.29%   |  34.18%   |
+| ASI         | 92.41%   |  97.47%  |   49.37%   |  56.96%   |  54.43%   |  32.91%   |
+| SkillWeaver  | 55.84%   |  40.35%  |   29.33%   |  14.55%   |  18.87%   |  9.33%   |
+| WALT         | 92.41%   |  89.87%  |   0.00%   |  55.70%   |  53.16%   |  0.00%   |
+
 
 ### LLM调用次数
-| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
-|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
-| AWM         | 8.59    | 9.17     | 9.90    | 9.59    | 9.80     |
-| ASI         | 7.68    | 8.03     | 9.37    | 9.00    | 9.39     |
-| SkillWeaver | 14.14   | 15.07    | 34.24   | 21.85   | 23.68    |
-| WALT        | 8.69    | 8.90     |  0      | 8.65    | 8.78     |
+| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift | v2_waber |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         | 8.59    | 9.17     | 9.90    | 9.59    | 9.80     | 9.42|
+| ASI         | 7.68    | 8.03     | 9.37    | 9.00    | 9.39     | 9.28|
+| SkillWeaver | 14.14   | 15.07    | 34.24   | 21.85   | 23.68    | 28.19|
+| WALT        | 8.69    | 8.90     |  0.00   | 8.65    | 8.78     | 0.00|
 
-| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
-|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
-| AWM         |  6.85  |  8.28  |   9.36   |  6.82   |   7.42   |
-| ASI         |  7.19  |  8.30  |   8.93   |  7.50   |   7.15  |
-| SkillWeaver |  11.56  |  19.13  |   18.32   |  8.23   |   8.84  |
-| WALT        | 17.44   |  25.40  |   0.00   |  15.83   |   16.62   |
+| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift | v2_waber |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         |  6.85  |  8.28  |   9.36   |  6.82   |   7.42   | 9.54|
+| ASI         |  7.19  |  8.30  |   8.93   |  7.50   |   7.15  | 9.11|
+| SkillWeaver |  11.56  |  19.13  |   18.32   |  8.23   |   8.84  | 33.09|
+| WALT        | 17.44   |  25.40  |   0.00   |  15.83   |   16.62   | 0.00 |
+
+| 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift | v2_waber |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+| AWM         |  3.84  |  3.06  |   6.96   |   4.61  |   4.47  |   7.23  |
+| ASI         |  3.00  |  2.38  |   7.32   |   5.18  |   4.87  |   6.62  |
+| SkillWeaver  |  11.27  |  7.84  |   22.11   |   9.37  |   9.91  |   22.59  |
+| WALT         |  4.37  |  4.20  |   0.00   |   13.82  |   13.58  |   0.00  |
 
 ### Skill调用次数
 | 方法        | v1(训练) | v1_drift(high) | v1_waber | v2 | v2_drift |
@@ -553,3 +583,21 @@ git clone 的比对逻辑需要修改
 3.2 小模型也是有必要做的，能够有类似的性能，更小的cost。
 ```
 
+## API
+
+| 方法        | API |
+|:-------------:|:----------:|
+| AWM         | GPT-4 (gpt-4-0613)    |
+| ASI         | claude-3.5-sonnet    |
+| SkillWeaver | GPT-4o   |
+| WALT        | GPT-5-mini    |
+
+## Case Study
+
+Case 1：WALT 异常状态下的瘫痪
+
+Case 2：Wordpress 上为什么干扰反而提升了性能？
+
+Case 3：Magento 复杂 DOM 的脆弱性
+
+Case 4：ASI 的进化适应
