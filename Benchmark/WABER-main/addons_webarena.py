@@ -17,7 +17,7 @@ def read_json(file_path):
 # read addon and frequency from the config file
 data = {
 	"addon": 1,
-	"frequency": 1
+	"frequency": 0
 }
 
 # retrieve the addon and frequency settings from the dictionary, using default values of 0 if the keys are not present
@@ -36,8 +36,10 @@ env_flags = {
     '127.0.0.1:7770': None,  # shopping
     'dockerized-magento.local': None,  # shopping_admin 
     '172.26.116.102:8080': None,  # gitlab
+    '172.26.116.102:8081': None,  # gitlab
     '127.0.0.1:8888': None,  # wikipedia
     'localhost:7780': None,
+    'localhost:8000': None,
 }
 
 # regular expressions for starting and ending task urls

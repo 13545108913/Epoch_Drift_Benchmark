@@ -3,10 +3,10 @@ import json
 # --- 配置 ---
 
 # 2. 输入文件（上一步生成的文件）
-INPUT_FILE = 'benchmark_tasks.json'
+INPUT_FILE = '../wordpress_task/wordpress_benchmark_tasks.json'
 
 # 3. 输出文件（最终的、已清理的文件）
-OUTPUT_FILE = 'wordpress_tasks_final.json'
+OUTPUT_FILE = '../wordpress_task/wordpress_tasks_final.json'
 
 # --- 脚本开始 ---
 
@@ -28,6 +28,11 @@ def main():
         # --- 3. 重新编号 ---
         for new_id, task in enumerate(cleaned_tasks):
             task['task_id'] = new_id
+            task["require_login"] = False
+            task["storage_state"] = ""
+            task["geolocation"] = None
+            task["require_reset"] = False
+            task["intent_template_id"] = new_id
         
         print(f"已对剩余任务的 'task_id' 从 0 到 {len(cleaned_tasks) - 1} 重新编号。")
 

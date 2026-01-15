@@ -12,6 +12,7 @@ from browsergym.core.task import AbstractBrowserTask
 
 from .instance import MyBenchmarkInstance
 from .drift import DriftInjector
+from .anomaly import InterferenceController
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
         intent_template_id: Optional[int] = None,
         site_version: str = "v1",
         with_drift: bool = False,
+        with_waber: bool = False,
         with_na_hint: bool = False,
         with_homepage_hint: bool = False,
     ) -> None:
@@ -69,6 +71,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
         self.drift_type = "all"
         self.drift_intensity = "high"
         self.with_drift = with_drift
+        self.with_waber = with_waber
 
         # one and only one of task id and template id must be provided
         if (task_id is None) == (intent_template_id is None):
@@ -82,7 +85,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
 
         import os
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        json_file_path = os.path.join(current_dir, 'wordpress_task/wordpress_tasks_final.json')
+        json_file_path = os.path.join(current_dir, 'admin_task/admin_tasks_final_v1.json')
         with open(json_file_path, "r", encoding="utf-8") as f:
             all_configs_str = f.read()
 
@@ -129,8 +132,29 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
         self.task_configs = task_configs
 
     def setup(self, page: playwright.sync_api.Page) -> tuple[str, dict]:
+        # --- 🟢 新增调试代码开始 ---
+        
+        # 1. 监听 Console 日志 (console.log, console.warn 等)
+        # page.on("console", lambda msg: print(f"[Browser Console] {msg.type}: {msg.text}"))
+
+        # 2. 监听未捕获的 JS 异常 (这是最关键的，GitLab 仓库不显示通常是因为这里报错)
+        # page.on("pageerror", lambda exc: print(f"[Browser Error] {exc}"))
+
+        # 3. 监听网络请求失败 (用于排查 CSP 拦截或资源加载失败)
+        # page.on("requestfailed", lambda request: print(f"[Request Failed] {request.url} - {request.failure}"))
+        
+        # --- 🔴 新增调试代码结束 ---
+        
         # import webarena on instanciation
         from .evaluators import evaluator_router
+
+        if (self.with_waber):
+            controller = InterferenceController(
+                addon_mode=1
+            )
+            # 挂载干扰逻辑
+            page.route("**/*", controller.route_handler)
+            page.goto("http://localhost:7780/admin/?logging=StartingRun1", timeout=60000) 
 
         if (self.with_drift):
             # 1. 生成漂移脚本 (此时还没加载页面)

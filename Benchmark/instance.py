@@ -247,7 +247,17 @@ class MyBenchmarkInstance:
                 self.urls[site.lower()][version] = os.environ[env_var_name]
 
         # 2. 加载账号信息 (假设所有版本的账号密码是一样的，如果不一样也需要分版本加载)
-        from webarena.browser_env.env_config import ACCOUNTS, HOMEPAGE
+        from webarena.browser_env.env_config import HOMEPAGE
+        ACCOUNTS = {
+            "reddit": {"username": "MarvelsGrantMan136", "password": "test1234"},
+            "gitlab": {"username": "byteblaze", "password": "a_very_secure_password_123!"},
+            "shopping": {
+                "username": "emma.lopez@gmail.com",
+                "password": "Password.123",
+            },
+            "shopping_admin": {"username": "admin", "password": "admin1234"},
+            "shopping_site_admin": {"username": "admin", "password": "admin1234"},
+        }
         self.credentials = ACCOUNTS
         self.home_url = HOMEPAGE
 
@@ -313,7 +323,8 @@ class MyBenchmarkInstance:
                 page.goto(f"{base_url}/?logging=StartingRun1") 
             
             case "wordpress":
-                page.goto(f"{base_url}/?logging=StartingRun1") 
+                # page.goto(f"{base_url}/?logging=StartingRun1") 
+                pass
 
             # ... (其他站点的登录逻辑同理，只需确保使用 base_url) ...
             case _:
