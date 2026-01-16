@@ -5,7 +5,7 @@ host = "http://" + os.environ.get("IP", "127.0.0.1")
 
 # For parallelization, we could create batches of ports that we offset.
 SHOPPING = os.getenv("SHOPPING", f"{host}:7770")
-SHOPPING_ADMIN = os.getenv("SHOPPING_ADMIN", f"{host}:7780") + "/admin"
+SHOPPING_ADMIN = os.getenv("SHOPPING_ADMIN", f"{host}:7780")
 REDDIT = os.getenv("REDDIT", f"{host}:9999")
 GITLAB = os.getenv("GITLAB", f"{host}:8023")
 MAP = os.getenv("MAP", f"{host}:3000")
@@ -37,7 +37,7 @@ ACCOUNTS = {
         "username": "emma.lopez@gmail.com",
         "password": "Password.123",
     },
-    "shopping_admin": {"username": "admin", "password": "admin1234"},
+    "shopping_admin": {"username": "admin", "password": "password123"},
     "shopping_site_admin": {"username": "admin", "password": "admin1234"},
 }
 

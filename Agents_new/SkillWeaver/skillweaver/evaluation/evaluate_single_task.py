@@ -89,8 +89,14 @@ async def run_test_case_with_webrover(
     # ===========================================================================
     # [Drift & Security Patch] 注入漂移脚本并强制绕过 CSP/HTTPS 错误
     # ===========================================================================
-    with_drift = False
-    with_waber = True
+    # with_drift = False
+    # with_waber = False
+    value_drift = os.getenv('with_drift', 'false').lower()
+    with_drift = value_drift in ('true', '1', 'yes', 'on')
+
+    value_waber = os.getenv('with_waber', 'false').lower()
+    with_waber = value_waber in ('true', '1', 'yes', 'on')
+
     drift_intensity = 'high'
     drift_type = 'all'
 
@@ -299,8 +305,8 @@ def evaluate_single_task(
                         }
                     )
                     # shopping_admin start page is '/admin', not '/'.
-                    if "shopping_admin" in container_hostnames:
-                        SITES["SHOPPING_ADMIN"] = SITES["SHOPPING_ADMIN"] + "/admin"
+                    # if "shopping_admin" in container_hostnames:
+                    #     SITES["SHOPPING_ADMIN"] = SITES["SHOPPING_ADMIN"] + "/admin"
                 else:
                     container_hostnames = {
                         # Convention in our code is that there is no http:// in container_hostnames.

@@ -107,8 +107,8 @@ async def webarena_renew_comb(comb: dict[str, str], path: str):
                 # Wait for the request to finish.
                 await page.wait_for_load_state("networkidle")
 
-                await page.goto("http://dockerized-magento.local/admin/?logging=StartingRun1")
-                await page.goto("http://dockerized-magento.local/admin/")
+                # await page.goto("http://localhost:7780/admin/?logging=StartingRun1")
+                # await page.goto("http://localhost:7780/admin")
 
             if key == "gitlab":
                 username = ACCOUNTS["gitlab"]["username"]
@@ -155,8 +155,8 @@ async def webarena_renew_comb(comb: dict[str, str], path: str):
                 # ----------------------------------------------------
                 # END: 关键修改部分
                 # ----------------------------------------------------
-                await page.goto("http://172.26.116.102:8081/?logging=StartingRun1")
-                await page.goto("http://172.26.116.102:8081")
+                # await page.goto("http://172.26.116.102:8080/?logging=StartingRun1")
+                # await page.goto("http://172.26.116.102:8080")
                 await asyncio.sleep(8)
 
         await browser.context.storage_state(path=path)
