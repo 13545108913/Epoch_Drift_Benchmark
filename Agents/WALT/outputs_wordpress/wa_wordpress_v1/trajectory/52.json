@@ -1,0 +1,1641 @@
+{
+    "task_prompt": "Navigate to the tag archive for 'javascript'.",
+    "is_successful": true,
+    "steps": {
+        "1": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\n\n                - Most questions expect a text answer expect it to be concise and to the point, no longer than 1 sentence.\n                - If you are unsure about what a task is specifically asking for, it is ok to return a more comprehensive answer (but still try to keep it concise).\n            \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Navigate to the tag archive for 'javascript'.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "[Your task history memory starts here]",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://localhost:8000/\nAvailable tabs:\n[TabInfo(page_id=0, url='http://localhost:8000/', title='Epoch & Drift Benchmark')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\n[0]<a Skip to content/>\n[1]<a Epoch & Drift Benchmark/>\n[2]<a />\n[3]<ul />\n[4]<a Sample Page/>\n[5]<a site mode button/>\n[6]<a />\nBreaking News\ntechnology\nHOW TO CREATE AN ELASTIC BEANSTALK ON AWS\n[7]<a technology/>\n[8]<a You need to know what the tilde (~) does in Excel/>\ntechnology\nWhat is Microsoft Planner and who is it for\nbusiness\nTo harness crypto ingenuity, financial threat must first be neutralised\ntechnology\nEthereum-Solidity Quiz Q5: What is the Private Mempool?\ntechnology\nHOW TO CREATE AN ELASTIC BEANSTALK ON AWS\ntechnology\nYou need to know what the tilde (~) does in Excel\n[9]<a />\n[10]<a />\n[11]<a What is Microsoft Planner and who is it for/>\n[12]<a December 26, 2025/>\n[13]<a admin/>\n[14]<a 1 Comment\non What is Microsoft Planner and who is it for/>\nMicrosoft has no shortage of productivity apps, but one of its most genuinely useful tools is also one of the easiest to miss. If you subscribe to Microsoft 365, you already have access to Microsoft Planner, a lightweight project organizer tucked inside 365 suite. It is straightforward for personal projects and structured enough for small [\u2026]\n[15]<a Continue Reading/>\n[16]<a You need to know what the tilde (~) does in Excel/>\n[17]<a December 26, 2025/>\n[18]<a admin/>\n[19]<a Leave a Comment\non You need to know what the tilde (~) does in Excel/>\nJump Links Picture this: you need to find or count cells containing asterisks (*) or question marks (?) in Excel, but you\u2019re getting incorrect results. This is because asterisks and question marks are wildcard characters. The solution? Excel\u2019s essential escape character, the tilde (~). Wildcard and escape characters in Excel Wildcard characters are symbols that [\u2026]\n[20]<a Continue Reading/>\n[21]<a To harness crypto ingenuity, financial threat must first be neutralised/>\n[22]<a December 26, 2025/>\n[23]<a admin/>\n[24]<a Leave a Comment\non To harness crypto ingenuity, financial threat must first be neutralised/>\nOpinion | To harness crypto ingenuity, financial threat must first be neutralised Future of money must be shaped by competition between private ingenuity and public purpose, not by rent seeking and speculative bubbles Future of money must be shaped by competition between private ingenuity and public purpose, not by rent seeking and speculative bubbles While [\u2026]\n[25]<a Continue Reading/>\n[26]<a Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\n[27]<a December 26, 2025/>\n[28]<a admin/>\n[29]<a Leave a Comment\non Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\nWe have previuosly established what a mempool is, a list of pending transactions, specific to each blockchain node, where new created transaction wait to be verified, included in a transaction block and executed on the blockchain. The transactions with lower gas prices spend more time in a mempool and can be overwritten with replacement transactions. [\u2026]\n[30]<a Continue Reading/>\n[31]<a HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\n[32]<a December 26, 2025/>\n[33]<a admin/>\n[34]<a Leave a Comment\non HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\nWHAT IS AN ELASTIC BEANSTALK: An Elastic Beanstalk application is a container for Elastic Beanstalk components, including environments where your application code runs on platforms provided and managed by Elastic Beanstalk, or in custom containers that you provide. THROUGH UNDERSTANDING OF ENVIROMENT ELASTIC BEANSTALK An Elastic Beanstalk environment is a collection of AWS resources running [\u2026]\n[35]<a Continue Reading/>\n[36]<a Scaling the Data Layer in Distributed Systems/>\n[37]<a December 26, 2025/>\n[38]<a admin/>\n[39]<a Leave a Comment\non Scaling the Data Layer in Distributed Systems/>\nScaling a stateless system is relatively straightforward. We can horizontally scale application servers by adding more instances behind a load balancer, and the system continues to work as expected. But what happens to the database? How can a database running on a single machine handle requests coming from N horizontally scaled application servers? Databases must [\u2026]\n[40]<a Continue Reading/>\n[41]<a Unlock Your Gift Cards\u2019 Full Potential with Google Wallet/>\n[42]<a December 26, 2025/>\n[43]<a admin/>\n[44]<a Leave a Comment\non Unlock Your Gift Cards\u2019 Full Potential with Google Wallet/>\nJump Links Gift cards are great, but when your physical wallet already has a ton of stuff in it, it can be easy to lose them in the chaos and completely forget about your free money. By adding your gift cards to Google Wallet, you\u2019ll be much more likely to remember them. Doing this is [\u2026]\n[45]<a Continue Reading/>\n[46]<a 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\n[47]<a December 26, 2025/>\n[48]<a admin/>\n[49]<a Leave a Comment\non 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\nThe WordPress ecosystem in 2026 looks fundamentally different than it did even two years ago. With AI integration reshaping development workflows, Phase 3 collaboration features rolling out in WordPress 6.9 and beyond, and new APIs like the Interactivity API and Abilities API changing how we build dynamic experiences, developers need tools that keep pace with [\u2026]\n[50]<a Continue Reading/>\n[51]<a Auto-Approve WebFetch and WebSearch in Claude Code with Hooks/>\n[52]<a December 26, 2025/>\n[53]<a admin/>\n[54]<a Leave a Comment\non Auto-Approve WebFetch and WebSearch in Claude Code with Hooks/>\n[55]<a Continue Reading/>\n[56]<a Frontend Website Development: A Practical Guide for Modern Web Projects/>\n[57]<a December 26, 2025/>\n[58]<a admin/>\n[59]<a Leave a Comment\non Frontend Website Development: A Practical Guide for Modern Web Projects/>\n[60]<a Continue Reading/>\n[61]<a Older posts/>\n[62]<label Search/>\n[63]<input ;s;search>Search/>\n[64]<button submit>Search/>\nRecent Posts\n[65]<a What is Microsoft Planner and who is it for/>\n[66]<a You need to know what the tilde (~) does in Excel/>\n[67]<a To harness crypto ingenuity, financial threat must first be neutralised/>\n[68]<a Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\n[69]<a HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\nRecent Comments\nTest User\non\nHow to get rid of unwanted Christmas presents \u2013 without being found out\nCommenter\non\nIn world first, Chinese surgeons save patient\u2019s ear with graft onto foot\nTest User\non\n[70]<a Rivalries and rumours: How the new order of the Murdoch dynasty is playing out/>\nTest User\non\n40 of our most helpful AI tips from 2025\nTest User\non\n[71]<a JavaScript SpeechSynthesis API/>\nArchives\n[72]<a December 2025/>\n[73]<a November 2025/>\n[74]<a October 2025/>\n[75]<a July 2025/>\n[76]<a June 2025/>\n[77]<a May 2025/>\n[78]<a April 2025/>\n[79]<a March 2025/>\n[80]<a January 2025/>\n[81]<a December 2024/>\n[82]<a October 2024/>\n[83]<a September 2024/>\n[84]<a August 2024/>\n[85]<a June 2024/>\n[86]<a May 2024/>\n[87]<a April 2024/>\n[88]<a March 2024/>\n[89]<a February 2024/>\n[90]<a January 2024/>\n[91]<a December 2023/>\n[92]<a November 2023/>\n[93]<a June 2023/>\n[94]<a May 2023/>\nApril 2023\n[95]<a December 2022/>\n[96]<a October 2022/>\n[97]<a July 2022/>\n[98]<a June 2022/>\n[99]<a May 2022/>\n[100]<a March 2022/>\n[101]<a December 2021/>\n[102]<a April 2020/>\n[103]<a September 2019/>\n[104]<a August 2019/>\n[105]<a May 2019/>\n[106]<a February 2019/>\n[107]<a October 2018/>\n[108]<a September 2018/>\n[109]<a December 2017/>\n[110]<a business/>\n[111]<a entertainment/>\n[112]<a general/>\n[113]<a health/>\n[114]<a politics/>\n[115]<a science/>\n[116]<a sports/>\n[117]<a technology/>\n[118]<a Mystery Themes/>\n... 1402 pixels below - scroll or extract content to see more ...\nCurrent step: 1/30Current date and time: 2025-12-30 19:43\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 5428,
+                "cumulative_input_token_count": 5428
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 5905,
+                    "prompt_tokens_cached": 3520,
+                    "completion_tokens": 200,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 6105,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Unknown - Just starting the task. Need to navigate to the tag archive for 'javascript'",
+                                    "memory": "Starting task: Navigate to the tag archive for 'javascript'. I need to find a way to access tag archives on this blog site. Looking at the page, I see categories like 'technology', 'business', etc. but no 'javascript' tag visible. I should search for javascript or look for tag navigation.",
+                                    "next_goal": "Search for 'javascript' using the search box to find javascript-related content or tag archives"
+                                },
+                                "action": [
+                                    {
+                                        "input_text": {
+                                            "index": 63,
+                                            "text": "javascript"
+                                        }
+                                    },
+                                    {
+                                        "click_element": {
+                                            "index": 64
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "2",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "2",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 239
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input javascript into index 63",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null
+                ]
+            }
+        },
+        "2": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\n\n                - Most questions expect a text answer expect it to be concise and to the point, no longer than 1 sentence.\n                - If you are unsure about what a task is specifically asking for, it is ok to return a more comprehensive answer (but still try to keep it concise).\n            \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Navigate to the tag archive for 'javascript'.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task. Need to navigate to the tag archive for 'javascript'",
+                                        "memory": "Starting task: Navigate to the tag archive for 'javascript'. I need to find a way to access tag archives on this blog site. Looking at the page, I see categories like 'technology', 'business', etc. but no 'javascript' tag visible. I should search for javascript or look for tag navigation.",
+                                        "next_goal": "Search for 'javascript' using the search box to find javascript-related content or tag archives"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 63,
+                                                "text": "javascript"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 64
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input javascript into index 63",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://localhost:8000/?s=javascript\nAvailable tabs:\n[TabInfo(page_id=0, url='http://localhost:8000/?s=javascript', title='Search Results for \u201cjavascript\u201d \u2013 Epoch & Drift Benchmark')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\n[0]<a Skip to content/>\n[1]<a Epoch & Drift Benchmark/>\n[2]<a />\n[3]<ul />\n[4]<a Sample Page/>\n[5]<a site mode button/>\n[6]<a />\nSearch Results for:\njavascript\n[7]<a JavaScript SpeechSynthesis API/>\n[8]<a November 20, 2025/>\n[9]<a admin/>\n[10]<a 1 Comment\non JavaScript SpeechSynthesis API/>\nJavaScript SpeechSynthesis API As the web continues to be the medium for all users, standards bodies need to continue to provide new APIs to enrich user experience and accessibility. One underused API for unsighted users is speechSynthesis , an API to programmatically direct the browser to audibly speak any arbitrary string. The Code You can [\u2026]\n[11]<a Continue Reading/>\n[12]<a Detect Caps Lock with JavaScript/>\n[13]<a February 6, 2024/>\n[14]<a admin/>\n[15]<a Leave a Comment\non Detect Caps Lock with JavaScript/>\nDetect Caps Lock with JavaScript Anyone is capable of having their caps lock key on at any given time without realizing so. Users can easily spot unwanted caps lock when typing in most inputs, but when using a password input , the problem isn\u2019t so obvious. That leads to the user\u2019s password being incorrect, which [\u2026]\n[16]<a Continue Reading/>\n[17]<a Extract a Number from a String with JavaScript/>\n[18]<a January 16, 2024/>\n[19]<a admin/>\n[20]<a Leave a Comment\non Extract a Number from a String with JavaScript/>\nExtract a Number from a String with JavaScript User input from HTML form fields is generally provided to JavaScript as a string. We\u2019ve lived with that fact for decades but sometimes developers need to extract numbers from that string. There are multiple ways to get those numbers but let\u2019s rely on regular expressions to extract [\u2026]\n[21]<a Continue Reading/>\n[22]<a 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\n[23]<a December 26, 2025/>\n[24]<a admin/>\n[25]<a Leave a Comment\non 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\nThe WordPress ecosystem in 2026 looks fundamentally different than it did even two years ago. With AI integration reshaping development workflows, Phase 3 collaboration features rolling out in WordPress 6.9 and beyond, and new APIs like the Interactivity API and Abilities API changing how we build dynamic experiences, developers need tools that keep pace with [\u2026]\n[26]<a Continue Reading/>\n[27]<a Frontend Website Development: A Practical Guide for Modern Web Projects/>\n[28]<a December 26, 2025/>\n[29]<a admin/>\n[30]<a Leave a Comment\non Frontend Website Development: A Practical Guide for Modern Web Projects/>\nFrontend website development is no longer just about making websites look good. Today, it plays a critical role in performance, accessibility, scalability, and user experience. In this post, I want to share a practical overview of frontend development, based on real-world project experience and current industry practices. What Is Frontend Website Development? Frontend development focuses [\u2026]\n[31]<a Continue Reading/>\n[32]<a I ditched VS Code for the open-source VSCodium, and I have no regrets/>\n[33]<a December 26, 2025/>\n[34]<a admin/>\n[35]<a 1 Comment\non I ditched VS Code for the open-source VSCodium, and I have no regrets/>\nJump Links VS Code is one of the most popular open-source (mostly) applications out there, and for good reason: It does everything you could ask for and then some. However, it also has always-on telemetry that you cannot disable. That is where VSCodium comes into play. Visual Studio Code is the jack of all trades [\u2026]\n[36]<a Continue Reading/>\nHere\u2019s why GitHub Pages is the best option for (most) free websites\n[37]<a December 25, 2025/>\n[38]<a admin/>\n[39]<a Leave a Comment\non Here\u2019s why GitHub Pages is the best option for (most) free websites/>\nWhen it comes to setting up free websites, there\u2019s always a catch. But if you want a free, simple method to set up a free, static website for yourself or for a personal project, that\u2019s relatively easy to do. My personal favorite, however, is GitHub Pages. My own personal website is hosted using GitHub Pages. [\u2026]\n[40]<a Continue Reading/>\n[41]<a Making your code base better will make your code coverage worse/>\n[42]<a December 22, 2025/>\n[43]<a admin/>\n[44]<a Leave a Comment\non Making your code base better will make your code coverage worse/>\n[Ed. note: While we take some time to rest up over the holidays and prepare for next year, we are re-publishing our top ten posts for the year. Please enjoy our favorite work this year and we\u2019ll see you in 2026.] There are certain widely used numbers and calculations that, without additional information, can give [\u2026]\n[45]<a Continue Reading/>\n[46]<a Masonry Layout is Now grid-lanes/>\n[47]<a December 19, 2025/>\n[48]<a admin/>\n[49]<a Leave a Comment\non Masonry Layout is Now grid-lanes/>\n[50]<a Continue Reading/>\n[51]<a What\u2019s !important #1: Advent Calendars, CSS Wrapped, Web Platform Updates, and More/>\n[52]<a December 16, 2025/>\n[53]<a admin/>\n[54]<a Leave a Comment\non What\u2019s !important #1: Advent Calendars, CSS Wrapped, Web Platform Updates, and More/>\n[55]<a Continue Reading/>\n[56]<a Older posts/>\n[57]<label Search/>\n[58]<input ;s;search>javascript/>\n[59]<button submit>Search/>\nRecent Posts\n[60]<a What is Microsoft Planner and who is it for/>\n[61]<a You need to know what the tilde (~) does in Excel/>\n[62]<a To harness crypto ingenuity, financial threat must first be neutralised/>\n[63]<a Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\n[64]<a HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\nRecent Comments\nTest User\non\nSettle down, nerds. AI is a normal technology\nTest User\non\nHow to get rid of unwanted Christmas presents \u2013 without being found out\nCommenter\non\nIn world first, Chinese surgeons save patient\u2019s ear with graft onto foot\nTest User\non\n[65]<a Rivalries and rumours: How the new order of the Murdoch dynasty is playing out/>\nTest User\non\n40 of our most helpful AI tips from 2025\nArchives\n[66]<a December 2025/>\n[67]<a November 2025/>\n[68]<a October 2025/>\n[69]<a July 2025/>\n[70]<a June 2025/>\n[71]<a May 2025/>\n[72]<a April 2025/>\n[73]<a March 2025/>\n[74]<a January 2025/>\n[75]<a December 2024/>\n[76]<a October 2024/>\n[77]<a September 2024/>\n[78]<a August 2024/>\n[79]<a June 2024/>\n[80]<a May 2024/>\n[81]<a April 2024/>\n[82]<a March 2024/>\n[83]<a February 2024/>\n[84]<a January 2024/>\n[85]<a December 2023/>\n[86]<a November 2023/>\n[87]<a June 2023/>\n[88]<a May 2023/>\n[89]<a April 2023/>\n[90]<a December 2022/>\n[91]<a October 2022/>\n[92]<a July 2022/>\n[93]<a June 2022/>\n[94]<a May 2022/>\n[95]<a March 2022/>\n[96]<a December 2021/>\n[97]<a April 2020/>\n[98]<a September 2019/>\n[99]<a August 2019/>\n[100]<a May 2019/>\n[101]<a February 2019/>\n[102]<a October 2018/>\n[103]<a September 2018/>\n[104]<a December 2017/>\n[105]<a business/>\n[106]<a entertainment/>\n[107]<a general/>\n[108]<a health/>\n[109]<a politics/>\n[110]<a science/>\n[111]<a sports/>\n[112]<a technology/>\n[113]<a Mystery Themes/>\n... 1275 pixels below - scroll or extract content to see more ...\nCurrent step: 2/30Current date and time: 2025-12-30 19:43\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 5490,
+                "cumulative_input_token_count": 5490
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 6009,
+                    "prompt_tokens_cached": 3712,
+                    "completion_tokens": 190,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 6199,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Successfully searched for 'javascript' and got search results showing javascript-related posts",
+                                    "memory": "I searched for 'javascript' and got search results. Now I need to find the tag archive for 'javascript'. Looking at the page, I see categories/tags on the right side (business, entertainment, general, health, politics, science, sports, technology). I don't see a 'javascript' tag in the visible list. I should scroll down to see more tags or look for a tag cloud.",
+                                    "next_goal": "Scroll down to see if there are more tags or a tag cloud section"
+                                },
+                                "action": [
+                                    {
+                                        "scroll_down": {}
+                                    }
+                                ]
+                            },
+                            "id": "3",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "3",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 237
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \ud83d\udd0d  Scrolled down the page by one page",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null
+                ]
+            }
+        },
+        "3": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\n\n                - Most questions expect a text answer expect it to be concise and to the point, no longer than 1 sentence.\n                - If you are unsure about what a task is specifically asking for, it is ok to return a more comprehensive answer (but still try to keep it concise).\n            \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Navigate to the tag archive for 'javascript'.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task. Need to navigate to the tag archive for 'javascript'",
+                                        "memory": "Starting task: Navigate to the tag archive for 'javascript'. I need to find a way to access tag archives on this blog site. Looking at the page, I see categories like 'technology', 'business', etc. but no 'javascript' tag visible. I should search for javascript or look for tag navigation.",
+                                        "next_goal": "Search for 'javascript' using the search box to find javascript-related content or tag archives"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 63,
+                                                "text": "javascript"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 64
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully searched for 'javascript' and got search results showing javascript-related posts",
+                                        "memory": "I searched for 'javascript' and got search results. Now I need to find the tag archive for 'javascript'. Looking at the page, I see categories/tags on the right side (business, entertainment, general, health, politics, science, sports, technology). I don't see a 'javascript' tag in the visible list. I should scroll down to see more tags or look for a tag cloud.",
+                                        "next_goal": "Scroll down to see if there are more tags or a tag cloud section"
+                                    },
+                                    "action": [
+                                        {
+                                            "scroll_down": {}
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\udd0d  Scrolled down the page by one page",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://localhost:8000/?s=javascript\nAvailable tabs:\n[TabInfo(page_id=0, url='http://localhost:8000/?s=javascript', title='Search Results for \u201cjavascript\u201d \u2013 Epoch & Drift Benchmark')]\nInteractive elements from top layer of the current page inside the viewport:\n... 1275 pixels above - scroll or extract content to see more ...\n[0]<a Skip to content/>\n[1]<a Epoch & Drift Benchmark/>\n[2]<a />\n[3]<ul />\n[4]<a Sample Page/>\n[5]<a site mode button/>\n[6]<a />\n[7]<a JavaScript SpeechSynthesis API/>\n[8]<a November 20, 2025/>\n[9]<a admin/>\n[10]<a 1 Comment\non JavaScript SpeechSynthesis API/>\n[11]<a Continue Reading/>\n[12]<a Detect Caps Lock with JavaScript/>\n[13]<a February 6, 2024/>\n[14]<a admin/>\n[15]<a Leave a Comment\non Detect Caps Lock with JavaScript/>\n[16]<a Continue Reading/>\n[17]<a Extract a Number from a String with JavaScript/>\n[18]<a January 16, 2024/>\n[19]<a admin/>\n[20]<a Leave a Comment\non Extract a Number from a String with JavaScript/>\nExtract a Number from a String with JavaScript User input from HTML form fields is generally provided to JavaScript as a string. We\u2019ve lived with that fact for decades but sometimes developers need to extract numbers from that string. There are multiple ways to get those numbers but let\u2019s rely on regular expressions to extract [\u2026]\n[21]<a Continue Reading/>\n[22]<a 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\n[23]<a December 26, 2025/>\n[24]<a admin/>\n[25]<a Leave a Comment\non 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\nThe WordPress ecosystem in 2026 looks fundamentally different than it did even two years ago. With AI integration reshaping development workflows, Phase 3 collaboration features rolling out in WordPress 6.9 and beyond, and new APIs like the Interactivity API and Abilities API changing how we build dynamic experiences, developers need tools that keep pace with [\u2026]\n[26]<a Continue Reading/>\n[27]<a Frontend Website Development: A Practical Guide for Modern Web Projects/>\n[28]<a December 26, 2025/>\n[29]<a admin/>\n[30]<a Leave a Comment\non Frontend Website Development: A Practical Guide for Modern Web Projects/>\nFrontend website development is no longer just about making websites look good. Today, it plays a critical role in performance, accessibility, scalability, and user experience. In this post, I want to share a practical overview of frontend development, based on real-world project experience and current industry practices. What Is Frontend Website Development? Frontend development focuses [\u2026]\n[31]<a Continue Reading/>\n[32]<a I ditched VS Code for the open-source VSCodium, and I have no regrets/>\n[33]<a December 26, 2025/>\n[34]<a admin/>\n[35]<a 1 Comment\non I ditched VS Code for the open-source VSCodium, and I have no regrets/>\nJump Links VS Code is one of the most popular open-source (mostly) applications out there, and for good reason: It does everything you could ask for and then some. However, it also has always-on telemetry that you cannot disable. That is where VSCodium comes into play. Visual Studio Code is the jack of all trades [\u2026]\n[36]<a Continue Reading/>\n[37]<a Here\u2019s why GitHub Pages is the best option for (most) free websites/>\n[38]<a December 25, 2025/>\n[39]<a admin/>\n[40]<a Leave a Comment\non Here\u2019s why GitHub Pages is the best option for (most) free websites/>\nWhen it comes to setting up free websites, there\u2019s always a catch. But if you want a free, simple method to set up a free, static website for yourself or for a personal project, that\u2019s relatively easy to do. My personal favorite, however, is GitHub Pages. My own personal website is hosted using GitHub Pages. [\u2026]\n[41]<a Continue Reading/>\n[42]<a Making your code base better will make your code coverage worse/>\n[43]<a December 22, 2025/>\n[44]<a admin/>\n[45]<a Leave a Comment\non Making your code base better will make your code coverage worse/>\n[Ed. note: While we take some time to rest up over the holidays and prepare for next year, we are re-publishing our top ten posts for the year. Please enjoy our favorite work this year and we\u2019ll see you in 2026.] There are certain widely used numbers and calculations that, without additional information, can give [\u2026]\n[46]<a Continue Reading/>\n[47]<a Masonry Layout is Now grid-lanes/>\n[48]<a December 19, 2025/>\n[49]<a admin/>\n[50]<a Leave a Comment\non Masonry Layout is Now grid-lanes/>\nWe\u2019ve talked a lot about Masonry layout here on CSS-Tricks, so there\u2019s no need to remind you of the two-sided discussions about how to approach it , the idea of using it as a new unifying layout concept , or alternative approaches for making it work today . Here\u2019s what you do need to know: [\u2026]\n[51]<a Continue Reading/>\nWhat\u2019s !important #1: Advent Calendars, CSS Wrapped, Web Platform Updates, and More\n[52]<a December 16, 2025/>\n[53]<a admin/>\n[54]<a Leave a Comment\non What\u2019s !important #1: Advent Calendars, CSS Wrapped, Web Platform Updates, and More/>\nWelcome to the first ever\u00a0 What\u2019s !important , a roundup of the best CSS and web development news from the last two weeks. If you\u2019re pressed for time (who isn\u2019t?) or you just can\u2019t stand missing out on anything CSS-related, this is the place to recap: Let\u2019s dig in! HTMHell Advent Calendar 2025 Manuel Matuzovi\u0107 [\u2026]\n[55]<a Continue Reading/>\nPosts navigation\n[56]<a Older posts/>\n[57]<label Search/>\n[58]<input ;s;search>javascript/>\n[59]<button submit>Search/>\n[60]<a What is Microsoft Planner and who is it for/>\n[61]<a You need to know what the tilde (~) does in Excel/>\n[62]<a To harness crypto ingenuity, financial threat must first be neutralised/>\n[63]<a Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\n[64]<a HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\nRecent Comments\nTest User\non\n[65]<a Settle down, nerds. AI is a normal technology/>\nTest User\non\n[66]<a How to get rid of unwanted Christmas presents \u2013 without being found out/>\nCommenter\non\n[67]<a In world first, Chinese surgeons save patient\u2019s ear with graft onto foot/>\nTest User\non\n[68]<a Rivalries and rumours: How the new order of the Murdoch dynasty is playing out/>\nTest User\non\n40 of our most helpful AI tips from 2025\nArchives\n[69]<a December 2025/>\n[70]<a November 2025/>\n[71]<a October 2025/>\n[72]<a July 2025/>\n[73]<a June 2025/>\n[74]<a May 2025/>\n[75]<a April 2025/>\n[76]<a March 2025/>\n[77]<a January 2025/>\n[78]<a December 2024/>\n[79]<a October 2024/>\n[80]<a September 2024/>\n[81]<a August 2024/>\n[82]<a June 2024/>\n[83]<a May 2024/>\n[84]<a April 2024/>\n[85]<a March 2024/>\n[86]<a February 2024/>\n[87]<a January 2024/>\n[88]<a December 2023/>\n[89]<a November 2023/>\n[90]<a June 2023/>\n[91]<a May 2023/>\n[92]<a April 2023/>\n[93]<a December 2022/>\n[94]<a October 2022/>\n[95]<a July 2022/>\n[96]<a June 2022/>\n[97]<a May 2022/>\n[98]<a March 2022/>\n[99]<a December 2021/>\n[100]<a April 2020/>\n[101]<a September 2019/>\n[102]<a August 2019/>\n[103]<a May 2019/>\n[104]<a February 2019/>\n[105]<a October 2018/>\n[106]<a September 2018/>\n[107]<a December 2017/>\nCategories\n[108]<a business/>\n[109]<a entertainment/>\n[110]<a general/>\n[111]<a health/>\n[112]<a politics/>\n[113]<a science/>\n[114]<a sports/>\n[115]<a technology/>\n|\nTheme: News Portal by\n[116]<a Mystery Themes/>\n.\n[End of page]\nCurrent step: 3/30Current date and time: 2025-12-30 19:43\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 5723,
+                "cumulative_input_token_count": 5723
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 6257,
+                    "prompt_tokens_cached": 3904,
+                    "completion_tokens": 204,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 6461,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Scrolled down and can see more content including categories section with 'technology' category but no 'javascript' tag",
+                                    "memory": "I've searched for 'javascript' and scrolled down. I can see categories section with business, entertainment, general, health, politics, science, sports, technology. No 'javascript' tag visible. I need to find tag archives. Maybe 'javascript' is a tag within 'technology' category or there's a separate tag cloud. I should check if clicking on 'technology' category shows javascript-related posts or tags.",
+                                    "next_goal": "Click on 'technology' category to see if it contains javascript-related content or tag navigation"
+                                },
+                                "action": [
+                                    {
+                                        "click_element": {
+                                            "index": 115
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "4",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "4",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 275
+            },
+            "controller_messages": {
+                "action_result": [],
+                "action_error": []
+            }
+        },
+        "4": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\n\n                - Most questions expect a text answer expect it to be concise and to the point, no longer than 1 sentence.\n                - If you are unsure about what a task is specifically asking for, it is ok to return a more comprehensive answer (but still try to keep it concise).\n            \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Navigate to the tag archive for 'javascript'.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task. Need to navigate to the tag archive for 'javascript'",
+                                        "memory": "Starting task: Navigate to the tag archive for 'javascript'. I need to find a way to access tag archives on this blog site. Looking at the page, I see categories like 'technology', 'business', etc. but no 'javascript' tag visible. I should search for javascript or look for tag navigation.",
+                                        "next_goal": "Search for 'javascript' using the search box to find javascript-related content or tag archives"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 63,
+                                                "text": "javascript"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 64
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully searched for 'javascript' and got search results showing javascript-related posts",
+                                        "memory": "I searched for 'javascript' and got search results. Now I need to find the tag archive for 'javascript'. Looking at the page, I see categories/tags on the right side (business, entertainment, general, health, politics, science, sports, technology). I don't see a 'javascript' tag in the visible list. I should scroll down to see more tags or look for a tag cloud.",
+                                        "next_goal": "Scroll down to see if there are more tags or a tag cloud section"
+                                    },
+                                    "action": [
+                                        {
+                                            "scroll_down": {}
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Scrolled down and can see more content including categories section with 'technology' category but no 'javascript' tag",
+                                        "memory": "I've searched for 'javascript' and scrolled down. I can see categories section with business, entertainment, general, health, politics, science, sports, technology. No 'javascript' tag visible. I need to find tag archives. Maybe 'javascript' is a tag within 'technology' category or there's a separate tag cloud. I should check if clicking on 'technology' category shows javascript-related posts or tags.",
+                                        "next_goal": "Click on 'technology' category to see if it contains javascript-related content or tag navigation"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 115
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "4",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "4",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://localhost:8000/?cat=16\nAvailable tabs:\n[TabInfo(page_id=0, url='http://localhost:8000/?cat=16', title='technology \u2013 Epoch & Drift Benchmark')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\n[0]<a Skip to content/>\n[1]<a Epoch & Drift Benchmark/>\n[2]<a />\n[3]<ul />\n[4]<a Sample Page/>\n[5]<a site mode button/>\n[6]<a />\nCategory:\ntechnology\n[7]<a You need to know what the tilde (~) does in Excel/>\n[8]<a December 26, 2025/>\n[9]<a admin/>\n[10]<a Leave a Comment\non You need to know what the tilde (~) does in Excel/>\nJump Links Picture this: you need to find or count cells containing asterisks (*) or question marks (?) in Excel, but you\u2019re getting incorrect results. This is because asterisks and question marks are wildcard characters. The solution? Excel\u2019s essential escape character, the tilde (~). Wildcard and escape characters in Excel Wildcard characters are symbols that [\u2026]\n[11]<a Continue Reading/>\n[12]<a What is Microsoft Planner and who is it for/>\n[13]<a December 26, 2025/>\n[14]<a admin/>\n[15]<a 1 Comment\non What is Microsoft Planner and who is it for/>\nMicrosoft has no shortage of productivity apps, but one of its most genuinely useful tools is also one of the easiest to miss. If you subscribe to Microsoft 365, you already have access to Microsoft Planner, a lightweight project organizer tucked inside 365 suite. It is straightforward for personal projects and structured enough for small [\u2026]\n[16]<a Continue Reading/>\n[17]<a Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\n[18]<a December 26, 2025/>\n[19]<a admin/>\n[20]<a Leave a Comment\non Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\nWe have previuosly established what a mempool is, a list of pending transactions, specific to each blockchain node, where new created transaction wait to be verified, included in a transaction block and executed on the blockchain. The transactions with lower gas prices spend more time in a mempool and can be overwritten with replacement transactions. [\u2026]\n[21]<a Continue Reading/>\n[22]<a HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\n[23]<a December 26, 2025/>\n[24]<a admin/>\n[25]<a Leave a Comment\non HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\nWHAT IS AN ELASTIC BEANSTALK: An Elastic Beanstalk application is a container for Elastic Beanstalk components, including environments where your application code runs on platforms provided and managed by Elastic Beanstalk, or in custom containers that you provide. THROUGH UNDERSTANDING OF ENVIROMENT ELASTIC BEANSTALK An Elastic Beanstalk environment is a collection of AWS resources running [\u2026]\n[26]<a Continue Reading/>\n[27]<a Scaling the Data Layer in Distributed Systems/>\n[28]<a December 26, 2025/>\n[29]<a admin/>\n[30]<a Leave a Comment\non Scaling the Data Layer in Distributed Systems/>\nScaling a stateless system is relatively straightforward. We can horizontally scale application servers by adding more instances behind a load balancer, and the system continues to work as expected. But what happens to the database? How can a database running on a single machine handle requests coming from N horizontally scaled application servers? Databases must [\u2026]\n[31]<a Continue Reading/>\n[32]<a Unlock Your Gift Cards\u2019 Full Potential with Google Wallet/>\n[33]<a December 26, 2025/>\n[34]<a admin/>\n[35]<a Leave a Comment\non Unlock Your Gift Cards\u2019 Full Potential with Google Wallet/>\nJump Links Gift cards are great, but when your physical wallet already has a ton of stuff in it, it can be easy to lose them in the chaos and completely forget about your free money. By adding your gift cards to Google Wallet, you\u2019ll be much more likely to remember them. Doing this is [\u2026]\n[36]<a Continue Reading/>\n[37]<a 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\n[38]<a December 26, 2025/>\n[39]<a admin/>\n[40]<a Leave a Comment\non 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\nThe WordPress ecosystem in 2026 looks fundamentally different than it did even two years ago. With AI integration reshaping development workflows, Phase 3 collaboration features rolling out in WordPress 6.9 and beyond, and new APIs like the Interactivity API and Abilities API changing how we build dynamic experiences, developers need tools that keep pace with [\u2026]\n[41]<a Continue Reading/>\n[42]<a Auto-Approve WebFetch and WebSearch in Claude Code with Hooks/>\n[43]<a December 26, 2025/>\n[44]<a admin/>\n[45]<a Leave a Comment\non Auto-Approve WebFetch and WebSearch in Claude Code with Hooks/>\nTL;DR: Claude Code\u2019s standard permission settings for WebFetch and WebSearch have known bugs. Hooks bypass these issues and work in CLI, VSCode, and sub-agents. If you use Claude Code regularly, you\u2019ve likely encountered the permission prompt fatigue. Every web search, every URL fetch: \u201cAllow WebSearch?\u201d \u201cAllow WebFetch?\u201d Click. Click. Click. You add these tools to [\u2026]\n[46]<a Continue Reading/>\n[47]<a Frontend Website Development: A Practical Guide for Modern Web Projects/>\n[48]<a December 26, 2025/>\n[49]<a admin/>\n[50]<a Leave a Comment\non Frontend Website Development: A Practical Guide for Modern Web Projects/>\n[51]<a Continue Reading/>\n[52]<a Day 26: Spark Streaming Joins/>\n[53]<a December 26, 2025/>\n[54]<a admin/>\n[55]<a Leave a Comment\non Day 26: Spark Streaming Joins/>\n[56]<a Continue Reading/>\n[57]<a Older posts/>\n[58]<label Search/>\n[59]<input ;s;search>Search/>\n[60]<button submit>Search/>\nRecent Posts\n[61]<a What is Microsoft Planner and who is it for/>\n[62]<a You need to know what the tilde (~) does in Excel/>\n[63]<a To harness crypto ingenuity, financial threat must first be neutralised/>\n[64]<a Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\n[65]<a HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\nRecent Comments\nTest User\non\nSettle down, nerds. AI is a normal technology\nTest User\non\nHow to get rid of unwanted Christmas presents \u2013 without being found out\nCommenter\non\nIn world first, Chinese surgeons save patient\u2019s ear with graft onto foot\nTest User\non\n[66]<a Rivalries and rumours: How the new order of the Murdoch dynasty is playing out/>\nTest User\non\n40 of our most helpful AI tips from 2025\nArchives\n[67]<a December 2025/>\n[68]<a November 2025/>\n[69]<a October 2025/>\n[70]<a July 2025/>\n[71]<a June 2025/>\n[72]<a May 2025/>\n[73]<a April 2025/>\n[74]<a March 2025/>\n[75]<a January 2025/>\n[76]<a December 2024/>\n[77]<a October 2024/>\n[78]<a September 2024/>\n[79]<a August 2024/>\n[80]<a June 2024/>\n[81]<a May 2024/>\n[82]<a April 2024/>\n[83]<a March 2024/>\n[84]<a February 2024/>\n[85]<a January 2024/>\n[86]<a December 2023/>\n[87]<a November 2023/>\n[88]<a June 2023/>\n[89]<a May 2023/>\n[90]<a April 2023/>\n[91]<a December 2022/>\n[92]<a October 2022/>\n[93]<a July 2022/>\n[94]<a June 2022/>\n[95]<a May 2022/>\n[96]<a March 2022/>\n[97]<a December 2021/>\n[98]<a April 2020/>\n[99]<a September 2019/>\n[100]<a August 2019/>\n[101]<a May 2019/>\n[102]<a February 2019/>\n[103]<a October 2018/>\n[104]<a September 2018/>\n[105]<a December 2017/>\n[106]<a business/>\n[107]<a entertainment/>\n[108]<a general/>\n[109]<a health/>\n[110]<a politics/>\n[111]<a science/>\n[112]<a sports/>\n[113]<a technology/>\n[114]<a Mystery Themes/>\n... 1325 pixels below - scroll or extract content to see more ...\nCurrent step: 4/30Current date and time: 2025-12-30 19:44\n\nAction error 1/1: ...Failed to click element: <a href=\"http://localhost:8000/?cat=16\" browser_use_index=\"115\"> [interactive, top, highlight:115, in-viewport, innerText: ]. Error: Failed to click element: Page.evaluate: Execution context was destroyed, most likely because of a navigation",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 6096,
+                "cumulative_input_token_count": 6096
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 6532,
+                    "prompt_tokens_cached": 4160,
+                    "completion_tokens": 213,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 6745,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Failed - The click on 'technology' category caused a navigation error. I'm now on the technology category page (cat=16) but need to find the javascript tag archive",
+                                    "memory": "I'm now on the technology category page. I need to find the tag archive for 'javascript'. Looking at the page, I see categories on the right side (business, entertainment, general, health, politics, science, sports, technology). No 'javascript' tag visible. I should check if there's a tag cloud or tags section. I need to scroll further down or look for 'Tags' section.",
+                                    "next_goal": "Scroll further down to look for a 'Tags' section or tag cloud that might contain 'javascript'"
+                                },
+                                "action": [
+                                    {
+                                        "scroll_down": {}
+                                    }
+                                ]
+                            },
+                            "id": "5",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "5",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 269
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \ud83d\udd0d  Scrolled down the page by one page",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null
+                ]
+            }
+        },
+        "5": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\n\n                - Most questions expect a text answer expect it to be concise and to the point, no longer than 1 sentence.\n                - If you are unsure about what a task is specifically asking for, it is ok to return a more comprehensive answer (but still try to keep it concise).\n            \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Navigate to the tag archive for 'javascript'.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task. Need to navigate to the tag archive for 'javascript'",
+                                        "memory": "Starting task: Navigate to the tag archive for 'javascript'. I need to find a way to access tag archives on this blog site. Looking at the page, I see categories like 'technology', 'business', etc. but no 'javascript' tag visible. I should search for javascript or look for tag navigation.",
+                                        "next_goal": "Search for 'javascript' using the search box to find javascript-related content or tag archives"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 63,
+                                                "text": "javascript"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 64
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully searched for 'javascript' and got search results showing javascript-related posts",
+                                        "memory": "I searched for 'javascript' and got search results. Now I need to find the tag archive for 'javascript'. Looking at the page, I see categories/tags on the right side (business, entertainment, general, health, politics, science, sports, technology). I don't see a 'javascript' tag in the visible list. I should scroll down to see more tags or look for a tag cloud.",
+                                        "next_goal": "Scroll down to see if there are more tags or a tag cloud section"
+                                    },
+                                    "action": [
+                                        {
+                                            "scroll_down": {}
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Scrolled down and can see more content including categories section with 'technology' category but no 'javascript' tag",
+                                        "memory": "I've searched for 'javascript' and scrolled down. I can see categories section with business, entertainment, general, health, politics, science, sports, technology. No 'javascript' tag visible. I need to find tag archives. Maybe 'javascript' is a tag within 'technology' category or there's a separate tag cloud. I should check if clicking on 'technology' category shows javascript-related posts or tags.",
+                                        "next_goal": "Click on 'technology' category to see if it contains javascript-related content or tag navigation"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 115
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "4",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "4",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Failed - The click on 'technology' category caused a navigation error. I'm now on the technology category page (cat=16) but need to find the javascript tag archive",
+                                        "memory": "I'm now on the technology category page. I need to find the tag archive for 'javascript'. Looking at the page, I see categories on the right side (business, entertainment, general, health, politics, science, sports, technology). No 'javascript' tag visible. I should check if there's a tag cloud or tags section. I need to scroll further down or look for 'Tags' section.",
+                                        "next_goal": "Scroll further down to look for a 'Tags' section or tag cloud that might contain 'javascript'"
+                                    },
+                                    "action": [
+                                        {
+                                            "scroll_down": {}
+                                        }
+                                    ]
+                                },
+                                "id": "5",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "5",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\udd0d  Scrolled down the page by one page",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://localhost:8000/?cat=16\nAvailable tabs:\n[TabInfo(page_id=0, url='http://localhost:8000/?cat=16', title='technology \u2013 Epoch & Drift Benchmark')]\nInteractive elements from top layer of the current page inside the viewport:\n... 1325 pixels above - scroll or extract content to see more ...\n[0]<a Skip to content/>\n[1]<a Epoch & Drift Benchmark/>\n[2]<a />\n[3]<ul />\n[4]<a Sample Page/>\n[5]<a site mode button/>\n[6]<a />\n[7]<a You need to know what the tilde (~) does in Excel/>\n[8]<a December 26, 2025/>\n[9]<a admin/>\n[10]<a Leave a Comment\non You need to know what the tilde (~) does in Excel/>\n[11]<a Continue Reading/>\n[12]<a What is Microsoft Planner and who is it for/>\n[13]<a December 26, 2025/>\n[14]<a admin/>\n[15]<a 1 Comment\non What is Microsoft Planner and who is it for/>\n[16]<a Continue Reading/>\n[17]<a Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\n[18]<a December 26, 2025/>\n[19]<a admin/>\n[20]<a Leave a Comment\non Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\nWe have previuosly established what a mempool is, a list of pending transactions, specific to each blockchain node, where new created transaction wait to be verified, included in a transaction block and executed on the blockchain. The transactions with lower gas prices spend more time in a mempool and can be overwritten with replacement transactions. [\u2026]\n[21]<a Continue Reading/>\n[22]<a HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\n[23]<a December 26, 2025/>\n[24]<a admin/>\n[25]<a Leave a Comment\non HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\nWHAT IS AN ELASTIC BEANSTALK: An Elastic Beanstalk application is a container for Elastic Beanstalk components, including environments where your application code runs on platforms provided and managed by Elastic Beanstalk, or in custom containers that you provide. THROUGH UNDERSTANDING OF ENVIROMENT ELASTIC BEANSTALK An Elastic Beanstalk environment is a collection of AWS resources running [\u2026]\nContinue Reading\n[26]<a Scaling the Data Layer in Distributed Systems/>\n[27]<a December 26, 2025/>\n[28]<a admin/>\n[29]<a Leave a Comment\non Scaling the Data Layer in Distributed Systems/>\nScaling a stateless system is relatively straightforward. We can horizontally scale application servers by adding more instances behind a load balancer, and the system continues to work as expected. But what happens to the database? How can a database running on a single machine handle requests coming from N horizontally scaled application servers? Databases must [\u2026]\n[30]<a Continue Reading/>\n[31]<a Unlock Your Gift Cards\u2019 Full Potential with Google Wallet/>\n[32]<a December 26, 2025/>\n[33]<a admin/>\n[34]<a Leave a Comment\non Unlock Your Gift Cards\u2019 Full Potential with Google Wallet/>\nJump Links Gift cards are great, but when your physical wallet already has a ton of stuff in it, it can be easy to lose them in the chaos and completely forget about your free money. By adding your gift cards to Google Wallet, you\u2019ll be much more likely to remember them. Doing this is [\u2026]\n[35]<a Continue Reading/>\n[36]<a 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\n[37]<a December 26, 2025/>\n[38]<a admin/>\n[39]<a Leave a Comment\non 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\nThe WordPress ecosystem in 2026 looks fundamentally different than it did even two years ago. With AI integration reshaping development workflows, Phase 3 collaboration features rolling out in WordPress 6.9 and beyond, and new APIs like the Interactivity API and Abilities API changing how we build dynamic experiences, developers need tools that keep pace with [\u2026]\n[40]<a Continue Reading/>\n[41]<a Auto-Approve WebFetch and WebSearch in Claude Code with Hooks/>\n[42]<a December 26, 2025/>\n[43]<a admin/>\n[44]<a Leave a Comment\non Auto-Approve WebFetch and WebSearch in Claude Code with Hooks/>\nTL;DR: Claude Code\u2019s standard permission settings for WebFetch and WebSearch have known bugs. Hooks bypass these issues and work in CLI, VSCode, and sub-agents. If you use Claude Code regularly, you\u2019ve likely encountered the permission prompt fatigue. Every web search, every URL fetch: \u201cAllow WebSearch?\u201d \u201cAllow WebFetch?\u201d Click. Click. Click. You add these tools to [\u2026]\n[45]<a Continue Reading/>\n[46]<a Frontend Website Development: A Practical Guide for Modern Web Projects/>\n[47]<a December 26, 2025/>\n[48]<a admin/>\n[49]<a Leave a Comment\non Frontend Website Development: A Practical Guide for Modern Web Projects/>\nFrontend website development is no longer just about making websites look good. Today, it plays a critical role in performance, accessibility, scalability, and user experience. In this post, I want to share a practical overview of frontend development, based on real-world project experience and current industry practices. What Is Frontend Website Development? Frontend development focuses [\u2026]\n[50]<a Continue Reading/>\n[51]<a Day 26: Spark Streaming Joins/>\n[52]<a December 26, 2025/>\n[53]<a admin/>\n[54]<a Leave a Comment\non Day 26: Spark Streaming Joins/>\nWelcome to Day 26 of the Spark Mastery Series. Today we tackle one of the hardest Spark topics: Streaming Joins. Many production streaming jobs fail because joins are misunderstood. Let\u2019s fix that. \ud83c\udf1f Stream-Static Joins (90% of Use Cases) This is the most common and safest pattern. Example: Why it works: If the static table [\u2026]\n[55]<a Continue Reading/>\nPosts navigation\n[56]<a Older posts/>\n[57]<label Search/>\n[58]<input ;s;search>Search/>\n[59]<button submit>Search/>\n[60]<a What is Microsoft Planner and who is it for/>\n[61]<a You need to know what the tilde (~) does in Excel/>\n[62]<a To harness crypto ingenuity, financial threat must first be neutralised/>\n[63]<a Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\n[64]<a HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\nRecent Comments\nTest User\non\n[65]<a Settle down, nerds. AI is a normal technology/>\nTest User\non\n[66]<a How to get rid of unwanted Christmas presents \u2013 without being found out/>\nCommenter\non\n[67]<a In world first, Chinese surgeons save patient\u2019s ear with graft onto foot/>\nTest User\non\n[68]<a Rivalries and rumours: How the new order of the Murdoch dynasty is playing out/>\nTest User\non\n40 of our most helpful AI tips from 2025\nArchives\n[69]<a December 2025/>\n[70]<a November 2025/>\n[71]<a October 2025/>\n[72]<a July 2025/>\n[73]<a June 2025/>\n[74]<a May 2025/>\n[75]<a April 2025/>\n[76]<a March 2025/>\n[77]<a January 2025/>\n[78]<a December 2024/>\n[79]<a October 2024/>\n[80]<a September 2024/>\n[81]<a August 2024/>\n[82]<a June 2024/>\n[83]<a May 2024/>\n[84]<a April 2024/>\n[85]<a March 2024/>\n[86]<a February 2024/>\n[87]<a January 2024/>\n[88]<a December 2023/>\n[89]<a November 2023/>\n[90]<a June 2023/>\n[91]<a May 2023/>\n[92]<a April 2023/>\n[93]<a December 2022/>\n[94]<a October 2022/>\n[95]<a July 2022/>\n[96]<a June 2022/>\n[97]<a May 2022/>\n[98]<a March 2022/>\n[99]<a December 2021/>\n[100]<a April 2020/>\n[101]<a September 2019/>\n[102]<a August 2019/>\n[103]<a May 2019/>\n[104]<a February 2019/>\n[105]<a October 2018/>\n[106]<a September 2018/>\n[107]<a December 2017/>\nCategories\n[108]<a business/>\n[109]<a entertainment/>\n[110]<a general/>\n[111]<a health/>\n[112]<a politics/>\n[113]<a science/>\n[114]<a sports/>\n[115]<a technology/>\n|\nTheme: News Portal by\n[116]<a Mystery Themes/>\n.\n[End of page]\nCurrent step: 5/30Current date and time: 2025-12-30 19:44\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 6303,
+                "cumulative_input_token_count": 6303
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 6728,
+                    "prompt_tokens_cached": 4352,
+                    "completion_tokens": 243,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 6971,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Scrolled down and can see the full page including categories section but still no 'javascript' tag. I see categories like business, entertainment, general, health, politics, science, sports, technology. No tag cloud or tags section visible.",
+                                    "memory": "I've searched for javascript, clicked on technology category, and scrolled down. I can see categories but no tags section. The task is to navigate to the tag archive for 'javascript'. I need to find if there's a tag archive page or if tags are accessible differently. Maybe tags are in the URL structure like ?tag=javascript. I should try going to the tag archive directly by URL or look for tag links in posts.",
+                                    "next_goal": "Try accessing the tag archive directly by going to URL with ?tag=javascript parameter"
+                                },
+                                "action": [
+                                    {
+                                        "go_to_url": {
+                                            "url": "http://localhost:8000/?tag=javascript"
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "6",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "6",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 324
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \ud83d\udd17  Navigated to http://localhost:8000/?tag=javascript",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null
+                ]
+            }
+        },
+        "6": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\n\n                - Most questions expect a text answer expect it to be concise and to the point, no longer than 1 sentence.\n                - If you are unsure about what a task is specifically asking for, it is ok to return a more comprehensive answer (but still try to keep it concise).\n            \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Navigate to the tag archive for 'javascript'.\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task. Need to navigate to the tag archive for 'javascript'",
+                                        "memory": "Starting task: Navigate to the tag archive for 'javascript'. I need to find a way to access tag archives on this blog site. Looking at the page, I see categories like 'technology', 'business', etc. but no 'javascript' tag visible. I should search for javascript or look for tag navigation.",
+                                        "next_goal": "Search for 'javascript' using the search box to find javascript-related content or tag archives"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 63,
+                                                "text": "javascript"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 64
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully searched for 'javascript' and got search results showing javascript-related posts",
+                                        "memory": "I searched for 'javascript' and got search results. Now I need to find the tag archive for 'javascript'. Looking at the page, I see categories/tags on the right side (business, entertainment, general, health, politics, science, sports, technology). I don't see a 'javascript' tag in the visible list. I should scroll down to see more tags or look for a tag cloud.",
+                                        "next_goal": "Scroll down to see if there are more tags or a tag cloud section"
+                                    },
+                                    "action": [
+                                        {
+                                            "scroll_down": {}
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Scrolled down and can see more content including categories section with 'technology' category but no 'javascript' tag",
+                                        "memory": "I've searched for 'javascript' and scrolled down. I can see categories section with business, entertainment, general, health, politics, science, sports, technology. No 'javascript' tag visible. I need to find tag archives. Maybe 'javascript' is a tag within 'technology' category or there's a separate tag cloud. I should check if clicking on 'technology' category shows javascript-related posts or tags.",
+                                        "next_goal": "Click on 'technology' category to see if it contains javascript-related content or tag navigation"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 115
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "4",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "4",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Failed - The click on 'technology' category caused a navigation error. I'm now on the technology category page (cat=16) but need to find the javascript tag archive",
+                                        "memory": "I'm now on the technology category page. I need to find the tag archive for 'javascript'. Looking at the page, I see categories on the right side (business, entertainment, general, health, politics, science, sports, technology). No 'javascript' tag visible. I should check if there's a tag cloud or tags section. I need to scroll further down or look for 'Tags' section.",
+                                        "next_goal": "Scroll further down to look for a 'Tags' section or tag cloud that might contain 'javascript'"
+                                    },
+                                    "action": [
+                                        {
+                                            "scroll_down": {}
+                                        }
+                                    ]
+                                },
+                                "id": "5",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "5",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Scrolled down and can see the full page including categories section but still no 'javascript' tag. I see categories like business, entertainment, general, health, politics, science, sports, technology. No tag cloud or tags section visible.",
+                                        "memory": "I've searched for javascript, clicked on technology category, and scrolled down. I can see categories but no tags section. The task is to navigate to the tag archive for 'javascript'. I need to find if there's a tag archive page or if tags are accessible differently. Maybe tags are in the URL structure like ?tag=javascript. I should try going to the tag archive directly by URL or look for tag links in posts.",
+                                        "next_goal": "Try accessing the tag archive directly by going to URL with ?tag=javascript parameter"
+                                    },
+                                    "action": [
+                                        {
+                                            "go_to_url": {
+                                                "url": "http://localhost:8000/?tag=javascript"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "6",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "6",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\udd17  Navigated to http://localhost:8000/?tag=javascript",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://localhost:8000/?tag=javascript\nAvailable tabs:\n[TabInfo(page_id=0, url='http://localhost:8000/?tag=javascript', title='JavaScript \u2013 Epoch & Drift Benchmark')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\n[0]<a Skip to content/>\n[1]<a Epoch & Drift Benchmark/>\n[2]<a />\n[3]<ul />\n[4]<a Sample Page/>\n[5]<a site mode button/>\n[6]<a />\nTag:\nJavaScript\n[7]<a 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\n[8]<a December 26, 2025/>\n[9]<a admin/>\n[10]<a Leave a Comment\non 12 Must-Have WordPress Plugins for Developers in 2026 \ud83d\ude80/>\nThe WordPress ecosystem in 2026 looks fundamentally different than it did even two years ago. With AI integration reshaping development workflows, Phase 3 collaboration features rolling out in WordPress 6.9 and beyond, and new APIs like the Interactivity API and Abilities API changing how we build dynamic experiences, developers need tools that keep pace with [\u2026]\n[11]<a Continue Reading/>\n[12]<a Detect Caps Lock with JavaScript/>\n[13]<a February 6, 2024/>\n[14]<a admin/>\n[15]<a Leave a Comment\non Detect Caps Lock with JavaScript/>\nDetect Caps Lock with JavaScript Anyone is capable of having their caps lock key on at any given time without realizing so. Users can easily spot unwanted caps lock when typing in most inputs, but when using a password input , the problem isn\u2019t so obvious. That leads to the user\u2019s password being incorrect, which [\u2026]\n[16]<a Continue Reading/>\n[17]<a Date.now()/>\n[18]<a January 17, 2024/>\n[19]<a admin/>\n[20]<a Leave a Comment\non Date.now()/>\nDate.now() Ask any software engineer and they\u2019ll tell you that coding date logic can be a nightmare. Developers need to consider timezones, weird date defaults, and platform-specific date formats. The easiest way to work with dates is to reduce the date to the most simple format possible \u2014 usually a timestamp. To get the immediate [\u2026]\n[21]<a Continue Reading/>\n[22]<a Extract a Number from a String with JavaScript/>\n[23]<a January 16, 2024/>\n[24]<a admin/>\n[25]<a Leave a Comment\non Extract a Number from a String with JavaScript/>\nExtract a Number from a String with JavaScript User input from HTML form fields is generally provided to JavaScript as a string. We\u2019ve lived with that fact for decades but sometimes developers need to extract numbers from that string. There are multiple ways to get those numbers but let\u2019s rely on regular expressions to extract [\u2026]\n[26]<a Continue Reading/>\n[27]<label Search/>\n[28]<input ;s;search>Search/>\n[29]<button submit>Search/>\nRecent Posts\n[30]<a What is Microsoft Planner and who is it for/>\n[31]<a You need to know what the tilde (~) does in Excel/>\n[32]<a To harness crypto ingenuity, financial threat must first be neutralised/>\n[33]<a Ethereum-Solidity Quiz Q5: What is the Private Mempool?/>\n[34]<a HOW TO CREATE AN ELASTIC BEANSTALK ON AWS/>\nRecent Comments\nTest User\non\nSettle down, nerds. AI is a normal technology\nTest User\non\nHow to get rid of unwanted Christmas presents \u2013 without being found out\nCommenter\non\nIn world first, Chinese surgeons save patient\u2019s ear with graft onto foot\nTest User\non\n[35]<a Rivalries and rumours: How the new order of the Murdoch dynasty is playing out/>\nTest User\non\n40 of our most helpful AI tips from 2025\nArchives\n[36]<a December 2025/>\n[37]<a November 2025/>\n[38]<a October 2025/>\n[39]<a July 2025/>\n[40]<a June 2025/>\n[41]<a May 2025/>\n[42]<a April 2025/>\n[43]<a March 2025/>\n[44]<a January 2025/>\n[45]<a December 2024/>\n[46]<a October 2024/>\n[47]<a September 2024/>\n[48]<a August 2024/>\n[49]<a June 2024/>\n[50]<a May 2024/>\n[51]<a April 2024/>\n[52]<a March 2024/>\n[53]<a February 2024/>\n[54]<a January 2024/>\n[55]<a December 2023/>\n[56]<a November 2023/>\n[57]<a June 2023/>\n[58]<a May 2023/>\n[59]<a April 2023/>\n[60]<a December 2022/>\n[61]<a October 2022/>\n[62]<a July 2022/>\n[63]<a June 2022/>\n[64]<a May 2022/>\n[65]<a March 2022/>\n[66]<a December 2021/>\n[67]<a April 2020/>\n[68]<a September 2019/>\n[69]<a August 2019/>\n[70]<a May 2019/>\n[71]<a February 2019/>\n[72]<a October 2018/>\n[73]<a September 2018/>\n[74]<a December 2017/>\n[75]<a business/>\n[76]<a entertainment/>\n[77]<a general/>\n[78]<a health/>\n[79]<a politics/>\n[80]<a science/>\n[81]<a sports/>\n[82]<a technology/>\n[83]<a Mystery Themes/>\n... 1015 pixels below - scroll or extract content to see more ...\nCurrent step: 6/30Current date and time: 2025-12-30 19:44\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 5648,
+                "cumulative_input_token_count": 5648
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 6244,
+                    "prompt_tokens_cached": 4608,
+                    "completion_tokens": 297,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 6541,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Successfully navigated to the tag archive for 'javascript' using ?tag=javascript URL parameter. The page shows posts tagged with 'javascript' and has 'Tag: JavaScript' heading at the top",
+                                    "memory": "I have successfully navigated to the tag archive for 'javascript'. The page shows posts tagged with JavaScript including '12 Must-Have WordPress Plugins for Developers in 2026', 'Detect Caps Lock with JavaScript', 'Date.now()', 'Extract a Number from a String with JavaScript'. The task is complete.",
+                                    "next_goal": "Complete the task since I have successfully navigated to the tag archive for 'javascript'"
+                                },
+                                "action": [
+                                    {
+                                        "done": {
+                                            "text": "Successfully navigated to the tag archive for 'javascript'. The page shows posts tagged with JavaScript including '12 Must-Have WordPress Plugins for Developers in 2026', 'Detect Caps Lock with JavaScript', 'Date.now()', and 'Extract a Number from a String with JavaScript'. The URL is http://localhost:8000/?tag=javascript and the page displays 'Tag: JavaScript' at the top, confirming this is the correct tag archive.",
+                                            "success": true
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "7",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "7",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 401
+            },
+            "controller_messages": {
+                "action_result": [],
+                "action_error": []
+            }
+        }
+    }
+}

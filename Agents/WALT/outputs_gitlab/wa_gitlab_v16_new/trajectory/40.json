@@ -1,0 +1,1881 @@
+{
+    "task_prompt": "Tell me who has made the most contributions, in terms of number of commits, to the Pytorch GAN project",
+    "is_successful": false,
+    "steps": {
+        "1": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Tell me who has made the most contributions, in terms of number of commits, to the Pytorch GAN project\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "[Your task history memory starts here]",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/users/sign_in\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/users/sign_in', title='Sign in \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\n[0]<img />\nGitLab Community Edition\n[1]<div tabpanel>f5CuW2CHPKKRFCaBgFCR7FhdY0L79ANkYaG18sZBK8BOJH8MNPBy6R4Gcyz9uf-7SE87sy4pk-a3x026brxk3w\nThis field is required.\nThis field is required.\nThis field is required.\nThis field is required.\n0\n1/>\n[2]<label Username or email/>\n[3]<input text;This field is required.;user[login]>Username or email/>\n[4]<label Password/>\n[5]<input ;password;user[password]>Password/>\n[6]<button Show password/>\n[7]<label Remember me/>\n[8]<a Forgot your password?/>\n[9]<button submit>Sign in/>\nDon't have an account yet?\n[10]<a Register now/>\n[11]<a Explore/>\n[12]<a Help/>\n[13]<a About GitLab/>\n[14]<a Community forum/>\n[15]<button English/>\n... 37 pixels below - scroll or extract content to see more ...\nCurrent step: 1/20Current date and time: 2025-12-06 18:18\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 3442,
+                "cumulative_input_token_count": 3442
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 5953,
+                    "prompt_tokens_cached": 5376,
+                    "completion_tokens": 193,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 6146,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Unknown - Just starting the task, no previous actions to evaluate",
+                                    "memory": "Starting task: Need to find who has made the most contributions (by number of commits) to the PyTorch GAN project. First step is to log in to GitLab. 0 out of 10 steps completed.",
+                                    "next_goal": "Log in to GitLab using provided credentials"
+                                },
+                                "action": [
+                                    {
+                                        "input_text": {
+                                            "index": 3,
+                                            "text": "byteblaze"
+                                        }
+                                    },
+                                    {
+                                        "input_text": {
+                                            "index": 5,
+                                            "text": "a_very_secure_password_123!"
+                                        }
+                                    },
+                                    {
+                                        "click_element": {
+                                            "index": 9
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "2",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "2",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 200
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 9: Sign in",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null,
+                    null,
+                    null
+                ]
+            }
+        },
+        "2": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Tell me who has made the most contributions, in terms of number of commits, to the Pytorch GAN project\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task, no previous actions to evaluate",
+                                        "memory": "Starting task: Need to find who has made the most contributions (by number of commits) to the PyTorch GAN project. First step is to log in to GitLab. 0 out of 10 steps completed.",
+                                        "next_goal": "Log in to GitLab using provided credentials"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "byteblaze"
+                                            }
+                                        },
+                                        {
+                                            "input_text": {
+                                                "index": 5,
+                                                "text": "a_very_secure_password_123!"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 9: Sign in",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/', title='Projects \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\nSkip to content\nGitLab\n[0]<a Homepage/>\n[1]<a false;button/>\n[2]<input Search GitLab;search;text/>\n/\n[3]<a Create new.../>\n[4]<a Issues>13/>\n[5]<a Merge requests>0/>\n[6]<a To-Do List>11/>\n[7]<a Help/>\n[8]<a />\n[9]<img />\n[10]<a Your work/>\n[11]<a Projects/>\n[12]<a Groups/>\n[13]<a Issues>Issues\n13/>\n[14]<a Merge requests/>\n[15]<a To-Do List>To-Do List\n11/>\n[16]<a Milestones/>\n[17]<a Snippets/>\n[18]<a Activity/>\n[19]<a Toggle sidebar;button>Collapse sidebar/>\n[20]<a Your work/>\n[21]<a Projects/>\nProjects\n[22]<a Explore projects/>\n[23]<a New project/>\n[24]<a Yours\n17/>\n[25]<a Starred\n3/>\n[26]<input name;search;Filter by name/>\n[27]<button Language/>\n[28]<button Name/>\n[29]<a All/>\n[30]<a Personal/>\n[31]<a 2/>\n[32]<a Byte Blaze\n/\n2019-nCov/>\nOwner\nUse Google Maps Timeline data to compare with COVID-19 patient history location.\n[33]<a Stars>0/>\n[34]<a Forks>0/>\n[35]<a Merge requests>0/>\n[36]<a Issues>0/>\nUpdated\n4 minutes ago\n[37]<a A/>\n[38]<a Byte Blaze\n/\na11y-syntax-highlighting/>\nMaintainer\n\ud83d\udc84\nAccessible light and dark syntax highlighting themes\n[39]<a Pipeline: failed/>\n[40]<a Stars>1/>\n[41]<a Forks>0/>\n[42]<a Merge requests>3/>\n[43]<a Issues>2/>\nUpdated\n2 minutes ago\n[44]<a A/>\n[45]<a Byte Blaze\n/\na11y-webring.club/>\nMaintainer\n\ud83c\udf10\nA webring for digital accessibility practitioners.\n[46]<a Pipeline: failed/>\n[47]<a Stars>2/>\n[48]<a Forks>0/>\n[49]<a Merge requests>67/>\n[50]<a Issues>4/>\nUpdated\n2 weeks ago\n[51]<a A/>\n[52]<a The A11Y Project\n/\na11yproject.com/>\nMaintainer\nThe A11Y Project is a community-driven effort to make digital accessibility easier.\n[53]<a Pipeline: failed/>\n[54]<a Stars>22/>\n[55]<a Forks>0/>\n[56]<a Merge requests>3/>\n[57]<a Issues>41/>\nUpdated\n8 minutes ago\n[58]<a />\n[59]<img />\n[60]<a Byte Blaze\n/\naccessible-html-content-patterns/>\nMaintainer\n\u267f\n\ufe0f The full HTML5 Doctor Element Index as well as common markup patterns for quick reference.\n[61]<a Pipeline: failed/>\n[62]<a Stars>1/>\n[63]<a Forks>0/>\n[64]<a Merge requests>9/>\n[65]<a Issues>0/>\nUpdated\n3 minutes ago\n[66]<a C/>\n[67]<a Byte Blaze\n/\nChatgpt/>\nOwner\n[68]<a Stars>0/>\n[69]<a Forks>0/>\n[70]<a Merge requests>0/>\n[71]<a Issues>0/>\nUpdated\njust now\n[72]<a />\n[73]<img />\n[74]<a Byte Blaze\n/\ncloud-to-butt/>\nMaintainer\nChrome extension that replaces occurrences of 'the cloud' with 'my butt'\n[75]<a Stars>0/>\n[76]<a Forks>0/>\n[77]<a Merge requests>0/>\n[78]<a Issues>1/>\nUpdated\n7 minutes ago\n[79]<a D/>\n[80]<a Primer\n/\ndesign/>\nDeveloper\nPrimer Design Guidelines\n[81]<a Pipeline: failed/>\n[82]<a Stars>21/>\n[83]<a Forks>0/>\n[84]<a Merge requests>145/>\n[85]<a Issues>21/>\nUpdated\n10 minutes ago\n[86]<a D/>\n[87]<a Byte Blaze\n/\ndotfiles/>\nMaintainer\n\ud83e\udd16\nComputer setup\n[88]<a Stars>0/>\n[89]<a Forks>0/>\n[90]<a Merge requests>0/>\n[91]<a Issues>3/>\nUpdated\n1 week ago\n[92]<a E/>\n[93]<a Byte Blaze\n/\nempathy-prompts/>\nMaintainer\n\ud83d\udca1\nIdeas to help consider Inclusive Design principles when making things for others to use.\n[94]<a Stars>7/>\n[95]<a Forks>0/>\n[96]<a Merge requests>0/>\n[97]<a Issues>8/>\nUpdated\n2 weeks ago\n[98]<a E/>\n[99]<a Byte Blaze\n/\nericwbailey.website/>\nMaintainer\n\ud83d\udcd0\nRepo for my personal website.\n[100]<a Pipeline: failed/>\n[101]<a Stars>2/>\n[102]<a Forks>0/>\n[103]<a Merge requests>0/>\n[104]<a Issues>0/>\nUpdated\n2 weeks ago\n[105]<a G/>\n[106]<a Byte Blaze\n/\ngimmiethat.space/>\nMaintainer\nI need some space.\n[107]<a Pipeline: failed/>\n[108]<a Stars>0/>\n[109]<a Forks>0/>\n[110]<a Merge requests>0/>\n[111]<a Issues>0/>\nUpdated\n1 week ago\n[112]<a M/>\n[113]<a Byte Blaze\n/\nmillennials-to-snake-people/>\nMaintainer\n\ud83d\udc0d\nChrome extension that replaces occurrences of 'Millennials' with 'Snake People'\n[114]<a Pipeline: failed/>\n[115]<a Stars>6/>\n[116]<a Forks>0/>\n[117]<a Merge requests>17/>\n[118]<a Issues>4/>\nUpdated\n6 days ago\n[119]<a P/>\n[120]<a Byte Blaze\n/\nPyTorch-GAN/>\nOwner\nPyTorch implementations of Generative Adversarial Networks.\n[121]<a Stars>0/>\n[122]<a Forks>0/>\n[123]<a Merge requests>0/>\n[124]<a Issues>0/>\nUpdated\njust now\n[125]<a R/>\n[126]<a Byte Blaze\n/\nremove-board-movement-events-from-the-github-issue-timeline/>\nMaintainer\nThis extension can remove and restore the presence of timeline items generated by a project board event from GitHub's timeline.\n[127]<a Stars>0/>\n[128]<a Forks>0/>\n[129]<a Merge requests>0/>\n[130]<a Issues>0/>\nUpdated\n2 weeks ago\n[131]<a S/>\n[132]<a Byte Blaze\n/\nsolarized-prism-theme/>\nMaintainer\nsolarized theme for prism.js\n[133]<a Pipeline: failed/>\n[134]<a Stars>0/>\n[135]<a Forks>0/>\n[136]<a Merge requests>0/>\n[137]<a Issues>1/>\nUpdated\n1 week ago\n[138]<a T/>\n[139]<a Byte Blaze\n/\ntimeit/>\nMaintainer\nRails implementation of time tracking tool timeit\n[140]<a Pipeline: failed/>\n[141]<a Stars>0/>\n[142]<a Forks>0/>\n[143]<a Merge requests>0/>\n[144]<a Issues>0/>\nUpdated\n6 days ago\n[End of page]\nCurrent step: 2/20Current date and time: 2025-12-06 18:18\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 5015,
+                "cumulative_input_token_count": 5015
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 7617,
+                    "prompt_tokens_cached": 5504,
+                    "completion_tokens": 144,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 7761,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Successfully logged in to GitLab and can see the projects dashboard",
+                                    "memory": "Logged in to GitLab. Found the PyTorch-GAN project at index 120. Need to click on it to access the repository. 1 out of 10 steps completed.",
+                                    "next_goal": "Click on the PyTorch-GAN project to access its repository"
+                                },
+                                "action": [
+                                    {
+                                        "click_element": {
+                                            "index": 120
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "3",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "3",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 156
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 120: Byte Blaze\n/\nPyTorch-GAN",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null
+                ]
+            }
+        },
+        "3": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Tell me who has made the most contributions, in terms of number of commits, to the Pytorch GAN project\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task, no previous actions to evaluate",
+                                        "memory": "Starting task: Need to find who has made the most contributions (by number of commits) to the PyTorch GAN project. First step is to log in to GitLab. 0 out of 10 steps completed.",
+                                        "next_goal": "Log in to GitLab using provided credentials"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "byteblaze"
+                                            }
+                                        },
+                                        {
+                                            "input_text": {
+                                                "index": 5,
+                                                "text": "a_very_secure_password_123!"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully logged in to GitLab and can see the projects dashboard",
+                                        "memory": "Logged in to GitLab. Found the PyTorch-GAN project at index 120. Need to click on it to access the repository. 1 out of 10 steps completed.",
+                                        "next_goal": "Click on the PyTorch-GAN project to access its repository"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 120
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 120: Byte Blaze\n/\nPyTorch-GAN",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/byteblaze/PyTorch-GAN\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/byteblaze/PyTorch-GAN', title='Byte Blaze / PyTorch-GAN \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\nSkip to content\nGitLab\n[0]<a Homepage/>\n[1]<a false;button/>\n[2]<input Search GitLab;search;text/>\n/\n[3]<a Create new.../>\n[4]<a Issues>13/>\n[5]<a Merge requests>0/>\n[6]<a To-Do List>11/>\n[7]<a Help/>\n[8]<a />\n[9]<img />\n[10]<a PyTorch-GAN>P\nPyTorch-GAN/>\n[11]<a Project information/>\n[12]<a Repository/>\n[13]<a Issues>Issues\n0/>\n[14]<a Merge requests>Merge requests\n0/>\n[15]<a CI/CD/>\n[16]<a Security and Compliance/>\n[17]<a Deployments/>\n[18]<a Packages and registries/>\n[19]<a Infrastructure/>\n[20]<a Monitor/>\n[21]<a Analytics/>\n[22]<a Wiki/>\n[23]<a Snippets/>\n[24]<a Settings/>\n[25]<a Toggle sidebar;button>Collapse sidebar/>\n[26]<div alert/>\n[27]<button Dismiss/>\n[28]<div alert>You can't push or pull repositories using SSH until you add an SSH key to your profile./>\n[29]<a Add SSH key/>\n[30]<a button>Don't show again/>\n[31]<div alert/>\n[32]<button Dismiss/>\n[33]<div alert>The Auto DevOps pipeline has been enabled and will be used if no alternative CI configuration file is found.\nContainer registry is not enabled on this GitLab instance. Ask an administrator to enable it in order for Auto DevOps to work./>\n[34]<a Settings/>\n[35]<a More information/>\n[36]<a Byte Blaze/>\n[37]<a PyTorch-GAN/>\nP\nPyTorch-GAN\nProject ID: 196\n[38]<button Copy project ID/>\n[39]<button false/>\n[40]<button Star/>\n[41]<a Starrers>0/>\n[42]<a Go to your fork>Fork/>\n[43]<a Forks>0/>\n[44]<a 193\nCommits/>\n[45]<a 25\nBranches/>\n[46]<a 0\nTags/>\n[47]<a 20 KB\nProject Storage/>\nPyTorch implementations of Generative Adversarial Networks.\n[48]<img />\n[49]<a Update README.md/>\nErik Linder-Nor\u00e9n\n          \n          authored\n4 years ago\n[50]<button Unverified/>\n[51]<span 36d3c77e/>\n[52]<button Copy commit SHA/>\n[53]<button master/>\n[54]<a PyTorch-GAN/>\n[55]<button false>Add to tree/>\n[56]<a Find file/>\n[57]<a Web IDE/>\n[58]<button Download>Select Archive Format/>\n[59]<a Clone/>\nForked from\n[60]<a Erik Linder-Nor\u00e9n / PyTorch-GAN/>\nUp to date with the upstream repository.\n[61]<a README/>\n[62]<a MIT License/>\n[63]<a Auto DevOps enabled/>\n[64]<a Add CHANGELOG/>\n[65]<a Add CONTRIBUTING/>\n[66]<a Add Kubernetes cluster/>\n[67]<a Add Wiki/>\n[68]<a Configure Integrations/>\nName\nLast commit\nLast update\n[69]<a assets/>\n[70]<a adds clustergan gif\n>adds clustergan gif/>\n6 years ago\n[71]<a data/>\n[72]<a Figures\n>Figures/>\n7 years ago\n[73]<a implementations/>\n[74]<a Adds single clustergan script\n>Adds single clustergan script/>\n6 years ago\n[75]<a .gitignore/>\n[76]<a MNIST normalization. Black refactoring.\n>MNIST normalization. Black refactoring./>\n6 years ago\n[77]<a LICENSE/>\n[78]<a Initial commit/>\n7 years ago\n[79]<a README.md/>\n[80]<a Update README.md/>\n4 years ago\n[81]<a requirements.txt/>\n[82]<a Added PyTorch 0.4.0 to requirements\n>Added PyTorch 0.4.0 to requirements/>\n7 years ago\n[83]<a README.md/>\n[84]<a />\n[85]<img />\nThis repository has gone stale as I unfortunately do not have the time to maintain it anymore. If you would like to continue the development of it as a collaborator send me an email at\n[86]<a eriklindernoren@gmail.com/>\n.\n[87]<a />\nPyTorch-GAN\nCollection of PyTorch implementations of Generative Adversarial Network varieties presented in research papers. Model architectures will not always mirror the ones proposed in the papers, but I have chosen to focus on getting the core ideas covered instead of getting every layer configuration right. Contributions and suggestions of GANs to implement are very welcomed.\nSee also:\n[88]<a Keras-GAN/>\n[89]<a />\nTable of Contents\n[90]<a Installation/>\n[91]<a Implementations/>\n[92]<a Auxiliary Classifier GAN/>\n[93]<a Adversarial Autoencoder/>\n[94]<a BEGAN/>\n[95]<a BicycleGAN/>\n[96]<a Boundary-Seeking GAN/>\n[97]<a Cluster GAN/>\n[98]<a Conditional GAN/>\n[99]<a Context-Conditional GAN/>\n[100]<a Context Encoder/>\n[101]<a Coupled GAN/>\n[102]<a CycleGAN/>\n[103]<a Deep Convolutional GAN/>\n[104]<a DiscoGAN/>\n[105]<a DRAGAN/>\nDualGAN\n[106]<a Energy-Based GAN/>\n[107]<a Enhanced Super-Resolution GAN/>\n[108]<a GAN/>\n[109]<a InfoGAN/>\n[110]<a Least Squares GAN/>\n[111]<a MUNIT/>\n[112]<a Pix2Pix/>\n[113]<a PixelDA/>\n[114]<a Relativistic GAN/>\n[115]<a Semi-Supervised GAN/>\n[116]<a Softmax GAN/>\n[117]<a StarGAN/>\n[118]<a Super-Resolution GAN/>\n[119]<a UNIT/>\n[120]<a Wasserstein GAN/>\n[121]<a Wasserstein GAN GP/>\n[122]<a Wasserstein GAN DIV/>\n[123]<a />\nInstallation\n$ git clone https://github.com/eriklindernoren/PyTorch-GAN\n[124]<button />\n[125]<a />\n[126]<a />\n[127]<a />\n[128]<a />\n[129]<a [Paper]/>\n[130]<a [Code]/>\n[131]<a />\n[132]<button />\n[133]<a />\n[134]<img />\n[135]<a />\n[136]<a />\n[137]<a />\n[138]<a [Paper]/>\n[139]<a [Code]/>\n[140]<a />\n[141]<button />\n[142]<a />\n[143]<a />\n[144]<a />\n[145]<a [Paper]/>\n[146]<a [Code]/>\n[147]<a />\n[148]<button />\n[149]<a />\n[150]<a />\n[151]<a />\n[152]<a [Paper]/>\n[153]<a [Code]/>\n[154]<a />\n[155]<img />\n[156]<a />\n[157]<button />\n[158]<a />\n[159]<img />\n[160]<a />\n[161]<a />\n[162]<a />\n[163]<a [Paper]/>\n[164]<a [Code]/>\n[165]<a />\n[166]<button />\n[167]<a />\n[168]<a />\n[169]<a />\n[170]<a [Paper]/>\n[171]<a [Code]/>\n[172]<a [implementation]/>\n[173]<a />\n[174]<button />\n[175]<a />\n[176]<img />\n[177]<a />\n[178]<a />\n[179]<a />\n[180]<a [Paper]/>\n[181]<a [Code]/>\n[182]<a />\n[183]<button />\n[184]<a />\n[185]<img />\n[186]<a />\n[187]<a />\n[188]<a />\n[189]<a [Paper]/>\n[190]<a [Code]/>\n[191]<a />\n[192]<button />\n[193]<a />\n[194]<a />\n[195]<a />\n[196]<a [Paper]/>\n[197]<a [Code]/>\n[198]<a />\n[199]<button />\n[200]<a />\n[201]<img />\n[202]<a />\n[203]<a />\n[204]<a />\n[205]<a [Paper]/>\n[206]<a [Code]/>\n[207]<a />\n[208]<button />\n[209]<a />\n[210]<img />\n[211]<a />\n[212]<a />\n[213]<a />\n[214]<a [Paper]/>\n[215]<a [Code]/>\n[216]<a />\n[217]<img />\n[218]<a />\n[219]<button />\n[220]<a />\n[221]<img />\n[222]<a />\n[223]<a />\n[224]<a />\n[225]<a [Paper]/>\n[226]<a [Code]/>\n[227]<a />\n[228]<button />\n[229]<a />\n[230]<img />\n[231]<a />\n[232]<a />\n[233]<a />\n[234]<a [Paper]/>\n[235]<a [Code]/>\n[236]<a />\n[237]<img />\n[238]<a />\n[239]<button />\n[240]<a />\n[241]<img />\n[242]<a />\n[243]<a />\n[244]<a />\n[245]<a [Paper]/>\n[246]<a [Code]/>\n[247]<a />\n[248]<button />\n[249]<a />\n[250]<a />\n[251]<a />\n[252]<a [Paper]/>\n[253]<a [Code]/>\n[254]<a />\n[255]<button />\n[256]<a />\n[257]<a />\n[258]<a />\n[259]<a [Paper]/>\n[260]<a [Code]/>\n[261]<a />\n[262]<button />\n[263]<a />\n[264]<a />\n[265]<a />\n[266]<a this https URL/>\n[267]<a [Paper]/>\n[268]<a [Code]/>\n[269]<a />\n[270]<button />\n[271]<a />\n[272]<img />\n[273]<a />\n[274]<a />\n[275]<a />\n[276]<a [Paper]/>\n[277]<a [Code]/>\n[278]<a />\n[279]<button />\n[280]<a />\n[281]<img />\n[282]<a />\n[283]<a />\n[284]<a />\n[285]<a [Paper]/>\n[286]<a [Code]/>\n[287]<a />\n[288]<button />\n[289]<a />\n[290]<img />\n[291]<a />\n[292]<img />\n[293]<a />\n[294]<a />\n[295]<a />\n[296]<a [Paper]/>\n[297]<a [Code]/>\n[298]<a />\n[299]<button />\n[300]<a />\n[301]<a />\n[302]<a />\n[303]<a this https URL/>\n[304]<a [Paper]/>\n[305]<a [Code]/>\n[306]<a />\n[307]<button />\n[308]<a />\n[309]<img />\n[310]<a />\n[311]<a />\n[312]<a />\n[313]<a [Paper]/>\n[314]<a [Code]/>\n[315]<a />\n[316]<img />\n[317]<a />\n[318]<button />\n[319]<a />\n[320]<img />\n[321]<a />\n[322]<a />\n[323]<a />\n[324]<a [Paper]/>\n[325]<a [Code]/>\n[326]<a />\n[327]<button />\n[328]<a />\n[329]<img />\n[330]<a />\n[331]<a />\n[332]<a />\n[333]<a [Paper]/>\n[334]<a [Code]/>\n[335]<a />\n[336]<button />\n[337]<a />\n[338]<a />\n[339]<a />\n[340]<a [Paper]/>\n[341]<a [Code]/>\n[342]<a />\n[343]<button />\n[344]<a />\n[345]<a />\n[346]<a />\n[347]<a [Paper]/>\n[348]<a [Code]/>\n[349]<a />\n[350]<button />\n[351]<a />\n[352]<a />\n[353]<a />\n[354]<a [Paper]/>\n[355]<a [Code]/>\n[356]<a />\n[357]<button />\n[358]<a />\n[359]<img />\n[360]<a />\n[361]<a />\n[362]<a />\n[363]<a [Paper]/>\n[364]<a [Code]/>\n[365]<a />\n[366]<img />\n[367]<a />\n[368]<button />\n[369]<a />\n[370]<img />\n[371]<a />\n[372]<a />\n[373]<a />\n[374]<a https URL/>\n[375]<a [Paper]/>\n[376]<a [Code]/>\n[377]<a />\n[378]<button />\n[379]<a />\n[380]<a />\n[381]<a />\n[382]<a [Paper]/>\n[383]<a [Code]/>\n[384]<a />\n[385]<button />\n[386]<a />\n[387]<a />\n[388]<a />\n[389]<a [Paper]/>\n[390]<a [Code]/>\n[391]<a />\n[392]<button />\n[393]<a />\n[394]<img />\n[395]<a />\n[396]<a />\n[397]<a />\n[398]<a [Paper]/>\n[399]<a [Code]/>\n[400]<a />\n[401]<button />\n[402]<a />\n[403]<img />\n... 32283 pixels below - scroll or extract content to see more ...\nCurrent step: 3/20Current date and time: 2025-12-06 18:18\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 6349,
+                "cumulative_input_token_count": 6349
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 9160,
+                    "prompt_tokens_cached": 5760,
+                    "completion_tokens": 166,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 9326,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Successfully accessed the PyTorch-GAN project repository page",
+                                    "memory": "On the PyTorch-GAN project repository page. Need to find contributor statistics. The project shows 193 commits total (from element 44). Need to check the repository analytics or contributors section to see who has the most commits. 2 out of 10 steps completed.",
+                                    "next_goal": "Navigate to repository analytics or contributors section to see commit statistics"
+                                },
+                                "action": [
+                                    {
+                                        "click_element": {
+                                            "index": 12
+                                        }
+                                    },
+                                    {
+                                        "wait": {
+                                            "seconds": 2
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "4",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "4",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 211
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 12: Repository",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \ud83d\udd52  Waiting for 2 seconds",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null,
+                    null
+                ]
+            }
+        },
+        "4": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Tell me who has made the most contributions, in terms of number of commits, to the Pytorch GAN project\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task, no previous actions to evaluate",
+                                        "memory": "Starting task: Need to find who has made the most contributions (by number of commits) to the PyTorch GAN project. First step is to log in to GitLab. 0 out of 10 steps completed.",
+                                        "next_goal": "Log in to GitLab using provided credentials"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "byteblaze"
+                                            }
+                                        },
+                                        {
+                                            "input_text": {
+                                                "index": 5,
+                                                "text": "a_very_secure_password_123!"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully logged in to GitLab and can see the projects dashboard",
+                                        "memory": "Logged in to GitLab. Found the PyTorch-GAN project at index 120. Need to click on it to access the repository. 1 out of 10 steps completed.",
+                                        "next_goal": "Click on the PyTorch-GAN project to access its repository"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 120
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully accessed the PyTorch-GAN project repository page",
+                                        "memory": "On the PyTorch-GAN project repository page. Need to find contributor statistics. The project shows 193 commits total (from element 44). Need to check the repository analytics or contributors section to see who has the most commits. 2 out of 10 steps completed.",
+                                        "next_goal": "Navigate to repository analytics or contributors section to see commit statistics"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 12
+                                            }
+                                        },
+                                        {
+                                            "wait": {
+                                                "seconds": 2
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "4",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "4",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 12: Repository",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \ud83d\udd52  Waiting for 2 seconds",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/byteblaze/PyTorch-GAN/-/tree/master\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/byteblaze/PyTorch-GAN/-/tree/master', title='Files \u00b7 master \u00b7 Byte Blaze / PyTorch-GAN \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\nSkip to content\nGitLab\n[0]<a Homepage/>\n[1]<a false;button/>\n[2]<input Search GitLab;search;text/>\n/\n[3]<a Create new.../>\n[4]<a Issues>13/>\n[5]<a Merge requests>0/>\n[6]<a To-Do List>11/>\n[7]<a Help/>\n[8]<a />\n[9]<img />\n[10]<a PyTorch-GAN>P\nPyTorch-GAN/>\n[11]<a Project information/>\n[12]<a Repository/>\n[13]<a Files/>\n[14]<a Commits/>\n[15]<a Branches/>\n[16]<a Tags/>\n[17]<a Contributor statistics/>\n[18]<a Graph/>\n[19]<a Compare revisions/>\n[20]<a Issues>Issues\n0/>\n[21]<a Merge requests>Merge requests\n0/>\n[22]<a CI/CD/>\n[23]<a Security and Compliance/>\n[24]<a Deployments/>\n[25]<a Packages and registries/>\n[26]<a Infrastructure/>\n[27]<a Monitor/>\n[28]<a Analytics/>\n[29]<a Wiki/>\n[30]<a Snippets/>\n[31]<a Settings/>\n[32]<a Toggle sidebar;button>Collapse sidebar/>\n[33]<a Byte Blaze/>\n[34]<a PyTorch-GAN/>\n[35]<a Repository/>\n[36]<img />\n[37]<a Update README.md/>\nErik Linder-Nor\u00e9n\n          \n          authored\n4 years ago\n[38]<button Unverified/>\n[39]<span 36d3c77e/>\n[40]<button Copy commit SHA/>\n[41]<button master/>\n[42]<a PyTorch-GAN/>\n[43]<button false>Add to tree/>\n[44]<a History/>\n[45]<a Find file/>\n[46]<a Web IDE/>\n[47]<button Download>Select Archive Format/>\n[48]<a Clone/>\nForked from\n[49]<a Erik Linder-Nor\u00e9n / PyTorch-GAN/>\nUp to date with the upstream repository.\nName\nLast commit\nLast update\n[50]<a assets/>\n[51]<a adds clustergan gif\n>adds clustergan gif/>\n6 years ago\n[52]<a data/>\n[53]<a Figures\n>Figures/>\n7 years ago\n[54]<a implementations/>\n[55]<a Adds single clustergan script\n>Adds single clustergan script/>\n6 years ago\n[56]<a .gitignore/>\n[57]<a MNIST normalization. Black refactoring.\n>MNIST normalization. Black refactoring./>\n6 years ago\n[58]<a LICENSE/>\n[59]<a Initial commit/>\n7 years ago\n[60]<a README.md/>\n[61]<a Update README.md/>\n4 years ago\n[62]<a requirements.txt/>\n[63]<a Added PyTorch 0.4.0 to requirements\n>Added PyTorch 0.4.0 to requirements/>\n7 years ago\n[64]<a README.md/>\n[65]<a />\n[66]<img />\nThis repository has gone stale as I unfortunately do not have the time to maintain it anymore. If you would like to continue the development of it as a collaborator send me an email at\n[67]<a eriklindernoren@gmail.com/>\n.\n[68]<a />\nPyTorch-GAN\nCollection of PyTorch implementations of Generative Adversarial Network varieties presented in research papers. Model architectures will not always mirror the ones proposed in the papers, but I have chosen to focus on getting the core ideas covered instead of getting every layer configuration right. Contributions and suggestions of GANs to implement are very welcomed.\nSee also:\n[69]<a Keras-GAN/>\n[70]<a />\nTable of Contents\n[71]<a Installation/>\n[72]<a Implementations/>\n[73]<a Auxiliary Classifier GAN/>\n[74]<a Adversarial Autoencoder/>\n[75]<a BEGAN/>\n[76]<a BicycleGAN/>\n[77]<a Boundary-Seeking GAN/>\n[78]<a Cluster GAN/>\n[79]<a Conditional GAN/>\n[80]<a Context-Conditional GAN/>\n[81]<a Context Encoder/>\n[82]<a Coupled GAN/>\n[83]<a CycleGAN/>\n[84]<a Deep Convolutional GAN/>\n[85]<a DiscoGAN/>\n[86]<a DRAGAN/>\n[87]<a DualGAN/>\n[88]<a Energy-Based GAN/>\n[89]<a Enhanced Super-Resolution GAN/>\n[90]<a GAN/>\n[91]<a InfoGAN/>\n[92]<a Least Squares GAN/>\n[93]<a MUNIT/>\n[94]<a Pix2Pix/>\n[95]<a PixelDA/>\n[96]<a Relativistic GAN/>\n[97]<a Semi-Supervised GAN/>\n[98]<a Softmax GAN/>\n[99]<a StarGAN/>\n[100]<a Super-Resolution GAN/>\n[101]<a UNIT/>\n[102]<a Wasserstein GAN/>\n[103]<a Wasserstein GAN GP/>\n[104]<a Wasserstein GAN DIV/>\n[105]<a />\nInstallation\n$ git clone https://github.com/eriklindernoren/PyTorch-GAN\n$ cd PyTorch-GAN/\n$ sudo pip3 install -r requirements.txt\n[106]<a />\nImplementations\n[107]<a />\nAuxiliary Classifier GAN\nAuxiliary Classifier Generative Adversarial Network\n[108]<a />\nAuthors\nAugustus Odena, Christopher Olah, Jonathon Shlens\n[109]<a />\nAbstract\nSynthesizing high resolution photorealistic images has been a long-standing challenge in machine learning. In this paper we introduce new methods for the improved training of generative adversarial networks (GANs) for image synthesis. We construct a variant of GANs employing label conditioning that results in 128x128 resolution image samples exhibiting global coherence. We expand on previous work for image quality assessment to provide two new analyses for assessing the discriminability and diversity of samples from class-conditional image synthesis models. These analyses demonstrate that high resolution samples provide class information not present in low resolution samples. Across 1000 ImageNet classes, 128x128 samples are more than twice as discriminable as artificially resized 32x32 samples. In addition, 84.7% of the classes have samples exhibiting diversity comparable to real ImageNet data.\n[110]<a [Paper]/>\n[111]<a [Code]/>\n[112]<a />\n[113]<button />\n[114]<a />\n[115]<img />\n[116]<a />\n[117]<a />\n[118]<a />\n[119]<a [Paper]/>\n[120]<a [Code]/>\n[121]<a />\n[122]<button />\n[123]<a />\n[124]<a />\n[125]<a />\n[126]<a [Paper]/>\n[127]<a [Code]/>\n[128]<a />\n[129]<button />\n[130]<a />\n[131]<a />\n[132]<a />\n[133]<a [Paper]/>\n[134]<a [Code]/>\n[135]<a />\n[136]<img />\n[137]<a />\n[138]<button />\n[139]<a />\n[140]<img />\n[141]<a />\n[142]<a />\n[143]<a />\n[144]<a [Paper]/>\n[145]<a [Code]/>\n[146]<a />\n[147]<button />\n[148]<a />\n[149]<a />\n[150]<a />\n[151]<a [Paper]/>\n[152]<a [Code]/>\n[153]<a [implementation]/>\n[154]<a />\n[155]<button />\n[156]<a />\n[157]<img />\n[158]<a />\n[159]<a />\n[160]<a />\n[161]<a [Paper]/>\n[162]<a [Code]/>\n[163]<a />\n[164]<button />\n[165]<a />\n[166]<img />\n[167]<a />\n[168]<a />\n[169]<a />\n[170]<a [Paper]/>\n[171]<a [Code]/>\n[172]<a />\n[173]<button />\n[174]<a />\n[175]<a />\n[176]<a />\n[177]<a [Paper]/>\n[178]<a [Code]/>\n[179]<a />\n[180]<button />\n[181]<a />\n[182]<img />\n[183]<a />\n[184]<a />\n[185]<a />\n[186]<a [Paper]/>\n[187]<a [Code]/>\n[188]<a />\n[189]<button />\n[190]<a />\n[191]<img />\n[192]<a />\n[193]<a />\n[194]<a />\n[195]<a [Paper]/>\n[196]<a [Code]/>\n[197]<a />\n[198]<img />\n[199]<a />\n[200]<button />\n[201]<a />\n[202]<img />\n[203]<a />\n[204]<a />\n[205]<a />\n[206]<a [Paper]/>\n[207]<a [Code]/>\n[208]<a />\n[209]<button />\n[210]<a />\n[211]<img />\n[212]<a />\n[213]<a />\n[214]<a />\n[215]<a [Paper]/>\n[216]<a [Code]/>\n[217]<a />\n[218]<img />\n[219]<a />\n[220]<button />\n[221]<a />\n[222]<img />\n[223]<a />\n[224]<a />\n[225]<a />\n[226]<a [Paper]/>\n[227]<a [Code]/>\n[228]<a />\n[229]<button />\n[230]<a />\n[231]<a />\n[232]<a />\n[233]<a [Paper]/>\n[234]<a [Code]/>\n[235]<a />\n[236]<button />\n[237]<a />\n[238]<a />\n[239]<a />\n[240]<a [Paper]/>\n[241]<a [Code]/>\n[242]<a />\n[243]<button />\n[244]<a />\n[245]<a />\n[246]<a />\n[247]<a this https URL/>\n[248]<a [Paper]/>\n[249]<a [Code]/>\n[250]<a />\n[251]<button />\n[252]<a />\n[253]<img />\n[254]<a />\n[255]<a />\n[256]<a />\n[257]<a [Paper]/>\n[258]<a [Code]/>\n[259]<a />\n[260]<button />\n[261]<a />\n[262]<img />\n[263]<a />\n[264]<a />\n[265]<a />\n[266]<a [Paper]/>\n[267]<a [Code]/>\n[268]<a />\n[269]<button />\n[270]<a />\n[271]<img />\n[272]<a />\n[273]<img />\n[274]<a />\n[275]<a />\n[276]<a />\n[277]<a [Paper]/>\n[278]<a [Code]/>\n[279]<a />\n[280]<button />\n[281]<a />\n[282]<a />\n[283]<a />\n[284]<a this https URL/>\n[285]<a [Paper]/>\n[286]<a [Code]/>\n[287]<a />\n[288]<button />\n[289]<a />\n[290]<img />\n[291]<a />\n[292]<a />\n[293]<a />\n[294]<a [Paper]/>\n[295]<a [Code]/>\n[296]<a />\n[297]<img />\n[298]<a />\n[299]<button />\n[300]<a />\n[301]<img />\n[302]<a />\n[303]<a />\n[304]<a />\n[305]<a [Paper]/>\n[306]<a [Code]/>\n[307]<a />\n[308]<button />\n[309]<a />\n[310]<img />\n[311]<a />\n[312]<a />\n[313]<a />\n[314]<a [Paper]/>\n[315]<a [Code]/>\n[316]<a />\n[317]<button />\n[318]<a />\n[319]<a />\n[320]<a />\n[321]<a [Paper]/>\n[322]<a [Code]/>\n[323]<a />\n[324]<button />\n[325]<a />\n[326]<a />\n[327]<a />\n[328]<a [Paper]/>\n[329]<a [Code]/>\n[330]<a />\n[331]<button />\n[332]<a />\n[333]<a />\n[334]<a />\n[335]<a [Paper]/>\n[336]<a [Code]/>\n[337]<a />\n[338]<button />\n[339]<a />\n[340]<img />\n[341]<a />\n[342]<a />\n[343]<a />\n[344]<a [Paper]/>\n[345]<a [Code]/>\n[346]<a />\n[347]<img />\n[348]<a />\n[349]<button />\n[350]<a />\n[351]<img />\n[352]<a />\n[353]<a />\n[354]<a />\n[355]<a https URL/>\n[356]<a [Paper]/>\n[357]<a [Code]/>\n[358]<a />\n[359]<button />\n[360]<a />\n[361]<a />\n[362]<a />\n[363]<a [Paper]/>\n[364]<a [Code]/>\n[365]<a />\n[366]<button />\n[367]<a />\n[368]<a />\n[369]<a />\n[370]<a [Paper]/>\n[371]<a [Code]/>\n[372]<a />\n[373]<button />\n[374]<a />\n[375]<img />\n[376]<a />\n[377]<a />\n[378]<a />\n[379]<a [Paper]/>\n[380]<a [Code]/>\n[381]<a />\n[382]<button />\n[383]<a />\n[384]<img />\n... 31157 pixels below - scroll or extract content to see more ...\nCurrent step: 4/20Current date and time: 2025-12-06 18:18\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 6660,
+                "cumulative_input_token_count": 6660
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 9332,
+                    "prompt_tokens_cached": 5952,
+                    "completion_tokens": 156,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 9488,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Successfully navigated to the repository page and can see the 'Contributor statistics' link at index 17",
+                                    "memory": "On the PyTorch-GAN repository page. Found 'Contributor statistics' link at index 17. Need to click it to see commit statistics by contributor. 3 out of 10 steps completed.",
+                                    "next_goal": "Click on 'Contributor statistics' to view contributor commit data"
+                                },
+                                "action": [
+                                    {
+                                        "click_element": {
+                                            "index": 17
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "5",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "5",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 181
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 17: Contributor statistics",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null
+                ]
+            }
+        },
+        "5": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Tell me who has made the most contributions, in terms of number of commits, to the Pytorch GAN project\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task, no previous actions to evaluate",
+                                        "memory": "Starting task: Need to find who has made the most contributions (by number of commits) to the PyTorch GAN project. First step is to log in to GitLab. 0 out of 10 steps completed.",
+                                        "next_goal": "Log in to GitLab using provided credentials"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "byteblaze"
+                                            }
+                                        },
+                                        {
+                                            "input_text": {
+                                                "index": 5,
+                                                "text": "a_very_secure_password_123!"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully logged in to GitLab and can see the projects dashboard",
+                                        "memory": "Logged in to GitLab. Found the PyTorch-GAN project at index 120. Need to click on it to access the repository. 1 out of 10 steps completed.",
+                                        "next_goal": "Click on the PyTorch-GAN project to access its repository"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 120
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully accessed the PyTorch-GAN project repository page",
+                                        "memory": "On the PyTorch-GAN project repository page. Need to find contributor statistics. The project shows 193 commits total (from element 44). Need to check the repository analytics or contributors section to see who has the most commits. 2 out of 10 steps completed.",
+                                        "next_goal": "Navigate to repository analytics or contributors section to see commit statistics"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 12
+                                            }
+                                        },
+                                        {
+                                            "wait": {
+                                                "seconds": 2
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "4",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "4",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 12: Repository",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully navigated to the repository page and can see the 'Contributor statistics' link at index 17",
+                                        "memory": "On the PyTorch-GAN repository page. Found 'Contributor statistics' link at index 17. Need to click it to see commit statistics by contributor. 3 out of 10 steps completed.",
+                                        "next_goal": "Click on 'Contributor statistics' to view contributor commit data"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 17
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "5",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "5",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 17: Contributor statistics",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/byteblaze/PyTorch-GAN/-/graphs/master?ref_type=heads\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/byteblaze/PyTorch-GAN/-/graphs/master?ref_type=heads', title='Contributor statistics \u00b7 Byte Blaze / PyTorch-GAN \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\nSkip to content\nGitLab\n[0]<a Homepage/>\n[1]<a false;button/>\n[2]<input Search GitLab;search;text/>\n/\n[3]<a Create new.../>\n[4]<a Issues>13/>\n[5]<a Merge requests>0/>\n[6]<a To-Do List>11/>\n[7]<a Help/>\n[8]<a />\n[9]<img />\n[10]<a PyTorch-GAN>P\nPyTorch-GAN/>\n[11]<a Project information/>\n[12]<a Repository/>\n[13]<a Files/>\n[14]<a Commits/>\n[15]<a Branches/>\n[16]<a Tags/>\n[17]<a Contributor statistics/>\n[18]<a Graph/>\n[19]<a Compare revisions/>\n[20]<a Issues>Issues\n0/>\n[21]<a Merge requests>Merge requests\n0/>\n[22]<a CI/CD/>\n[23]<a Security and Compliance/>\n[24]<a Deployments/>\n[25]<a Packages and registries/>\n[26]<a Infrastructure/>\n[27]<a Monitor/>\n[28]<a Analytics/>\n[29]<a Wiki/>\n[30]<a Snippets/>\n[31]<a Settings/>\n[32]<a Toggle sidebar;button>Collapse sidebar/>\n[33]<a Byte Blaze/>\n[34]<a PyTorch-GAN/>\n[35]<a Contributor statistics/>\n[36]<button master/>\n[37]<a History/>\nCommits to master\nExcluding merge commits. Limited to 6,000 commits.\n[38]<div button>Commits\nAvg: 164m \u00b7 Max:\n          30/>\nErik Linder-Nor\u00e9n\n85 commits (eriklindernoren@live.se)\n[39]<div button>Commits\nAvg: 85.7m \u00b7 Max:\n          14/>\neriklindernoren\n60 commits (eriklindernoren@gmail.com)\n[40]<div button>Commits\nAvg: 60.5m \u00b7 Max:\n          15/>\npinnacle\n8 commits (pinnacle.chen@qq.com)\n[41]<div button>Commits\nAvg: 8.06m \u00b7 Max:\n          4/>\nzhampel\n3 commits (17304045+zhampel@users.noreply.github.com)\n[42]<div button>Commits\nAvg: 3.02m \u00b7 Max:\n          2/>\nChenYang\n1 commit (34475230+chenyang1999@users.noreply.github.com)\n[43]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\nChristoph Schorn\n1 commit (christoph.schorn1@rwth-aachen.de)\n[44]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\nKarlind\n1 commit (karlind@users.noreply.github.com)\n[45]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\ndeveloper\n1 commit (mgschwan@zero997.com)\n[46]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\nErik Linder noren\n1 commit (erik@eriks-macbook-pro.local)\n[47]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\nErik Linder noren\n1 commit (erik@c-10-253-231-243.clients.eduroam.liu.se)\n[48]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\nTrevor Blackwell\n1 commit (tlb@tlb.org)\n[49]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\n... 551 pixels below - scroll or extract content to see more ...\nCurrent step: 5/20Current date and time: 2025-12-06 18:19\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 4817,
+                "cumulative_input_token_count": 4817
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 7376,
+                    "prompt_tokens_cached": 6144,
+                    "completion_tokens": 192,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 7568,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Successfully accessed the contributor statistics page showing commit counts per contributor",
+                                    "memory": "On the contributor statistics page. Can see commit counts: Erik Linder-Nor\u00e9n has 85 commits, eriklindernoren has 60 commits, pinnacle has 8 commits, etc. Need to verify this is complete data and determine who has the most commits. 4 out of 10 steps completed.",
+                                    "next_goal": "Extract all contributor commit data to confirm who has the most commits"
+                                },
+                                "action": [
+                                    {
+                                        "extract_content": {
+                                            "goal": "Extract all contributor names and their commit counts from the contributor statistics page to determine who has the most commits"
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "6",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "6",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 251
+            },
+            "controller_messages": {
+                "action_result": [
+                    {
+                        "content": "Action result: \ud83d\udcc4  Extracted from page\n: ```json\n{\n  \"contributors\": [\n    {\n      \"name\": \"Erik Linder-Nor\u00e9n\",\n      \"commit_count\": 85,\n      \"email\": \"eriklindernoren@live.se\"\n    },\n    {\n      \"name\": \"eriklindernoren\",\n      \"commit_count\": 60,\n      \"email\": \"eriklindernoren@gmail.com\"\n    },\n    {\n      \"name\": \"pinnacle\",\n      \"commit_count\": 8,\n      \"email\": \"pinnacle.chen@qq.com\"\n    },\n    {\n      \"name\": \"zhampel\",\n      \"commit_count\": 3,\n      \"email\": \"17304045+zhampel@users.noreply.github.com\"\n    },\n    {\n      \"name\": \"ChenYang\",\n      \"commit_count\": 1,\n      \"email\": \"34475230+chenyang1999@users.noreply.github.com\"\n    },\n    {\n      \"name\": \"Christoph Schorn\",\n      \"commit_count\": 1,\n      \"email\": \"christoph.schorn1@rwth-aachen.de\"\n    },\n    {\n      \"name\": \"Karlind\",\n      \"commit_count\": 1,\n      \"email\": \"karlind@users.noreply.github.com\"\n    },\n    {\n      \"name\": \"developer\",\n      \"commit_count\": 1,\n      \"email\": \"mgschwan@zero997.com\"\n    },\n    {\n      \"name\": \"Erik Linder noren\",\n      \"commit_count\": 1,\n      \"email\": \"erik@eriks-macbook-pro.local\"\n    },\n    {\n      \"name\": \"Erik Linder noren\",\n      \"commit_count\": 1,\n      \"email\": \"erik@c-10-253-231-243.clients.eduroam.liu.se\"\n    },\n    {\n      \"name\": \"Trevor Blackwell\",\n      \"commit_count\": 1,\n      \"email\": \"tlb@tlb.org\"\n    }\n  ],\n  \"summary\": \"The page shows contributor statistics for the PyTorch-GAN project on GitLab. The contributor with the most commits is 'Erik Linder-Nor\u00e9n' with 85 commits, followed by 'eriklindernoren' with 60 commits. The data excludes merge commits and is limited to 6,000 commits.\"\n}\n```\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "action_error": [
+                    null
+                ]
+            }
+        },
+        "6": {
+            "input_messages": {
+                "contents": [
+                    {
+                        "content": "You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.\n\n# Input Format\nTask\nPrevious steps\nCurrent URL\nOpen Tabs\nInteractive Elements\n[index]<type>text</type>\n- index: Numeric identifier for interaction\n- type: HTML element type (button, input, etc.)\n- text: Element description\nExample:\n[33]<button>Submit Form</button>\n\n- Only elements with numeric indexes in [] are interactive\n- elements without [] provide only context\n\n# Response Rules\n1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:\n{\"current_state\": {\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not\",\n\"memory\": \"Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz\",\n\"next_goal\": \"What needs to be done with the next immediate action; if any plans are provided, use them as a reference to generate the next action\"},\n\"action\":[{\"one_action_name\": {// action-specific parameter}}, // ... more actions in sequence]}\n\n1. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.\nCommon action sequences:\n- Form filling: [{\"input_text\": {\"index\": 1, \"text\": \"username\"}}, {\"input_text\": {\"index\": 2, \"text\": \"password\"}}, {\"click_element\": {\"index\": 3}}]\n- Navigation and extraction: [{\"go_to_url\": {\"url\": \"https://example.com\"}}, {\"extract_content\": {\"goal\": \"extract the names\"}}]\n- Actions are executed in the given order\n- If the page changes after an action, the sequence is interrupted and you get the new state.\n- Only provide the action sequence until an action which changes the page state significantly.\n- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page\n- only use multiple actions if it makes sense.\n\n1. ELEMENT INTERACTION:\n- Only use indexes of the interactive elements\n- Elements marked with \"[]Non-interactive text\" are non-interactive\n\n1. NAVIGATION & ERROR HANDLING:\n- If no suitable elements exist, use other functions to complete the task\n- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.\n- Handle popups/cookies by accepting or closing them\n- Use scroll to find elements you are looking for\n- If you want to research something, open a new tab instead of using the current tab\n- If captcha pops up, try to solve it - else try a different approach\n- If the page is not fully loaded, use wait action\n\n1. TASK COMPLETION:\n- Use the done action as the last action as soon as the ultimate task is complete\n- Dont use \"done\" before you are done with everything the user asked you, except you reach the last step of max_steps. \n- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!\n- If you have to do something repeatedly for example the task says for \"each\", or \"for all\", or \"x times\", count always inside \"memory\" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.\n- Don't hallucinate actions\n- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. \n\n1. VISUAL CONTEXT:\n- When an image is provided, use it to understand the page layout\n- Bounding boxes with labels on their top right corner correspond to element indexes\n\n1. Form filling:\n- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.\n\n1. Long tasks:\n- Keep track of the status and subresults in the memory. \n\n1. Extraction:\n- If your task is to find information - call extract_content on the specific pages to get and store the information.\nYour responses must be always JSON with the specified format. \n\n**IMPORTANT GUIDELINES**\n- Do NOT ask the user clarification questions, simply use your best judgement based on the user prompt to complete the task.\n- Webpages may provide functionality to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n    - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n    - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text. ALWAYS use your visual understanding to complement the search engine.              \n- If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n- If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check at least a few pages before concluding that no such items exist.\n- Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n- extract_content() is a useful action to extract goal-relevant structured information from dense pages such as search results. It operates by extracting the page DOM as markdown, converting inline images to an interleaved input, and passing it to a VLM. It can thus capture multimodal information from the full page without requiring scrolling.\n\nIn the event that you have been logged out and need to log in, use the following credentials: {'username': 'byteblaze', 'password': 'a_very_secure_password_123!'}\n\n                In addition to UI actions, you have access to **tool actions** that implement recorded UI sequences deterministically.\n                These are highly reliable and efficient compared to manual UI actions.\n                - There are 7 tool actions available, named based on their functionality (e.g., login_tool, search_for_listing_tool)\n                - PREFER using tool actions when available as they are more robust than performing individual UI actions\n                - If the plan generated by the planner lists browser actions that can be replaced by a tool, do so when possible. \n                - Use common sense to determine the right tool parameters even if they do not match exactly: example if a tool allows sorting by `Newly Listed' and the task asks for sorting by `published date', infer that they are likely one and the same.\n                \n        **IMPORTANT SEARCH GUIDELINES**\n        - Webpages may provide functionality search eg. to search, sort, filter, and paginate results. Use them when available, but be aware that the search engine may be rudimentary and struggle with:\n            - compound queries (e.g red car): try simplifying the query (eg. try searching for just \"car\" if \"red car\" doesn't return any results)\n            - queries about the appearance of the items: the search engine may only do retrieval based on text descriptions, and so may miss visual attributes unless they are explicitly mentioned in the text.              \n        - If no results are returned, do NOT conclude that no such items exist. Instead, try relaxing the search criteria. Pro-tip: applying filters with an empty search query is often a good fallback strategy                        \n        - If a LOT of results are returned that cannot be directly filtered, note that they may span multiple pages. Make sure to check atleast a few pages before concluding that no such items exist.\n        - Given a list of results, always carefully cross-reference text observations against the provided screenshot using element IDs\n        \n            - extract_content() is a useful action to extract goal-relevant TEXT-ONLY structured information from search results\n            ",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "system",
+                        "name": null,
+                        "id": null
+                    },
+                    {
+                        "content": "Your ultimate task is: \"\"\"Tell me who has made the most contributions, in terms of number of commits, to the Pytorch GAN project\"\"\". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Example output:",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - I opend the first page",
+                                        "memory": "Starting with the new task. I have completed 1/10 steps",
+                                        "next_goal": "Click on company a"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 0
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "1",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "Browser started",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "1",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Unknown - Just starting the task, no previous actions to evaluate",
+                                        "memory": "Starting task: Need to find who has made the most contributions (by number of commits) to the PyTorch GAN project. First step is to log in to GitLab. 0 out of 10 steps completed.",
+                                        "next_goal": "Log in to GitLab using provided credentials"
+                                    },
+                                    "action": [
+                                        {
+                                            "input_text": {
+                                                "index": 3,
+                                                "text": "byteblaze"
+                                            }
+                                        },
+                                        {
+                                            "input_text": {
+                                                "index": 5,
+                                                "text": "a_very_secure_password_123!"
+                                            }
+                                        },
+                                        {
+                                            "click_element": {
+                                                "index": 9
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "2",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "2",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input byteblaze into index 3",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "Action result: \u2328\ufe0f  Input a_very_secure_password_123! into index 5",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully logged in to GitLab and can see the projects dashboard",
+                                        "memory": "Logged in to GitLab. Found the PyTorch-GAN project at index 120. Need to click on it to access the repository. 1 out of 10 steps completed.",
+                                        "next_goal": "Click on the PyTorch-GAN project to access its repository"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 120
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "3",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "3",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully accessed the PyTorch-GAN project repository page",
+                                        "memory": "On the PyTorch-GAN project repository page. Need to find contributor statistics. The project shows 193 commits total (from element 44). Need to check the repository analytics or contributors section to see who has the most commits. 2 out of 10 steps completed.",
+                                        "next_goal": "Navigate to repository analytics or contributors section to see commit statistics"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 12
+                                            }
+                                        },
+                                        {
+                                            "wait": {
+                                                "seconds": 2
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "4",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "4",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\uddb1\ufe0f  Clicked button with index 12: Repository",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully navigated to the repository page and can see the 'Contributor statistics' link at index 17",
+                                        "memory": "On the PyTorch-GAN repository page. Found 'Contributor statistics' link at index 17. Need to click it to see commit statistics by contributor. 3 out of 10 steps completed.",
+                                        "next_goal": "Click on 'Contributor statistics' to view contributor commit data"
+                                    },
+                                    "action": [
+                                        {
+                                            "click_element": {
+                                                "index": 17
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "5",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "5",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "ai",
+                        "name": null,
+                        "id": null,
+                        "example": false,
+                        "tool_calls": [
+                            {
+                                "name": "AgentOutput",
+                                "args": {
+                                    "current_state": {
+                                        "evaluation_previous_goal": "Success - Successfully accessed the contributor statistics page showing commit counts per contributor",
+                                        "memory": "On the contributor statistics page. Can see commit counts: Erik Linder-Nor\u00e9n has 85 commits, eriklindernoren has 60 commits, pinnacle has 8 commits, etc. Need to verify this is complete data and determine who has the most commits. 4 out of 10 steps completed.",
+                                        "next_goal": "Extract all contributor commit data to confirm who has the most commits"
+                                    },
+                                    "action": [
+                                        {
+                                            "extract_content": {
+                                                "goal": "Extract all contributor names and their commit counts from the contributor statistics page to determine who has the most commits"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "id": "6",
+                                "type": "tool_call"
+                            }
+                        ],
+                        "invalid_tool_calls": [],
+                        "usage_metadata": null
+                    },
+                    {
+                        "content": "",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": null,
+                        "id": null,
+                        "tool_call_id": "6",
+                        "artifact": null,
+                        "status": "success"
+                    },
+                    {
+                        "content": "Action result: \ud83d\udcc4  Extracted from page\n: ```json\n{\n  \"contributors\": [\n    {\n      \"name\": \"Erik Linder-Nor\u00e9n\",\n      \"commit_count\": 85,\n      \"email\": \"eriklindernoren@live.se\"\n    },\n    {\n      \"name\": \"eriklindernoren\",\n      \"commit_count\": 60,\n      \"email\": \"eriklindernoren@gmail.com\"\n    },\n    {\n      \"name\": \"pinnacle\",\n      \"commit_count\": 8,\n      \"email\": \"pinnacle.chen@qq.com\"\n    },\n    {\n      \"name\": \"zhampel\",\n      \"commit_count\": 3,\n      \"email\": \"17304045+zhampel@users.noreply.github.com\"\n    },\n    {\n      \"name\": \"ChenYang\",\n      \"commit_count\": 1,\n      \"email\": \"34475230+chenyang1999@users.noreply.github.com\"\n    },\n    {\n      \"name\": \"Christoph Schorn\",\n      \"commit_count\": 1,\n      \"email\": \"christoph.schorn1@rwth-aachen.de\"\n    },\n    {\n      \"name\": \"Karlind\",\n      \"commit_count\": 1,\n      \"email\": \"karlind@users.noreply.github.com\"\n    },\n    {\n      \"name\": \"developer\",\n      \"commit_count\": 1,\n      \"email\": \"mgschwan@zero997.com\"\n    },\n    {\n      \"name\": \"Erik Linder noren\",\n      \"commit_count\": 1,\n      \"email\": \"erik@eriks-macbook-pro.local\"\n    },\n    {\n      \"name\": \"Erik Linder noren\",\n      \"commit_count\": 1,\n      \"email\": \"erik@c-10-253-231-243.clients.eduroam.liu.se\"\n    },\n    {\n      \"name\": \"Trevor Blackwell\",\n      \"commit_count\": 1,\n      \"email\": \"tlb@tlb.org\"\n    }\n  ],\n  \"summary\": \"The page shows contributor statistics for the PyTorch-GAN project on GitLab. The contributor with the most commits is 'Erik Linder-Nor\u00e9n' with 85 commits, followed by 'eriklindernoren' with 60 commits. The data excludes merge commits and is limited to 6,000 commits.\"\n}\n```\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    },
+                    {
+                        "content": "\n[Task history memory ends]\n[Current state starts here]\nThe following is one-time information - if you need to remember it write it to memory:\nCurrent url: http://172.26.116.102:8081/byteblaze/PyTorch-GAN/-/graphs/master?ref_type=heads\nAvailable tabs:\n[TabInfo(page_id=0, url='http://172.26.116.102:8081/byteblaze/PyTorch-GAN/-/graphs/master?ref_type=heads', title='Contributor statistics \u00b7 Byte Blaze / PyTorch-GAN \u00b7 GitLab')]\nInteractive elements from top layer of the current page inside the viewport:\n[Start of page]\nSkip to content\nGitLab\n[0]<a Homepage/>\n[1]<a false;button/>\n[2]<input Search GitLab;search;text/>\n/\n[3]<a Create new.../>\n[4]<a Issues>13/>\n[5]<a Merge requests>0/>\n[6]<a To-Do List>11/>\n[7]<a Help/>\n[8]<a />\n[9]<img />\n[10]<a PyTorch-GAN>P\nPyTorch-GAN/>\n[11]<a Project information/>\n[12]<a Repository/>\n[13]<a Files/>\n[14]<a Commits/>\n[15]<a Branches/>\n[16]<a Tags/>\n[17]<a Contributor statistics/>\n[18]<a Graph/>\n[19]<a Compare revisions/>\n[20]<a Issues>Issues\n0/>\n[21]<a Merge requests>Merge requests\n0/>\n[22]<a CI/CD/>\n[23]<a Security and Compliance/>\n[24]<a Deployments/>\n[25]<a Packages and registries/>\n[26]<a Infrastructure/>\n[27]<a Monitor/>\n[28]<a Analytics/>\n[29]<a Wiki/>\n[30]<a Snippets/>\n[31]<a Settings/>\n[32]<a Toggle sidebar;button>Collapse sidebar/>\n[33]<a Byte Blaze/>\n[34]<a PyTorch-GAN/>\n[35]<a Contributor statistics/>\n[36]<button master/>\n[37]<a History/>\nCommits to master\nExcluding merge commits. Limited to 6,000 commits.\n[38]<div button>Commits\nAvg: 164m \u00b7 Max:\n          30/>\nErik Linder-Nor\u00e9n\n85 commits (eriklindernoren@live.se)\n[39]<div button>Commits\nAvg: 85.7m \u00b7 Max:\n          14/>\neriklindernoren\n60 commits (eriklindernoren@gmail.com)\n[40]<div button>Commits\nAvg: 60.5m \u00b7 Max:\n          15/>\npinnacle\n8 commits (pinnacle.chen@qq.com)\n[41]<div button>Commits\nAvg: 8.06m \u00b7 Max:\n          4/>\nzhampel\n3 commits (17304045+zhampel@users.noreply.github.com)\n[42]<div button>Commits\nAvg: 3.02m \u00b7 Max:\n          2/>\nChenYang\n1 commit (34475230+chenyang1999@users.noreply.github.com)\n[43]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\nChristoph Schorn\n1 commit (christoph.schorn1@rwth-aachen.de)\n[44]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\nKarlind\n1 commit (karlind@users.noreply.github.com)\n[45]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\ndeveloper\n1 commit (mgschwan@zero997.com)\n[46]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\nErik Linder noren\n1 commit (erik@eriks-macbook-pro.local)\n[47]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\nErik Linder noren\n1 commit (erik@c-10-253-231-243.clients.eduroam.liu.se)\n[48]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\nTrevor Blackwell\n1 commit (tlb@tlb.org)\n[49]<div button>Commits\nAvg: 1.01m \u00b7 Max:\n          1/>\n... 551 pixels below - scroll or extract content to see more ...\nCurrent step: 6/20Current date and time: 2025-12-06 18:19\n",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "human",
+                        "name": null,
+                        "id": null,
+                        "example": false
+                    }
+                ],
+                "token_count": 5590,
+                "cumulative_input_token_count": 5590
+            },
+            "get_next_action": {
+                "usage": {
+                    "prompt_tokens": 8095,
+                    "prompt_tokens_cached": 6336,
+                    "completion_tokens": 325,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 8420,
+                    "total_cost": 0.0
+                }
+            },
+            "output_messages": {
+                "tool_call_message": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "ai",
+                    "name": null,
+                    "id": null,
+                    "example": false,
+                    "tool_calls": [
+                        {
+                            "name": "AgentOutput",
+                            "args": {
+                                "current_state": {
+                                    "evaluation_previous_goal": "Success - Successfully extracted contributor statistics showing Erik Linder-Nor\u00e9n has 85 commits, which is the highest count",
+                                    "memory": "Extracted contributor data: Erik Linder-Nor\u00e9n has 85 commits, eriklindernoren has 60 commits, others have fewer. This appears to be the complete contributor list. Need to verify if there are any other contributors not shown or if this data is limited. The page says 'Excluding merge commits. Limited to 6,000 commits.' but the project has only 193 commits total, so this should be complete. 5 out of 10 steps completed.",
+                                    "next_goal": "Complete the task by providing the answer and using done action"
+                                },
+                                "action": [
+                                    {
+                                        "done": {
+                                            "text": "The contributor with the most commits to the PyTorch GAN project is Erik Linder-Nor\u00e9n with 85 commits. The complete contributor statistics show: 1. Erik Linder-Nor\u00e9n - 85 commits, 2. eriklindernoren - 60 commits, 3. pinnacle - 8 commits, 4. zhampel - 3 commits, and several others with 1 commit each. The project has a total of 193 commits, and the contributor statistics page shows all contributors excluding merge commits.",
+                                            "success": true
+                                        }
+                                    }
+                                ]
+                            },
+                            "id": "7",
+                            "type": "tool_call"
+                        }
+                    ],
+                    "invalid_tool_calls": [],
+                    "usage_metadata": null
+                },
+                "tool_response": {
+                    "content": "",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "tool",
+                    "name": null,
+                    "id": null,
+                    "tool_call_id": "7",
+                    "artifact": null,
+                    "status": "success"
+                },
+                "token_count": 410
+            },
+            "controller_messages": {
+                "action_result": [],
+                "action_error": []
+            }
+        }
+    }
+}
