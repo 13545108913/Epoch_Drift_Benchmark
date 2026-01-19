@@ -1,0 +1,37 @@
+"""Replace the website placeholders with website domains from env_config
+Generate the test data"""
+
+import os
+import json
+
+BASE_URL = os.environ.get("BASE_URL")
+SHOPPING = f"{BASE_URL}:7770"
+SHOPPING_ADMIN = "http://dockerized-magento.local/admin"
+REDDIT = f"{BASE_URL}:9999"
+GITLAB = "http://172.26.116.102:8080"
+MAP = f"{BASE_URL}:3000"
+WORDPRESS = "http://localhost:8000"
+WIKIPEDIA = f"{BASE_URL}:8888/wikipedia_en_all_maxi_2022-05/A/User:The_other_Kiwix_guy/Landing"
+
+
+def main() -> None:
+    with open("./admin_tasks_final_v1.json", "r") as f:
+        raw = f.read()
+    raw = raw.replace("__GITLAB__", GITLAB)
+    raw = raw.replace("__REDDIT__", REDDIT)
+    raw = raw.replace("__SHOPPING__", SHOPPING)
+    raw = raw.replace("__SHOPPING_ADMIN__", SHOPPING_ADMIN)
+    raw = raw.replace("__WIKIPEDIA__", WIKIPEDIA)
+    raw = raw.replace("__MAP__", MAP)
+    raw = raw.replace("__WORDPRESS__", WORDPRESS)
+    with open("./test.json", "w") as f:
+        f.write(raw)
+    # split to multiple files
+    data = json.loads(raw)
+    for idx, item in enumerate(data):
+        with open(f"./{idx}.json", "w") as f:
+            json.dump(item, f, indent=2)
+
+
+if __name__ == "__main__":
+    main()
