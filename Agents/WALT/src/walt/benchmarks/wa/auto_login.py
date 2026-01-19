@@ -267,19 +267,36 @@ def renew_comb(
         username = ACCOUNTS["shopping_admin"]["username"]
         password = ACCOUNTS["shopping_admin"]["password"]
         page.goto(f"{SHOPPING_ADMIN}")
-        page.get_by_placeholder("user name").fill(username)
-        page.get_by_placeholder("password").fill(password)
-        page.get_by_role("button", name="Sign in").click()
+
+        page.locator("#username").fill(username)
+
+        # 2. 修正密码定位 (HTML中 id="login")
+        page.locator("#login").fill(password)
+
+        # 3. 修正按钮定位 (HTML中 value="Login")
+        # page.get_by_role("button", name="Login").click()
+        # page.get_by_role("button", name=re.compile(r"Login|Sign in", re.IGNORECASE)).click()
+        # 定义 M1 风格的按钮
+        button_m1 = page.get_by_role("button", name="Login")
+
+        # 定义 M2 风格的按钮
+        button_m2 = page.get_by_role("button", name="Sign in")
+
+        # 结合两者，点击任意存在的那个
+        button_m1.or_(button_m2).click(timeout=60000)
 
     if "gitlab" in comb:
         username = ACCOUNTS["gitlab"]["username"]
         password = ACCOUNTS["gitlab"]["password"]
         page.goto(f"{GITLAB}/users/sign_in")
-        page.get_by_test_id("username-field").click()
-        page.get_by_test_id("username-field").fill(username)
-        page.get_by_test_id("username-field").press("Tab")
-        page.get_by_test_id("password-field").fill(password)
-        page.get_by_test_id("sign-in-button").click()
+        # page.get_by_test_id("username-field").click()
+        # page.get_by_test_id("username-field").fill(username)
+        # page.get_by_test_id("username-field").press("Tab")
+        # page.get_by_test_id("password-field").fill(password)
+        # page.get_by_test_id("sign-in-button").click()
+        page.get_by_label("Username or email").fill(username)
+        page.locator("#user_password").fill(password)
+        page.get_by_role("button", name="Sign in").click()
 
     context.storage_state(path=f"{auth_folder}/{'.'.join(comb)}_state.json")
     print(f"Saved auth state to {auth_folder}/{'.'.join(comb)}_state.json")

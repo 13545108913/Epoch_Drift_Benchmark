@@ -396,7 +396,7 @@ def config() -> argparse.Namespace:
         help="Maximum number of concurrent tasks per process",
     )
     parser.add_argument("--test_start_idx", type=int, default=0)
-    parser.add_argument("--test_end_idx", type=int, default=79)
+    parser.add_argument("--test_end_idx", type=int, default=161)
     parser.add_argument("--force_login_every_task", action="store_true")
     parser.add_argument("--run_as_debug_mode", action="store_true")
     parser.add_argument(
@@ -615,7 +615,7 @@ async def evaluate_task_core(
                 # Build command with account credentials and process distribution info
                 cmd = [
                     "python",
-                    "helpers/auto_login.py",
+                    "src/walt/benchmarks/wa/auto_login.py",
                     "--auth_folder",
                     temp_dir,
                     "--site_list",
@@ -838,24 +838,24 @@ async def evaluate_task_core(
 
 
         # --- 新增代码开始：发送干扰信号 ---
-        proxy_url = "http://localhost:8000/?logging=StartingRun1"
+        # proxy_url = "http://localhost:8000/?logging=StartingRun1"
         
-        # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
-        # 这样 addon 脚本才能捕获到这个请求并重置状态
-        mitm_proxy = "http://127.0.0.1:8848" 
-        proxies = {
-            "http": mitm_proxy,
-            "https": mitm_proxy,
-        }
+        # # 必须配置代理，指向你的 mitmproxy (通常是 8848 端口)
+        # # 这样 addon 脚本才能捕获到这个请求并重置状态
+        # mitm_proxy = "http://127.0.0.1:8848" 
+        # proxies = {
+        #     "http": mitm_proxy,
+        #     "https": mitm_proxy,
+        # }
 
-        try:
-            # 发送请求，设置超时防止卡死
-            response = requests.get(proxy_url, proxies=proxies, timeout=5)
-            print(f"OK: Connect to {proxy_url}")
-        except requests.exceptions.ProxyError:
-            print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
-        except Exception as e:
-            print(f"Failed to send stop signal: {e}")
+        # try:
+        #     # 发送请求，设置超时防止卡死
+        #     response = requests.get(proxy_url, proxies=proxies, timeout=5)
+        #     print(f"OK: Connect to {proxy_url}")
+        # except requests.exceptions.ProxyError:
+        #     print("Error: Could not connect to mitmproxy on port 8848. Is it running?")
+        # except Exception as e:
+        #     print(f"Failed to send stop signal: {e}")
         # --- 新增代码结束 ---
 
         # page = await context.get_current_page()
@@ -883,7 +883,7 @@ async def evaluate_task_core(
             # 挂载干扰逻辑
             page = await context.get_current_page()
             await page.route("**/*", controller.route_handler)
-            await page.goto("http://localhost:8000/?logging=StartingRun1", timeout=60000, wait_until="domcontentloaded") 
+            await page.goto("http://172.26.116.102:8081/?logging=StartingRun1", timeout=60000, wait_until="domcontentloaded")
 
         if with_drift:
             try:
