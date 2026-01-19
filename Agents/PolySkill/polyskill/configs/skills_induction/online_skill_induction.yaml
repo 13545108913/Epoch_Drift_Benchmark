@@ -1,0 +1,51 @@
+# Online Skill Induction Configuration
+# This configuration enables continuous skill learning where learned skills are used in upcoming tasks
+
+run_name: online_skill_induction
+
+runner:
+  threads: 4  # Lower threads for sequential skill accumulation
+  output_dir: ./results/skill_induction
+  seed: 42
+
+model_configs:
+  gpt_4:
+    provider: openai 
+    name: gpt-4.1
+    temperature: 0.3
+    max_tokens: 8192
+
+benchmarks:
+  webarena_shopping:
+    dataset: webarena-shopping
+    max_examples: 10
+    max_steps: 20
+    headless: true
+    reset_env: false
+
+agents:
+  # HSM v3 with ASI and skill induction
+  hsm_v3_asi_learner:
+    name: hsm_v3_asi
+    model_config_name: gpt_4
+    action_file_path: null  # Will be generated through learning
+    # Skill induction configuration
+    skill_induction:
+      enabled: true
+      storage_path: ./skill_induction_data
+      extraction_type: dual  # Extract both NL and code
+      min_skill_complexity: 2
+      max_skill_complexity: 8
+      min_pattern_frequency: 2
+      enable_trajectory_validation: true
+      enable_skill_memory: true
+      enable_intelligent_selection: true
+      # Online learning settings
+      update_frequency: 5  # Update skills every 5 tasks
+      max_skills_per_update: 3
+      # Auto-export settings
+      auto_export: true
+      export_formats:
+        - python_module
+        - workflows_markdown
+        - agent_memory
