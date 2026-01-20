@@ -106,7 +106,7 @@ def calculate_average_calls(target_py_file, results_dir):
 # --- 执行脚本 ---
 if __name__ == "__main__":
     # 配置路径
-    TARGET_FILE = 'actions/admin.py'
-    RESULTS_DIR = 'asi_results/admin_results/results_asi_v2_waber'
+    TARGET_FILE = 'actions/wordpress.py'
+    RESULTS_DIR = 'asi_results/wordpress_results/results_asi_v2_waber'
 
     calculate_average_calls(TARGET_FILE, RESULTS_DIR)
