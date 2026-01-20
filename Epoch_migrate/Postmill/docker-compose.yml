@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+  db:
+    image: postgres:11-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postmill
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=postmill
+    volumes:
+      # Added persistence for the database
+      - postmill_db:/var/lib/postgresql/data
+
+  php:
+    image: registry.gitlab.com/postmill/postmill/app:latest
+    restart: always
+    environment:
+      - TRUSTED_HOSTS=localhost
+      # Ensure the app knows how to connect to the db service
+      - DATABASE_URL=postgres://postmill:secret@db:5432/postmill
+    volumes:
+      - postmill_images:/app/public/submission_images
+      - postmill_thumbs:/app/public/media/cache
+      - postmill_var:/app/var
+    depends_on:
+      - db
+
+  web:
+    image: registry.gitlab.com/postmill/postmill/web:latest
+    restart: always
+    environment:
+      - TRUSTED_HOSTS=localhost
+    ports:
+      - "3002:80"
+    volumes:
+      - postmill_images:/app/public/submission_images
+      - postmill_thumbs:/app/public/media/cache
+    depends_on:
+      - php
+
+volumes:
+  postmill_images: {}
+  postmill_thumbs: {}
+  postmill_var: {}
+  postmill_db: {} # Defined the new database volume

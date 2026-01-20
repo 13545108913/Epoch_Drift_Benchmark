@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  db:
+    # 核心修改：将 mysql:5.7 替换为 mariadb:10.6
+    # MariaDB 完美兼容 MySQL 协议，且原生支持 Apple Silicon
+    image: mariadb:10.6
+    environment:
+      # 环境变量名称完全通用，不需要改动
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wp_user
+      MYSQL_PASSWORD: wp_password
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+
+  wordpress:
+    build: .
+    depends_on:
+      - db
+    ports:
+      - "8000:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wp_user
+      WORDPRESS_DB_PASSWORD: wp_password
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wp_content:/var/www/html/wp-content
+      - ./temp_data:/tmp/import_data
+    restart: always
+
+volumes:
+  db_data:
+  wp_content:
