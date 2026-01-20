@@ -105,5 +105,6 @@ CLIENT_DICT = {
     "gpt-4": LM_Client,
     "gpt-4o": GPT4V_Client,
     "gpt-4o-2024-05-13": GPT4V_Client,
-    "gpt-5-mini-2025-08-07": GPT4V_Client, # <-- Added your model here
+    "gpt-5-mini-2025-08-07": GPT4V_Client,
+    "claude-haiku-4-5-20251001": GPT4V_Client,
 }

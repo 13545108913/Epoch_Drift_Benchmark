@@ -1,5 +1,7 @@
 import re
 import time
+import datetime
+import os  # 新增引用：用于获取进程ID
 
 import playwright.sync_api
 
@@ -16,34 +18,20 @@ def execute_python_code(
     **additional_globals
 ):
     """
-    Executes Python code in a new context, except for a playwright `page` object and a `send_message_to_user` function.
-
-    WARNING: this is not safe!
-    https://stackoverflow.com/questions/77655440/can-you-protect-a-python-variable-with-exec
-
-    Args:
-        code: the Python code to execute, as a string.
-        page: the playwright page that will be made accessible to the code.
-        send_message_to_user: utility function that will be made accessible to the code. It should take one text argument.
-        report_infeasible_instructions: utility function that will be made accessible to the code. It should take one text argument.
-        additional_globals: additional global variables to make accessible to the code.
+    Executes Python code in a new context.
     """
-
     globals = {
         "page": page,
         "send_message_to_user": send_message_to_user,
         "report_infeasible_instructions": report_infeasible_instructions,
         **additional_globals,
     }
-
     exec(code, globals)
 
 
 def step(self: BrowserEnv, action: str) -> tuple:
     """
-    Small modification of the original BrowserEnv step method that uses the custom 
-    execute_python_code function. 
-    TODO: Probably better to refactor browsergym to support custom exec instead of this hack.
+    Step function with multiprocessing-safe error logging.
     """        
     self.last_action = action
 
@@ -80,46 +68,63 @@ def step(self: BrowserEnv, action: str) -> tuple:
         self.last_action_error = ""
     except Exception as e:
         self.last_action_error = f"{type(e).__name__}: {e}"
+        
+        # --- [Error Logging - Multiprocessing Safe] ---
+        try:
+            # 获取当前进程ID
+            pid = os.getpid()
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # 构造日志内容，包含 PID 以便追踪
+            log_entry = (
+                f"[{timestamp}] [Process: {pid}] ERROR OCCURRED:\n"
+                f"Action Code: {action}\n"
+                f"Error Message: {self.last_action_error}\n"
+                f"{'-'*50}\n"
+            )
+            
+            # 使用包含 PID 的文件名，确保每个进程写自己的文件，避免冲突
+            # 文件名示例: execution_errors_pid_12345.log
+            log_filename = f"my_log/execution_errors_pid_{pid}.log"
+            
+            with open(log_filename, "a", encoding="utf-8") as f:
+                f.write(log_entry)
+                
+        except Exception as log_err:
+            logger.error(f"Failed to save error to local file: {log_err}")
+        # --- [End of Error Logging] ---
+
         match = re.match("TimeoutError: Timeout ([0-9]+)ms exceeded.", self.last_action_error)
         if match:
             info["action_exec_timeout"] = float(match.groups()[0]) / 1000  # ms to sec
+            
     logger.debug(f"Action executed")
     info["action_exec_stop"] = time.time()
 
-    # wait a bit (for the JavaScript callback to set the active page)
-    time.sleep(0.5)  # wait for JS events to be fired (half a second)
-    self.context.cookies()  # trigger all waiting Playwright callbacks on the stack (hack, see https://playwright.dev/java/docs/multithreading)
-
-    # wait for the network to idle before extracting the observation, reward etc.
+    # wait a bit
+    time.sleep(0.5) 
+    self.context.cookies() 
     self._wait_dom_loaded()
-
-    # after the action is executed, the active page might have changed
-    # perform a safety check
     self._active_page_check()
     logger.debug(f"Active page checked")
 
-    # if asked, wait for user message
     self._wait_for_user_message()
     logger.debug(f"User message done")
 
     logger.debug(f"Initiating task validation")
-    # extract reward, done, user_message, info (task-specific)
     reward, done, user_message, task_info = self._task_validate()
     info["task_info"] = task_info
     logger.debug(f"Task validation done")
 
-    # add any user message sent by the task to the chat
     if user_message:
         self.chat.add_message(role="user", msg=user_message)
 
-    # extract observation (generic)
     obs = self._get_obs()
     logger.debug(f"Observation extracted")
 
-    # new step API wants a 5-tuple (gymnasium)
     terminated = done or (
         self.terminate_on_infeasible and self.infeasible_message_received
-    )  # task or agent can terminate the episode
+    )
     truncated = False
 
     return obs, reward, terminated, truncated, info
