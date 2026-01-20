@@ -75,21 +75,24 @@ Format your response as a valid json:
 
 def extract_content(text, start_tag):
     """
-    Extract the content that follows 'Info:' in a given string.
-
-    :param text: A string that may contain lines starting with 'Info:'
-    :return: The content that follows 'Info:' or None if not found
+    Extract the content that follows a start_tag in a given string.
+    Handles leading whitespace robustly.
     """
     # Split the text into lines
     lines = text.split("\n")
 
-    # Loop through each line to find a line that starts with 'Info:'
+    # Loop through each line
     for line in lines:
-        if line.startswith(start_tag):
-            # Extract and return the content after 'Info:'
-            return line[len(start_tag) :].strip()
-
-    # Return None if 'Info:' is not found in any line
+        # Strip whitespace from the left side before checking
+        clean_line = line.lstrip()
+        
+        if clean_line.startswith(start_tag):
+            # Split by the tag (limit to 1 split) and take the second part
+            # This is safer than slicing by index when whitespace is involved
+            parts = clean_line.split(start_tag, 1)
+            if len(parts) > 1:
+                return parts[1].strip()
+            
     return ""
 
 
