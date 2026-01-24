@@ -163,9 +163,22 @@ def update_workflows(workflow: str, existing_workflows: list[str]) -> tuple[bool
     name = get_workflow_name(workflow)
     for ew in existing_workflows:
         ew_name = get_workflow_name(ew)
+        # messages = [
+        #     {"role": "system", "content": "You are an expert in navigating the web, your task is to check if the two workflows refer to the same task."},
+        #     {"role": "user", "content": "Does the following two workflows refer to the same task? Only return 'yes' or 'no', do not provide any additional information."},
+        #     {"role": "user", "content": f"Workflow 1: {name}\nWorkflow 2: {ew_name}"}
+        # ]
         messages = [
-            {"role": "system", "content": "You are an expert in navigating the web, your task is to check if the two workflows refer to the same task."},
-            {"role": "user", "content": "Does the following two workflows refer to the same task? Only return 'yes' or 'no', do not provide any additional information."},
+            {"role": "system", "content": "You are an expert in distinguishing web navigation tasks. Your goal is to prevent duplicate workflows while keeping distinct ones."},
+            {"role": "user", "content": (
+                "Compare the following two workflows. Determine if they describe the EXACT SAME user intent and operation sequence.\n"
+                "Rules for 'NO':\n"
+                "- If one creates a NEW item and the other modifies an EXISTING item, return 'no'.\n"
+                "- If one is about 'Searching/Navigating' and the other is about 'Creating/Writing', return 'no'.\n"
+                "- If the key actions (verbs) are different (e.g., 'Create' vs 'Assign'), return 'no'.\n\n"
+                "Only return 'yes' if they are functionally identical duplicates.\n"
+                "Return ONLY 'yes' or 'no'."
+            )},
             {"role": "user", "content": f"Workflow 1: {name}\nWorkflow 2: {ew_name}"}
         ]
         
@@ -220,6 +233,7 @@ def get_better_workflow(workflow1: str, workflow2: str) -> str:
             temperature=args.temperature,
         )
         response_text = response.choices[0].message.content.lower()
+        print(f"DEBUG - Comparison Reason: {response_text}") # 新增这行
     except Exception as e:
         print(f"Error comparing workflows: {e}")
         return workflow2 
