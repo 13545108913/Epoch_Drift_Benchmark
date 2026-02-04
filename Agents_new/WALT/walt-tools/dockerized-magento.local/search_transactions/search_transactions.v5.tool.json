@@ -1,0 +1,202 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session logs show a complete run: navigation to the Magento admin Transactions page, login (performed earlier during recording), dismissal of an 'Incoming Message' popup, filling filter inputs (Order ID, Transaction ID, Payment Method, Transaction Type, Is Closed, Created At date range), clicking Search, and extracting results. Selectors that resolved reliably during the run are mainly attribute-based (input[name=..], select[name=..]) and a grid-scoped Search button XPath.\n\nTask Definition:\n- Provide a deterministic, re-usable automation tool that: navigates to the admin Transactions grid, dismisses the blocking notification, populates any provided filter fields, applies filters by clicking Search, and extracts the filtered grid results and visible filter values. The tool assumes the browser context is already authenticated with an admin session.\n\nAction Plan (detailed steps to implement):\n1) Navigate to the Transactions admin URL (parameterized). 2) Short wait for initial load. 3) Dismiss the Incoming Message popup using a strict XPath that matches the visible 'close' anchor (this was necessary in the recording). 4) Wait briefly for dismiss/AJAX to settle. 5) Fill each filter control if a value is provided (controls targeted by name attributes: increment_id, txn_id, method, txn_type, is_closed, created_at[from], created_at[to]). 6) Click the grid-scoped Search button to apply filters. 7) Wait for grid refresh. 8) Extract the results and the visible filter states for verification.\n\nVariable Identification (inputs required by the tool):\n- increment_id (string, optional): Order increment id; maps to input[name='increment_id'].\n- txn_id (string, optional): Transaction id; maps to input[name='txn_id'].\n- method (string, optional): Visible payment method option text; maps to select[name='method'].\n- txn_type (string, optional): Visible transaction type text (one of Order/Authorization/Capture/Void/Refund); maps to select[name='txn_type'].\n- is_closed (string, optional): Visible text 'Yes'/'No'; maps to select[name='is_closed'].\n- created_from (string date YYYY-MM-DD, optional): maps to input[name='created_at[from]'].\n- created_to (string date YYYY-MM-DD, optional): maps to input[name='created_at[to]'].\n- transactions_url (string, optional): URL for the Transactions page; default recorded URL can be used if not provided.\n\nStep Optimization and Selector Rationale:\n- Prefer attribute-based selectors (input[name=...], select[name=...]) because they targeted unique elements in the recording and are less brittle than class-based selectors.\n- Scope the Search button to the grid filter row via XPath: (//table[contains(@class,'grid')]//tr[contains(@class,'filter')]//button[@title='Search'])[1] to ensure exactly one match when multiple 'Search' buttons exist on the admin layout.\n- Include a deterministic popup-close XPath that matches anchor title/href and visible text to avoid ambiguous matches: //a[@title='close' and @href='#' and normalize-space(string(.))='close'].\n- Avoid relying on storage_state injection (this caused the previous tool failure). The fix is to not pass storage_state to BrowserContextConfig; instead set cookies/localStorage via the platform-specific context APIs or assume an existing authenticated browser context.\n\nDeterminism & Robustness Notes:\n- All steps are sequential and deterministic. They do not branch; if a caller passes empty strings for optional inputs the corresponding input/select steps will still be executed but with empty values; integrators should run a no-op/no-change action if they wish to skip setting a field.\n- The tool intentionally avoids dynamic element hashing in favor of semantic attribute selectors and a grid-scoped XPath for the Search button to satisfy the 'exact single element' requirement.\n- The tool assumes an admin session is active (no login step included). If a login is needed the integrator should perform authentication prior to running this tool.\n\nEssential only: The sequence intentionally includes only essential interactions (navigate, dismiss popup, set filters, apply, extract). Non-essential exploration or sorting/pagination steps are omitted per instructions.\n\nSelectors Verified in Recording: input[name='increment_id'], input[name='txn_id'], select[name='txn_type'], select[name='is_closed'], select[name='method'], input[name='created_at[from]'], input[name='created_at[to]'], and the grid-scoped Search button XPath for reliable clicks.\n\nImplementation remark: Integrators should ensure their automation runner waits for the '#loading-mask' or equivalent overlay to vanish before interacting where necessary; the tool uses brief waits but production harness should replace static waits with explicit waitUntilInvisible checks on '#loading-mask' or the ajax-loader images.",
+  "name": "magento_admin_transactions_search",
+  "description": "Search Magento admin payment transactions grid using filter controls (order id, transaction id, payment method, transaction type, is_closed, created at date range) and return filtered results. Assumes an authenticated admin session is already available in the browser context.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to the Transactions admin page. If {transactions_url} is not supplied, call implementer should substitute the default URL.",
+      "output": null,
+      "type": "navigation",
+      "url": "{transactions_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Brief wait for page resources and any initial AJAX to start. Recommended to be paired with overlay checks in the test harness.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Click the Incoming Message popup close anchor if present to dismiss the blocking notification. Selector scoped to the visible 'close' anchor.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[@title='close' and @href='#' and normalize-space(string(.))='close']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the popup close animation/AJAX to finish (safe small pause).",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Enter Order Increment ID into the 'Order ID' filter text input. Leave empty to skip (caller may pass an empty string).",
+      "output": null,
+      "cssSelector": "input[name='increment_id']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{increment_id}"
+    },
+    {
+      "description": "Enter Transaction ID into the 'Transaction ID' filter text input. Leave empty to skip.",
+      "output": null,
+      "cssSelector": "input[name='txn_id']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{txn_id}"
+    },
+    {
+      "description": "Select the desired Payment Method from the 'Payment Method Name' dropdown. If empty, the step will still target the control but not change selection (caller should provide visible option text).",
+      "output": null,
+      "cssSelector": "select[name='method']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{method}"
+    },
+    {
+      "description": "Select the Transaction Type dropdown option (e.g. 'Capture'). Leave empty to not change selection.",
+      "output": null,
+      "cssSelector": "select[name='txn_type']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{txn_type}"
+    },
+    {
+      "description": "Select the Is Closed dropdown option ('Yes' or 'No'). Leave empty to not change selection.",
+      "output": null,
+      "cssSelector": "select[name='is_closed']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{is_closed}"
+    },
+    {
+      "description": "Enter the Created At 'From' date (YYYY-MM-DD). Leave empty to skip.",
+      "output": null,
+      "cssSelector": "input[name='created_at[from]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_from}"
+    },
+    {
+      "description": "Enter the Created At 'To' date (YYYY-MM-DD). Leave empty to skip.",
+      "output": null,
+      "cssSelector": "input[name='created_at[to]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_to}"
+    },
+    {
+      "description": "Click the Search / Apply Filters button scoped to the Transactions grid filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//table[contains(@class,'grid')]//tr[contains(@class,'filter')]//button[@title='Search'])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters (adjustable by integrator).",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Extract grid rows (if any), the 'Total X records' text, and the visible values from filter inputs/selects to confirm which filters were applied.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Capture the filtered Transactions grid results and the currently-applied filter values from the filter row."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Order increment ID to filter by. Corresponds to input[name='increment_id'] in the Transactions grid filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "txn_id",
+      "type": "string",
+      "format": null,
+      "description": "Transaction ID to filter by. Corresponds to input[name='txn_id'] in the Transactions grid filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "method",
+      "type": "string",
+      "format": null,
+      "description": "Visible payment method text to select from the Payment Method dropdown (e.g. 'PayPal Express Checkout'). Matches select[name='method'].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "txn_type",
+      "type": "string",
+      "format": null,
+      "description": "Transaction type visible text to select (e.g. 'Capture'). Matches select[name='txn_type'].",
+      "required": false,
+      "enum": [
+        "Order",
+        "Authorization",
+        "Capture",
+        "Void",
+        "Refund"
+      ]
+    },
+    {
+      "name": "is_closed",
+      "type": "string",
+      "format": null,
+      "description": "Visible text for the Is Closed dropdown (use 'Yes' or 'No'). Matches select[name='is_closed'].",
+      "required": false,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "created_from",
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "description": "Created At date 'From' value in ISO format (YYYY-MM-DD). Corresponds to input[name='created_at[from]'].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_to",
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "description": "Created At date 'To' value in ISO format (YYYY-MM-DD). Corresponds to input[name='created_at[to]'].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "transactions_url",
+      "type": "string",
+      "format": null,
+      "description": "URL of the Magento admin Transactions page. Defaults to the recorded URL if not provided: 'http://dockerized-magento.local/index.php/admin/sales_transactions/'.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigated to http://localhost:8000/, identified a \"site mode button\" anchor (href=\"#\") and clicked it. The agent then attempted to verify the appearance change but could not extract body attributes from the plain-text dump; it recommended DOM checks.\n\nTask Definition:\n- Create a reusable tool that opens the specified base URL, locates the site mode toggle control (using XPath first, CSS fallback second), clicks it to toggle the theme, and optionally extracts DOM attributes to verify the change.\n\nAction Plan:\n1. Navigate to the provided base URL.\n2. Wait briefly for JS to initialize.\n3. Try to locate the toggle by XPath //a[normalize-space(.)='site mode button'] (parameterized). If not found, try CSS header a[href=\"#\"] (parameterized). If still not found, agentic search for an anchor with href=\"#\" containing 'site mode' text. Click the found element.\n4. Wait briefly for the change to take effect.\n5. If verify_dom_checks is true, extract body class, data-theme attributes on body and html, and computed backgroundColor to confirm the change.\n6. Return the extracted verification results.\n\nVariable Identification:\n- base_url (required): the site to open\n- toggle_selector_xpath (optional): XPath to find the control; default derived from recording\n- toggle_selector_css (optional): CSS fallback selector\n- verify_dom_checks (optional bool): whether to extract DOM attributes after toggling\n\nStep Optimization:\n- Combined clicks and verification into one deterministic sequence.\n- Used XPath as primary selector because the recorded interaction relied on exact visible text.\n- Added a short wait after navigation and after click to allow JS to apply theme changes.\n- Included an agentic fallback step because some themes may render the toggle with different markup (no stable elementHash recorded except for the clicked element hash which may not be stable across deployments).\n\nNotes/Assumptions:\n- The site toggle uses client-side JS and does not navigate away (href=\"#\").\n- The tool assumes no login is required; authentication steps are omitted per instructions unless a login page is encountered.\n- The recorded elementHash '39df3bb82d' exists but DOM can change; hence tool uses parameterized selectors and an agentic fallback.\n\nJustification for agentic step:\n- The page dump lacked raw DOM attributes for the toggle; to robustly locate the toggle across themes, agentic selection that can examine visible text and href is necessary.\n\nInputs are minimal and map directly to the observed selectors to avoid adding unrelated parameters. The verification extraction is optional to handle cases where the plain-text snapshot lacks DOM attributes. ",
+  "name": "toggle_site_mode",
+  "description": "Toggle the website appearance mode (light/dark) by clicking the site mode control on the page. Uses the discovered XPath selector //a[normalize-space(.)='site mode button'] or a CSS fallback header a[href=\"#\"]. Assumes the user session is already authenticated if needed. The tool verifies the toggle by extracting body classes and data-theme attributes when available.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the base URL where the site mode toggle is located.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the page to load and JS to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Use agentic selection because some themes render dynamic markup; this step finds and clicks the toggle if present.",
+      "output": null,
+      "type": "agent",
+      "task": "Locate the site mode toggle using the provided selectors in order: 1) XPath {toggle_selector_xpath}, 2) CSS {toggle_selector_css}. If found, click the element. If not found, search for an anchor with href=\"#\" and visible text containing 'site mode' and click it. Limit attempts to 5.",
+      "max_steps": 5
+    },
+    {
+      "description": "Wait briefly for the appearance change to apply.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Collect DOM attributes and computed style to verify that the site mode change occurred.",
+      "output": "toggle_verification",
+      "type": "extract_page_content",
+      "goal": "After toggling, extract document.body.className, document.body.getAttribute('data-theme'), document.documentElement.getAttribute('data-theme'), and window.getComputedStyle(document.body).backgroundColor. Also confirm the toggle element is present at the provided selector."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base URL of the site to toggle, e.g. 'http://localhost:8000/'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "toggle_selector_xpath",
+      "type": "string",
+      "format": null,
+      "description": "XPath selector for the toggle element. Default: \"//a[normalize-space(.)='site mode button']\"",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "toggle_selector_css",
+      "type": "string",
+      "format": null,
+      "description": "CSS selector fallback for the toggle element. Default: \"header a[href='#']\"",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "verify_dom_checks",
+      "type": "bool",
+      "format": null,
+      "description": "If true, extract body class and data-theme attributes after toggling to verify the appearance change. Default: true",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

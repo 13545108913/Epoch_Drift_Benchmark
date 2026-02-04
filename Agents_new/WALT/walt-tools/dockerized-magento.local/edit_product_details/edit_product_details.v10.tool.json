@@ -1,0 +1,285 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigates to a Magento 1.x admin product edit page, fills General/Prices/Inventory fields, interacts with tabs, clicks Save/Save and Continue, duplicates a product (setLocation navigation) and performs a mass-delete via the Manage Products grid. Stable selectors observed include ids (#name,#sku,#weight,#price,#status,#visibility), name-attributes for stock fields (product[stock_data][...]), and toolbar buttons with title attributes (Save, Save and Continue Edit, Delete, Duplicate). Native JS confirm() is used by deleteConfirm.\n\nTask Definition:\n- Create a deterministic, reusable tool that navigates to a product edit page (by product_id), updates the core editable fields (General, Prices, Inventory), assigns websites/categories when requested, and clicks the chosen save action to persist changes. The tool assumes an active/admin-authenticated browser context.\n\nAction Plan:\n1) Navigate directly to product edit URL.\n2) Open General tab and set name, sku, weight.\n3) Open Prices tab and set price.\n4) Open Inventory tab and set manage_stock, qty, is_in_stock.\n5) Assign websites and categories using agent steps (these are installation-specific and may require DOM reasoning).\n6) Click the requested Save action and wait for save to complete.\n7) Extract admin messages to confirm the result.\n\nVariable Identification (inputs):\n- base_url (host + scheme from recording)\n- product_id (product identifier in URL)\n- name, sku, weight, price (string/number editable fields)\n- status, visibility (visible option text values for selects)\n- category_ids, website_ids (comma-separated lists for assignment)\n- qty, manage_stock, is_in_stock (inventory fields)\n- save_action (exact title text of the save button to click)\n\nStep Optimization & Determinism:\n- Use direct navigation to the product edit URL (faster & deterministic).\n- Prefer id and name attribute selectors observed in the recording (#name,#sku,#weight,#price and name-based stock_data selectors) to resolve to exactly one element.\n- Use label-anchored XPath patterns as fallbacks where IDs may not exist.\n- Convert the website and category assignments to small agent tasks because they depend on per-installation DOM (checkbox trees, hidden inputs, or separate chooser pages). This avoids brittle selectors and handles modal/tree interactions.\n- Avoid conditional branching in step sequence; instead steps will act using the provided input values. If a value is omitted the corresponding input will receive an empty string (caller should provide values to change). The save action is selected by matching the provided save_action text to the button's title attribute.\n\nConstraints and Assumptions:\n- The browser session must already be authenticated as admin (recording shows admin login was done earlier).\n- Admin frontName is 'admin' as in the recorded URLs; if customized, caller must pass an appropriate base_url that includes adjusted path.\n- For safety the tool does not perform Delete or Duplicate automatically\u2014those were demonstrated in the recording but the tool's single purpose is edit+save. Category and website assignments are handled via agent steps to ensure reliability across installs.\n\nSelectors used in steps are taken from the recorded session and chosen for stability: id-based (#name,#sku,#weight,#price), name-based for stock (product[stock_data][...]), toolbar buttons (title attribute), and tab anchors (href patterns).",
+  "name": "magento_edit_product",
+  "description": "Edit a Magento 1.x product in the Admin product edit page and persist changes. Navigates to the product edit URL, updates General/Prices/Inventory fields (name, sku, weight, price, status, visibility, qty, manage_stock, is_in_stock, category_ids, website_ids) using stable selectors observed in the recorded session, and clicks the requested save action (Save or Save and Continue Edit). Assumes an authenticated admin session is already available in the browser context.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate directly to the product edit page for the requested product id.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/catalog_product/edit/id/{product_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Short wait to allow admin UI widgets to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Open the General tab to ensure General fields are visible.",
+      "output": null,
+      "cssSelector": "a[href='#product_info_tabs_general']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for General tab panel to become visible.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set product Name using '#name'. If {name} is empty the step will leave the field unchanged (input of empty string).",
+      "output": null,
+      "cssSelector": "#name",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Set product SKU using '#sku'.",
+      "output": null,
+      "cssSelector": "#sku",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Set product Weight using '#weight'.",
+      "output": null,
+      "cssSelector": "#weight",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{weight}"
+    },
+    {
+      "description": "Open the Prices tab where the Price input is located.",
+      "output": null,
+      "cssSelector": "#product_info_tabs_prices_tab a, a[href*='prices']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the Prices tab panel to render (Prices panel may be lazy-loaded).",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set product Price. Targets input#price or input[name='product[price]'].",
+      "output": null,
+      "cssSelector": "input#price, input[name='product[price]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{price}"
+    },
+    {
+      "description": "Open the Inventory tab to access stock controls (Qty, Manage Stock, Stock Availability).",
+      "output": null,
+      "cssSelector": "a[title='Inventory'], //a[normalize-space(.)='Inventory']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for Inventory tab contents to be visible.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set Manage Stock by visible option text (e.g. 'Yes', 'No', 'Use Config Settings').",
+      "output": null,
+      "cssSelector": "select[name='product[stock_data][manage_stock]'], select[name*='manage_stock']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{manage_stock}"
+    },
+    {
+      "description": "Set inventory Quantity (qty).",
+      "output": null,
+      "cssSelector": "input[name='product[stock_data][qty]'], input[id$='qty']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{qty}"
+    },
+    {
+      "description": "Set Stock Availability by visible option text (e.g. 'In Stock' or 'Out of Stock').",
+      "output": null,
+      "cssSelector": "select[name='product[stock_data][is_in_stock]'], select[name*='is_in_stock']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{is_in_stock}"
+    },
+    {
+      "description": "Website assignment is implemented as an agent step because website checkboxes are rendered per-installation and may require row-scoped clicks. Input {website_ids} should be a comma-separated list of website id values or empty.",
+      "output": null,
+      "type": "agent",
+      "task": "Assign websites by checking inputs named product[website_ids][] matching values in the comma-separated parameter {website_ids}. For each id in {website_ids} click the checkbox input[name='product[website_ids][]'][value='{id}'] if present.",
+      "max_steps": 4
+    },
+    {
+      "description": "Categories are often managed with a tree chooser; this agent step will attempt to set category ids from {category_ids} using the most stable method available in DOM.",
+      "output": null,
+      "type": "agent",
+      "task": "Assign categories by setting hidden inputs or clicking category tree checkboxes for each id in comma-separated parameter {category_ids}. Use inputs named product[category_ids][] or open Categories chooser if necessary.",
+      "max_steps": 6
+    },
+    {
+      "description": "Click the requested save action. This uses the exact save_action title text provided in input (e.g. 'Save' or 'Save and Continue Edit').",
+      "output": null,
+      "cssSelector": "button[title='{save_action}'], button#save, input[title='{save_action}']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for save to process and for any loading overlay to clear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract success/error messages (e.g., 'The product has been saved.' or 'Total of X record(s) have been deleted.') from the admin messages area (ul.messages or #messages).",
+      "output": "save_result",
+      "type": "extract_page_content",
+      "goal": "Capture admin messages to confirm save success and return page state (product id may change after duplicate)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base site URL including scheme and host (example from recording: \"http://dockerized-magento.local\"). Do NOT include a trailing slash.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric product id to edit (example: \"2796\").",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Product Name to set. Target input: CSS selector '#name' (or input[name='product[name]']). Provide full text for the field.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "format": null,
+      "description": "Product SKU to set. Target input: CSS selector '#sku' (or input[name='product[sku]']).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "weight",
+      "type": "string",
+      "format": null,
+      "description": "Weight value to set (numeric string). Target input: CSS selector '#weight' or input[name='product[weight]'].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price",
+      "type": "string",
+      "format": null,
+      "description": "Price value to set (decimal string). Target input: CSS selector \"input#price\" or input[name='product[price]'].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Status visible option text to select (examples: 'Enabled' or 'Disabled'). Uses label-based XPath or select#status. Provide the visible option text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visibility",
+      "type": "string",
+      "format": null,
+      "description": "Visibility visible option text to select (examples: 'Catalog, Search', 'Catalog', 'Search', 'Not Visible Individually'). Uses select#visibility or label-based XPath.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "category_ids",
+      "type": "string",
+      "format": null,
+      "description": "Comma-separated category ids to assign (example: '2,10,15'). This tool does not expand the categories tree; it will attempt to set hidden input(s) if present (input[name='product[category_ids][]']).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "website_ids",
+      "type": "string",
+      "format": null,
+      "description": "Comma-separated website ids to assign (example: '1,2'). Tool will target checkbox inputs named product[website_ids][] with matching value attributes.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty",
+      "type": "number",
+      "format": null,
+      "description": "Inventory quantity to set. Target input: input[name='product[stock_data][qty]'].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "manage_stock",
+      "type": "string",
+      "format": null,
+      "description": "Visible option text for Manage Stock (examples: 'Yes', 'No', or 'Use Config Settings'). Targets select[name='product[stock_data][manage_stock]'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_in_stock",
+      "type": "string",
+      "format": null,
+      "description": "Visible option text for Stock Availability (examples: 'In Stock' or 'Out of Stock'). Targets select[name='product[stock_data][is_in_stock]'].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "save_action",
+      "type": "string",
+      "format": null,
+      "description": "Which save action to click after edits. Provide exact button title text as in admin (examples: 'Save' OR 'Save and Continue Edit'). The step will click button[title='{save_action}'].",
+      "required": true,
+      "enum": null
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "tool_analysis": "Step Analysis:\n- This recorded sequence authenticates (already assumed) and automates: 1) navigate to admin order view for a given internal order id, 2) click the 'Reorder' action, 3) wait for the New Order draft (sales_order_create) to appear, 4) click 'Submit Order' to create the order, and 5) capture the result. The recorded session shows these actions succeeded and produced a new order (example result #145000021).\n\nTask Definition:\n- Create a deterministic, reusable browser automation tool that reproduces the recorded Reorder->Submit flow for any order by internal order_entity_id. The tool must locate actions using stable, scoped XPath selectors and extract relevant page data (order_view, new_order_page, create_result). It must optionally extract CSRF form_key when present.\n\nAction Plan (detailed):\n1) Navigate directly to admin order view URL using provided base_url and order_entity_id (deterministic URL navigation avoids menu clicks).\n2) Extract the order view page to confirm the order and to capture any direct href for Reorder and optionally a form_key.\n3) Click the Reorder control. Use attribute-based XPath that includes the order_entity_id to ensure exact targeting (a[href*=\"sales_order/reorder\"][href*=\"order_id/{order_entity_id}\"]).\n4) Wait for navigation to the New Order page (small wait time parameterized).\n5) Extract the New Order page to read items, totals, presence of Submit Order, and optionally form_key.\n6) Click the Submit Order control using a robust XPath that matches button, input, or anchor variants.\n7) Wait for completion and extract the resulting Order View to confirm creation and capture identifying information.\n\nVariable Identification (inputs):\n- base_url (string, required): the admin host and protocol, used to construct direct navigation URLs.\n- order_entity_id (string, required): internal numeric id used in admin URLs (the order_id query param). Using entity id in href-based XPath yields deterministic matching.\n- expected_grand_total (string, optional): used only to include a verification value in final extraction output; not required for function.\n- check_form_key (bool, optional): if true, tool will extract input[name='form_key'] values when present and include them in outputs.\n- wait_after_click_seconds (number, optional): allows tuning waits for slow environments (default used by steps when omitted).\n\nStep Optimization:\n- Replaced UI menu navigation with a direct deterministic navigation to the order view URL: {base_url}/index.php/admin/sales_order/view/order_id/{order_entity_id}/. This avoids brittle clicks on the Sales->Orders menu.\n- Used attribute-based XPath that matches the admin reorder href pattern and includes the order_entity_id parameter to uniquely identify the correct Reorder element. This addresses previous test failures caused by ambiguous selectors resolving to multiple elements.\n- For Submit Order used an XPath union that covers button/input/anchor implementations across admin themes to be robust without depending on fragile class names.\n- Added explicit wait steps after clicks/navigation to handle timing issues found in earlier attempts.\n- Kept explicit extraction steps before and after actions to collect hrefs, potential form_key values, and confirmation messages; this helps debugging and makes the tool verifiable.\n\nDeterminism and Essential Steps Only:\n- All steps are essential to achieve the single task: create a new order from an existing order. No exploratory or optional filtering/sorting steps are included.\n- No authentication steps are included per instructions (assumes an active logged-in admin session in the browser context). If the target environment is not logged in, the navigation will land on the login page and the extractions will surface that requirement.\n\nSelector Robustness and Failure Mitigation:\n- Prefer XPath that includes order_entity_id in the href when available to avoid selecting Reorder controls for other orders.\n- If form_key is required in other environments, the tool extracts it (when check_form_key=true) so callers can record or use it for API-style requests; on this demo instance formkey validation was disabled and the tool still functions.\n\nOutputs:\n- The tool stores three extraction outputs: order_view (pre-reorder), new_order_page (after clicking Reorder), and create_result (final order view after Submit). Each output contains the extracted page text, found hrefs, and any form_key when requested.\n\nNotes/Limitations:\n- The tool assumes the browser session is already authenticated to the Magento admin and that the admin theme uses URLs that include the order_id parameter in reorder hrefs. If the admin theme implements Reorder as a JS-triggered POST within a form, the attribute-based href click may not apply; the extract_page_content step will capture the form and form_key so the caller can adapt if needed.\n- The tool intentionally avoids trying to log in or change store context; those would be separate tools.\n\nThis definition follows the two-pass approach: UI interactions were optimized to direct URL navigation where possible and deterministic XPaths were used to avoid ambiguous selectors which caused prior failures.",
+  "name": "create_order_from_existing_order",
+  "description": "Given an existing admin order (entity id), navigate to its Order View, click the Reorder control to open a New Order draft, then click Submit Order to create the new order. Assumes an active, logged-in admin browser session. Uses XPath selectors scoped to order id and visible button text. Returns extracted page outputs at key steps (order_view, new_order_page, create_result).",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate directly to the admin Order View page for the provided internal order_entity_id (no UI menu navigation).",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/sales_order/view/order_id/{order_entity_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Capture Order View details to confirm we're on correct order and to read any Reorder href or form_key present.",
+      "output": "order_view",
+      "type": "extract_page_content",
+      "goal": "Locate the 'Reorder' action and capture surrounding order view information (order number, visible action bar text, any anchor hrefs). Also look for input[name='form_key'] when {check_form_key} is true."
+    },
+    {
+      "description": "Click the Reorder control scoped by the known order_entity_id. This targets the admin reorder href pattern (sales_order/reorder/order_id/{order_entity_id}).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[contains(@href,'/sales_order/reorder') and contains(@href,'order_id/{order_entity_id}')][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the New Order (sales_order_create) page to load after clicking Reorder.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Confirm Reorder landed on the New Order draft page and extract totals/items and CSRF token if requested.",
+      "output": "new_order_page",
+      "type": "extract_page_content",
+      "goal": "On the New Order page capture key controls: presence of 'Submit Order', items list, order totals, and (optionally) input[name='form_key'] value."
+    },
+    {
+      "description": "Click the visible 'Submit Order' control. Uses multiple XPath alternatives to match button/input/link variants across admin themes.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//button[normalize-space(.)='Submit Order'] | //input[@value='Submit Order'] | //a[normalize-space(.)='Submit Order'])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the create-order action to complete and the resulting Order View (confirmation) to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Final extraction to confirm creation of the new order and return identifying information (new increment id, totals, confirmations).",
+      "output": "create_result",
+      "type": "extract_page_content",
+      "goal": "Capture the resulting Order View confirmation page (look for 'The order has been created.' message, new order increment id, and the order totals). Include extracted form_key if {check_form_key} is true. If expected_grand_total was provided, include it in the output object for quick comparison."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base URL of the Magento admin site including protocol and host (e.g. \"http://dockerized-magento.local\"). Must be the same host and admin session already authenticated in the browser.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_entity_id",
+      "type": "string",
+      "format": null,
+      "description": "Internal order entity id used in admin URLs (numeric string), e.g. \"204\". This is the 'order_id' parameter in admin URLs.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "expected_grand_total",
+      "type": "string",
+      "format": null,
+      "description": "Optional: expected grand total of the created order (e.g. \"$289.87\"). If provided, the final extraction will include this value for quick verification.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "check_form_key",
+      "type": "bool",
+      "format": null,
+      "description": "Optional boolean. If true the tool will extract the input[name='form_key'] value from pages where present and include it in outputs. Default: false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_after_click_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Optional number of seconds to wait after clicks/navigation to allow page load (default: 2). Use larger values on slow environments.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

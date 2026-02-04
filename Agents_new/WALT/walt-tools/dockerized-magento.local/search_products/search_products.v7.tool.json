@@ -1,0 +1,405 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded steps navigate to the Magento Admin Manage Products grid, apply header filters (ID, SKU, Name, Price, Qty and selects like Type/Attrib. Set/Visibility/Status/Websites), click Search, optionally select the first result, perform a mass-action (Change status / Delete / Update Attributes), submit it, then open the first result's Edit page. The recorded interactions include stable XPaths anchored to header link text and href patterns and demonstrated Add Product navigation and New Product selectors.\n\nTask Definition:\n- Provide a reusable automation tool that: 1) navigates to the Magento Admin products grid, 2) applies user-supplied header filters (text, numeric ranges and selects), 3) clicks Search, 4) selects the first visible row and applies a mass-action (with parameter), and 5) opens the product Edit page for the first result. The tool assumes the session is already authenticated.\n\nAction Plan (ordered deterministic steps):\n1) Navigate to provided admin_products_url. 2) Wait briefly and verify the grid loaded. 3) Fill header filters (sku, name, id range, price range, qty range). 4) Select header dropdowns (Type, Attribute Set, Visibility, Status, Websites). 5) Click Search and wait for refresh. 6) Capture search results. 7) Select first row checkbox. 8) Choose mass-action and (if Change status) set the status parameter. 9) Click Submit, wait and capture the result. 10) Click the Edit link on the first row and capture the Edit page.\n\nVariable Identification (inputs):\n- admin_products_url: absolute URL to the grid (required). Used to navigate directly to the grid (optimizes navigation). \n- open_first: boolean to indicate the tool will act on the first visible row (required to make selection deterministic). \n- sku, name: text fields to fill SKU/Name filters. \n- id_from, id_to: numeric strings for ID range filter (two inputs). \n- price_from, price_to: range values for Price filter. \n- qty_from, qty_to: range values for Qty filter. \n- type, attribute_set, visibility, status, website: visible option texts for header select filters. These map directly to the select fields used in the recorded session. \n- mass_action: visible action text chosen from the Actions select (required - demonstration core). \n- mass_action_status: visible text for the status parameter when Change status is chosen. \n- table_selector: optional override for the grid table selector when header-text XPaths are not usable in custom admin themes.\n\nStep Optimization and Determinism:\n- Navigation is optimized by directly using the provided admin_products_url instead of clicking through menus. \n- XPaths are anchored to visible header anchor text (e.g. //a[normalize-space(.)='SKU']/ancestor::th//input[1]) so they remain robust across class/id changes and column order shifts. \n- The tool acts deterministically on the first visible row to avoid fragile row-position branching; requiring open_first true ensures consistent behavior. \n- Mass-action parameter selection targets the parameter controls that appear adjacent to the mass-action control (common Magento pattern). \n- Wait steps inserted after navigation, Search and Submit to allow async JS grid refresh.\n\nNotes / Caveats:\n- The tool assumes the automation context is already authenticated in Magento Admin (no login step included). If the environment requires login, call the login workflow before this tool.\n- If your Magento admin is localized (labels translated) or the theme significantly changes header texts, set table_selector or update XPath label text accordingly.\n- The tool intentionally avoids fragile class-only selectors and uses header-text anchored XPaths; if a grid has non-standard header text, provide table_selector to scope selectors.\n\nThis tool implements only the essential actions required by the original task (apply filters, mass-action, open Edit). It avoids optional exploratory steps and keeps a single-purpose sequence.",
+  "name": "magento_admin_find_and_open_product_tool",
+  "description": "Tool to find products in Magento Admin product grid using provided filter criteria (id range, sku, name, price range, qty range, selects) then apply a mass-action and open a product for editing. Deterministic selectors use column-header anchored XPaths so the tool is robust to CSS/class changes. Assumes the automation context is already authenticated in the Magento Admin session.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Admin Manage Products grid URL provided by {admin_products_url}.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_products_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the grid to load and any JS to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Capture page to confirm the grid and filter row are present before applying filters.",
+      "output": "grid_before_search",
+      "type": "extract_page_content",
+      "goal": "Verify Manage Products grid loaded and capture available filters and actions (used for validation)."
+    },
+    {
+      "description": "Enter SKU filter text into the SKU filter input (first input under the SKU header). Leave blank if {sku} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='SKU']/ancestor::th//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Enter Name filter text into the Name filter input. Leave blank if {name} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='Name']/ancestor::th//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Enter ID 'From' value into the ID range filter (first input). Leave blank if {id_from} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//a[normalize-space(.)='ID']/ancestor::th//input)[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{id_from}"
+    },
+    {
+      "description": "Enter ID 'To' value into the ID range filter (second input). Leave blank if {id_to} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//a[normalize-space(.)='ID']/ancestor::th//input)[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{id_to}"
+    },
+    {
+      "description": "Enter Price 'From' value into the Price range filter (first input). Leave blank if {price_from} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//a[normalize-space(.)='Price']/ancestor::th//input)[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{price_from}"
+    },
+    {
+      "description": "Enter Price 'To' value into the Price range filter (second input). Leave blank if {price_to} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//a[normalize-space(.)='Price']/ancestor::th//input)[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{price_to}"
+    },
+    {
+      "description": "Enter Qty 'From' into the Qty range filter (first input). Leave blank if {qty_from} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//a[normalize-space(.)='Qty']/ancestor::th//input)[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{qty_from}"
+    },
+    {
+      "description": "Enter Qty 'To' into the Qty range filter (second input). Leave blank if {qty_to} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//a[normalize-space(.)='Qty']/ancestor::th//input)[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{qty_to}"
+    },
+    {
+      "description": "Select a value in the Type column filter by visible text. Leave blank if {type} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='Type']/ancestor::th//select",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{type}"
+    },
+    {
+      "description": "Select an Attribute Set in the header filter by visible text. Leave blank if {attribute_set} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='Attrib. Set Name']/ancestor::th//select",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{attribute_set}"
+    },
+    {
+      "description": "Re-enter SKU (duplicate step to ensure change detection works on some Magento builds).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='SKU']/ancestor::th//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Select a value in the Visibility header filter by visible text. Leave blank if {visibility} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='Visibility']/ancestor::th//select",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{visibility}"
+    },
+    {
+      "description": "Select a value in the Status header filter by visible text. Leave blank if {status} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='Status']/ancestor::th//select",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Select a Website in the header filter by visible text. Leave blank if {website} is empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='Websites']/ancestor::th//select",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{website}"
+    },
+    {
+      "description": "Click the Search button to apply all header filters.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space(.)='Search'] | //input[@value='Search']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after Search.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Extract the current grid rows and capture the first row's details for verification.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Capture filtered search results (rows, edit links, counts)."
+    },
+    {
+      "description": "Select the first visible product row (checkbox) so mass-action applies to it. This tool assumes {open_first} is true.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//table//tbody//tr)[1]//input[@type='checkbox']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Choose the mass-action from the Actions dropdown by visible text (example: 'Change status').",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//select[contains(@name,'massaction') or contains(@id,'massaction')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{mass_action}"
+    },
+    {
+      "description": "If mass_action is 'Change status', set the Status parameter dropdown to the requested visible text (e.g., 'Disabled'). Leave blank if not applicable.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//select[contains(@name,'status') and ancestor::div[contains(@class,'massaction')]] | //select[contains(@id,'status') and ancestor::div[contains(@class,'massaction')]]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{mass_action_status}"
+    },
+    {
+      "description": "Click the Submit button to apply the selected mass action to the selected row(s).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space(.)='Submit'] | //input[@value='Submit']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the mass-action to be processed and the grid to refresh.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Collect page messages and updated row statuses after mass-action submission.",
+      "output": "mass_action_result",
+      "type": "extract_page_content",
+      "goal": "Capture grid after mass-action to verify action result and notifications."
+    },
+    {
+      "description": "Open the Edit page for the first visible product row (click the Edit link in the Action column).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//table//tbody//tr)[1]//a[contains(normalize-space(.),'Edit') or contains(@href,'/catalog_product/edit/')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the product Edit page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract the product edit page content to confirm the page open and identify Save/Back controls.",
+      "output": "product_edit_page",
+      "type": "extract_page_content",
+      "goal": "Capture the product Edit page to confirm navigation and collect top action button selectors (Save/Back/Delete) for verification."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_products_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL to the Magento Admin Manage Products grid (example: 'http://dockerized-magento.local/index.php/admin/catalog_product/'). Tool will navigate to this URL first.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "open_first",
+      "type": "bool",
+      "format": null,
+      "description": "If true the tool will target the first visible product row for selection and opening its Edit page. Set to true to use the first row; set to false only if you will isolate a single product via filters and want to click a product-specific Edit link (still uses first visible row).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "format": null,
+      "description": "SKU filter text to enter in the SKU column filter. Leave empty to skip/clear SKU filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Name filter text to enter in the Name column filter. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "id_from",
+      "type": "string",
+      "format": null,
+      "description": "ID 'From' value for the ID numeric range filter (enter numeric string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "id_to",
+      "type": "string",
+      "format": null,
+      "description": "ID 'To' value for the ID numeric range filter (enter numeric string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price_from",
+      "type": "string",
+      "format": null,
+      "description": "Price 'From' for the Price range filter. Use decimal string (e.g. '10.00').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price_to",
+      "type": "string",
+      "format": null,
+      "description": "Price 'To' for the Price range filter. Use decimal string (e.g. '50.00').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty_from",
+      "type": "string",
+      "format": null,
+      "description": "Qty 'From' for the Qty numeric range filter (integer string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty_to",
+      "type": "string",
+      "format": null,
+      "description": "Qty 'To' for the Qty numeric range filter (integer string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "format": null,
+      "description": "Visible option text to select from the 'Type' filter dropdown (e.g., 'Simple Product'). Leave empty to not change the Type filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "attribute_set",
+      "type": "string",
+      "format": null,
+      "description": "Visible option text to select from the 'Attrib. Set Name' filter (e.g., 'Default'). Leave empty to not change.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visibility",
+      "type": "string",
+      "format": null,
+      "description": "Visible option text to select from the 'Visibility' filter (e.g., 'Catalog, Search'). Leave empty to not change.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Visible option text to select from the 'Status' filter (e.g., 'Enabled' or 'Disabled'). Leave empty to not change.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "website",
+      "type": "string",
+      "format": null,
+      "description": "Visible option text to select from the 'Websites' filter (e.g., 'Main Website'). Leave empty to not change.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "mass_action",
+      "type": "string",
+      "format": null,
+      "description": "Mass action visible text to choose from the Actions dropdown (examples: 'Change status', 'Delete', 'Update Attributes'). This tool demonstrates selecting the action then clicking Submit.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "mass_action_status",
+      "type": "string",
+      "format": null,
+      "description": "If mass_action is 'Change status', set this to the visible status option you want (e.g., 'Disabled'). Leave empty if not applicable.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "table_selector",
+      "type": "string",
+      "format": null,
+      "description": "Optional CSS selector or XPath for the grid table if the default header-text anchored selectors do not work in your Magento build (example CSS: '#productGrid_table'). Leave empty to use header-text anchored XPaths.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

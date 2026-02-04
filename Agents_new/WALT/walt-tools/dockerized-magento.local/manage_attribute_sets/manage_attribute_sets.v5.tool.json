@@ -1,0 +1,80 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session logs a full workflow: navigate to Magento admin Manage Attribute Sets page, filter by Set Name, apply Search, locate and click the attribute set link to open its editor; also demonstrates creating a new attribute set via Add New Set when needed. The page sometimes displays an incoming message popup that can block UI controls; the grid filter and edit links are reliably located by XPath using visible text or a row-scoped anchor.\n\nTask Definition:\n- Purpose: Given an attribute set name, open its editor in Magento 1 admin Manage Attribute Sets. Optionally create the attribute set if it does not exist and create_if_missing is true, selecting a skeleton 'Based On' set.\n- Assumptions: Browser session is already authenticated to Magento admin. The tool will use the Manage Attribute Sets URL by default but accepts a custom URL.\n\nAction Plan:\n1. Navigate to the Manage Attribute Sets URL.\n2. Wait briefly for page load and extract a snapshot to confirm the grid is present.\n3. Use an agentic step to handle dynamic behavior: search the grid for an anchor whose visible text equals the requested attribute_set_name; if found, click it. If not found and create_if_missing is true, click Add New Set, fill Name and Based On, Save, return to the grid and click the new set. Use robust XPath selectors for each action and limit internal attempts.\n4. Wait for the edit page to load and extract the edit page snapshot including Name input and Save button selectors.\n\nVariable Identification (inputs required):\n- attribute_set_name (string, required): exact visible name of the attribute set to open.\n- create_if_missing (bool, optional): whether to create the attribute set if it's not present. Default false.\n- based_on (string, optional): which existing set to use as skeleton when creating; default 'Default'.\n- admin_attribute_sets_url (string, optional): full URL to the Manage Attribute Sets page; default is the recorded URL 'http://dockerized-magento.local/index.php/admin/catalog_product_set/'.\n\nStep Optimization and Selector Choices:\n- Prefer XPath selectors that match visible text or locate the Set Name column header then the input inside it (e.g. //th[.//text()[contains(.,'Set Name')]]//input[1]) because CSS cannot reliably match visible text in many automation engines.\n- For clicking the Edit link, prefer the row-scoped XPath: //table//tbody//tr[td[normalize-space(.)='{attribute_set_name}']]//a[1] which is robust against other page anchors.\n- For Add New Set and Save, use exact visible-text XPath: //a[normalize-space(.)='Add New Set'] and (//button[contains(normalize-space(.),'Save')])[1]. These were stable in the recorded session.\n- Modal/pop-up close is not added as a separate unconditional step to keep the path minimal; the agent step will try to handle blocking popups if they interfere (the agent's internal routine should use modal-close selectors when necessary).\n\nWhy an agent step?\n- The session shows intermittent navigation and dynamic UI content (popups and occasional mis-clicks). To be robust across different Magento installs and small DOM variations, the agent step is used to make existence checks and perform conditional creation when required. This keeps the main sequence deterministic while allowing necessary dynamic behavior.\n\nEssential-only steps:\n- The tool only performs actions essential to the core task: load the page, locate or create the attribute set, open the editor, and confirm edit page controls. No extra filtering, sorting, or optional exploratory steps are included.\n\nRuntime notes:\n- The tool assumes an authenticated browser context.\n- If the target page uses a different language/localized labels, the href-based fallbacks (href contains 'catalog_product_set/edit' or '.../new') should be used by the agent implementation.\n\n",
+  "name": "magento_open_or_create_attribute_set",
+  "description": "Locate an attribute set by name on Magento 1 admin Manage Attribute Sets page and open it for editing. If the set is not found and create_if_missing=true, create it using the provided 'based_on' skeleton, then open the newly-created set's editor. Assumes the browser session is already authenticated as an admin user.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to the Manage Attribute Sets admin page. If admin_attribute_sets_url is not provided, the system should use the default Manage Attribute Sets URL.",
+      "output": "manage_page_navigation",
+      "type": "navigation",
+      "url": "{admin_attribute_sets_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the Manage Attribute Sets page to render after navigation.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Collect page-level information to help the agent step decide whether the target row exists.",
+      "output": "manage_page_snapshot",
+      "type": "extract_page_content",
+      "goal": "Confirm the Manage Attribute Sets grid loaded and capture basic page state (presence of Add New Set, filter row and grid rows)."
+    },
+    {
+      "description": "Agentic step to handle dynamic existence checks and conditional creation flow; executes up to 6 sub-steps to either open the set or create-and-open it.",
+      "output": "open_or_create_result",
+      "type": "agent",
+      "task": "Find an attribute set row whose Set Name equals '{attribute_set_name}' on the loaded Manage Attribute Sets page. If the row is present, click the link (the anchor inside that row's Set Name cell) to open the attribute-set editor. If no matching row is found and {create_if_missing} is true, click the 'Add New Set' control, fill the Name input with '{attribute_set_name}', choose the skeleton set named '{based_on}' (or 'Default' if {based_on} is empty), click Save, then navigate back to the Manage Attribute Sets grid and click the newly created attribute-set link. Use these robust selectors (try them in order):\n\n- Open grid row link by exact visible text: //a[normalize-space(text())='{attribute_set_name}']\n- Scoped row anchor: //table//tbody//tr[td[normalize-space(.)='{attribute_set_name}']]//a[1]\n- Edit-action in row: //table//tbody//tr[td[normalize-space(.)='{attribute_set_name}']]//a[contains(@href,'catalog_product_set/edit') or contains(@title,'Edit')]\n\nFor creating a new set use:\n- Add New Set: //a[normalize-space(.)='Add New Set']\n- Name input on Add page: //label[contains(normalize-space(.),'Name')]/following::input[1]\n- Based On select: //label[contains(normalize-space(.),'Based On')]/following::select[1]\n- Save button on Add page: (//button[contains(normalize-space(.),'Save') or contains(@title,'Save')])[1]\n\nLimit internal attempt steps to 6. Provide the final action (clicked element xpath) and resulting page URL in the agent output.",
+      "max_steps": 6
+    },
+    {
+      "description": "Wait for the attribute set edit page to load after the click from the agent step.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Capture the edit page state and return selectors for verification: Name input (//label[contains(normalize-space(.),'Name')]/following::input[1]) and Save ((//button[contains(normalize-space(.),'Save')])[1]).",
+      "output": "edit_page_snapshot",
+      "type": "extract_page_content",
+      "goal": "Confirm the attribute set editor loaded and extract key controls: attribute set Name input, Save button, and attribute group/attribute lists."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "attribute_set_name",
+      "type": "string",
+      "format": null,
+      "description": "Exact attribute set name to locate and open for editing (visible text in the grid).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "create_if_missing",
+      "type": "bool",
+      "format": null,
+      "description": "If true and the attribute set is not found, create a new attribute set with the provided name. Default: false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "based_on",
+      "type": "string",
+      "format": null,
+      "description": "When creating a new attribute set, select this existing set as the skeleton (e.g., 'Default'). If omitted, 'Default' will be used.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "admin_attribute_sets_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the Manage Attribute Sets admin page. If omitted, the tool navigates to 'http://dockerized-magento.local/index.php/admin/catalog_product_set/'.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

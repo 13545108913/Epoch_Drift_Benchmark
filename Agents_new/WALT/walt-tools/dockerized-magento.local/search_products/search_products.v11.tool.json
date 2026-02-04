@@ -1,0 +1,309 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session logs show: navigation to Magento admin product grid URL, fall-back to login (handled earlier), successful login, product grid analysis (selectors captured), clicking an Edit link and opening the product edit page (id=2785). The captured selectors use header-text-scoped XPaths for stability and known Magento IDs for massaction and Add Product where available.\n\nTask Definition:\n- Single deterministic task: navigate to a Magento admin product grid, set filter values provided by the caller (ID/name/SKU/price/qty/type/attribute set/visibility/status/website), apply filters, then open the specified product's Edit page by navigating directly to the edit URL for the given product_id. Authentication is intentionally omitted (assumes logged-in browser session).\n\nAction Plan (detailed ordered steps):\n1) Navigate to product grid URL. 2) Wait briefly for grid and filters to initialize. 3) Fill ID from/to inputs.\n4) Fill Name and SKU text filters.\n5) Fill Price from/to and qty from/to.\n6) Set Type, Attribute Set, Visibility, Status, Websites selects (using visible option text). 7) Click 'Search' to apply filters and wait for refresh. 8) Navigate directly to the product Edit URL constructed from grid_url and product_id. 9) Wait for product edit page to load.\n\nVariable Identification (inputs required for reuse):\n- grid_url (string, required): exact product grid URL recorded in session.\n- product_id (string, required): numeric product id to open; used to build deterministic edit URL.\n- entity_id_from, entity_id_to, name, sku, price_from, price_to, qty_from, qty_to (strings, optional): filter text/numeric values mapped directly to filter inputs.\n- type_id, attribute_set_id, visibility, status, website_id (strings, optional): visible option text for select filters.\n- wait_seconds (number, optional): tuning for slow environments.\n\nStep Optimization and Rationale:\n- Replaced brittle UI click on a row's 'Edit' anchor with a direct navigation to the canonical edit URL (/catalog_product/edit/id/{product_id}/). This is deterministic and avoids selector ambiguity/pagination side effects.\n- Prefer header-text-scoped XPaths (e.g., //th[.//a[contains(normalize-space(.),'Name')]]//input) rather than positional CSS nth-of-type selectors; header-text scoping survives column reorderings.\n- Kept explicit UI interactions for filters and the Search click because many Magento admin grids apply filter state client-side or via POST/AJAX; these steps reproduce the user flow reliably.\n- All input selectors are stable XPaths extracted from the recorded session and tuned to resolve to a single control in the header filter row.\n\nConstraints and assumptions:\n- The tool requires an already-authenticated admin browser session in the context where it runs (no login steps included).\n- The grid_url should match the environment's admin frontName and include trailing slash. If the admin frontName differs, the edit URL pattern may need adjustment.\n- select_change steps expect the visible option text exactly as shown in the admin UI.\n\nFailure-mode guidance:\n- If a selector fails to resolve (due to heavy customizations), increase wait_seconds or inspect the grid DOM and replace the XPath with an environment-specific id or data-* attribute (data-index/data-column) as recommended in the recorded analysis.\n- If direct navigation to the edit URL hits a permission or routing error, verify the session is authenticated and the admin frontName has not been changed.\n\nThis tool is intentionally single-purpose and deterministic: given a grid_url and product_id (plus optional filters), it navigates to the grid, applies filters, and opens the product edit page by URL construction.",
+  "name": "magento_find_and_open_product",
+  "description": "Navigate to Magento admin product grid, apply product filters (id, name, sku, price range, qty range, type, attribute set, visibility, status, website) and open a specific product Edit page by product id. Assumes the session is already authenticated in the browser context.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento admin product grid URL (assumes logged-in admin session).",
+      "output": null,
+      "type": "navigation",
+      "url": "{grid_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the grid and filter controls to initialize (adjust with wait_seconds input if necessary).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Enter ID 'From' filter (entity_id[from]). Provide empty string if not used.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[contains(normalize-space(.),'ID')] or contains(normalize-space(.),'ID') or .//span[text()='ID']]//input[@type='text' or @type='number' or @type='search'][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{entity_id_from}"
+    },
+    {
+      "description": "Enter ID 'To' filter (entity_id[to]). Provide empty string if not used.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[contains(normalize-space(.),'ID')] or contains(normalize-space(.),'ID') or .//span[text()='ID']]//input[@type='text' or @type='number' or @type='search'][2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{entity_id_to}"
+    },
+    {
+      "description": "Enter Name filter (name).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[contains(normalize-space(.),'Name')] or contains(normalize-space(.),'Name') or .//span[text()='Name']]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Enter SKU filter (sku).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[contains(normalize-space(.),'SKU')] or contains(normalize-space(.),'SKU') or .//span[text()='SKU']]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Enter Price 'From' filter (price[from]).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[contains(normalize-space(.),'Price')] or contains(normalize-space(.),'Price') or .//span[text()='Price']]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{price_from}"
+    },
+    {
+      "description": "Enter Price 'To' filter (price[to]).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[contains(normalize-space(.),'Price')] or contains(normalize-space(.),'Price') or .//span[text()='Price']]//input[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{price_to}"
+    },
+    {
+      "description": "Enter Qty 'From' filter (qty[from]).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[contains(.,'Qty') or .//a[contains(normalize-space(.),'Qty')]]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{qty_from}"
+    },
+    {
+      "description": "Enter Qty 'To' filter (qty[to]).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[contains(.,'Qty') or .//a[contains(normalize-space(.),'Qty')]]//input[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{qty_to}"
+    },
+    {
+      "description": "Select Product Type in the Type filter select (provide the visible option text exactly). Leave blank to skip selecting a value.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[contains(normalize-space(.),'Type')] or contains(normalize-space(.),'Type') or .//span[text()='Type']]//select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{type_id}"
+    },
+    {
+      "description": "Select Attribute Set (provide visible option text exactly).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[contains(normalize-space(.),'Attrib.') or contains(normalize-space(.),'Attrib. Set') or contains(normalize-space(.),'Attrib. Set Name')]//select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{attribute_set_id}"
+    },
+    {
+      "description": "Select Visibility filter option (visible option text).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[contains(.,'Visibility')]//select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{visibility}"
+    },
+    {
+      "description": "Select Status filter option (visible option text).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[contains(.,'Status')]//select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Select Website filter option (visible option text).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[contains(.,'Websites')]//select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{website_id}"
+    },
+    {
+      "description": "Click the Search / Apply Filters button to apply the filters.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//button[normalize-space(text())='Search' or @title='Search' or normalize-space(.)='Search'])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters. Increase wait_seconds input if needed.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Open the Edit page for the specified product id directly (reliable and deterministic). This replaces brittle 'click Edit' UI steps by constructing the canonical edit URL pattern from observed admin routes.",
+      "output": null,
+      "type": "navigation",
+      "url": "{grid_url}edit/id/{product_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Allow the product Edit page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "grid_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL to the Magento admin product grid (example: \"http://dockerized-magento.local/index.php/admin/catalog_product/\"). Must include trailing slash.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric product id to open for editing (will navigate to the edit page: /catalog_product/edit/id/{product_id}/). Use the product id from the grid or database.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "entity_id_from",
+      "type": "string",
+      "format": null,
+      "description": "Filter - ID (minimum). Matches the 'From' value in the ID filter header input (entity_id[from]).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "entity_id_to",
+      "type": "string",
+      "format": null,
+      "description": "Filter - ID (maximum). Matches the 'To' value in the ID filter header input (entity_id[to]).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Filter - Name. Text to enter into the Name filter input (matches product name substring).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "format": null,
+      "description": "Filter - SKU. Text to enter into the SKU filter input (matches SKU substring).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price_from",
+      "type": "string",
+      "format": null,
+      "description": "Filter - Price From (minimum price). Enter numeric value (no currency symbol).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price_to",
+      "type": "string",
+      "format": null,
+      "description": "Filter - Price To (maximum price). Enter numeric value (no currency symbol).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty_from",
+      "type": "string",
+      "format": null,
+      "description": "Filter - Quantity From (minimum qty).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty_to",
+      "type": "string",
+      "format": null,
+      "description": "Filter - Quantity To (maximum qty).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type_id",
+      "type": "string",
+      "format": null,
+      "description": "Filter - Product Type (visible option text). Example values: \"Simple Product\", \"Configurable Product\". Use the select option visible text exactly.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "attribute_set_id",
+      "type": "string",
+      "format": null,
+      "description": "Filter - Attribute Set (visible option text). Example: \"Default\" or other attribute set names as shown in the grid filter select.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visibility",
+      "type": "string",
+      "format": null,
+      "description": "Filter - Visibility (visible option text). Example values: \"Not Visible Individually\", \"Catalog\", \"Search\", \"Catalog, Search\".",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Filter - Status (visible option text). Example: \"Enabled\" or \"Disabled\".",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "website_id",
+      "type": "string",
+      "format": null,
+      "description": "Filter - Website (visible option text). Example: \"Main Website\".",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait after navigation or search to allow the grid to render. Default behavior: the tool will perform brief waits; set this to a higher number if the environment is slow.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

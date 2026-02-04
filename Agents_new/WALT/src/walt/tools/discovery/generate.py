@@ -294,7 +294,7 @@ async def _generate_test_optimize_tool(
     }
 
     base_tool = None
-    max_attempts = 5
+    max_attempts = 8
 
     # Phase 1: Generate and test base tool (up to 5 attempts)
     for attempt in range(1, max_attempts + 1):
@@ -547,6 +547,11 @@ Starting URL: {tool_data.get('start_url', 'Not specified')}
 
 Key interactions to demonstrate:
 {elements_text}
+
+IMPORTANT CREDENTIALS:
+If you encounter a login screen or need to authenticate to access the tool, strictly use the following credentials:
+- Username: admin
+- Password: password123
 
 IMPORTANT: Actually interact with controls to record stable selectors - avoid relying on dynamic content analysis when direct interaction is possible.
 

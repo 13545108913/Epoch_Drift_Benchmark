@@ -1,0 +1,178 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigates the Magento Admin Transactions page, logs in (outside this tool), then interacts with the grid filter inputs and selects to apply filters and click Search. Stable XPaths were recorded that map filter inputs by header text to avoid brittle column index reliance.\n\nTask Definition:\n- Build a deterministic, reusable tool that navigates to the Magento Admin transactions list, fills the filter row (transaction id, order id, payment method, transaction type, is_closed, created at range), clicks Search, waits for refresh, and extracts the results grid or 'No records found' message.\n\nAction Plan (detailed to-do):\n1. Navigate to {admin_transactions_url} and wait briefly for JS/UI to render.\n2. Input transaction_id into the Transaction ID filter input (XPath targeted by header text).\n3. Input order_id into the Order ID filter input.\n4. Select payment_method option by visible text in the Payment Method Name dropdown.\n5. Select transaction_type option by visible text.\n6. Select is_closed option by visible text ('Yes'/'No').\n7. Input created_at_from and created_at_to into the Created At from/to fields (ISO date string).\n8. Click the Search button (XPath resilient to button/input/anchor variants).\n9. Wait for grid refresh and extract page content: either result rows (with key columns) or 'No records found'.\n\nVariable Identification (inputs needed):\n- admin_transactions_url (required): where the grid lives; recorded interactions target that page.\n- transaction_id (optional): text filter for Transaction ID input.\n- order_id (optional): text filter for Order ID input.\n- payment_method (optional): visible option text for Payment Method Name select.\n- transaction_type (optional): visible option text for Transaction Type select.\n- is_closed (optional): visible option text for Is Closed select.\n- created_at_from / created_at_to (optional): ISO YYYY-MM-DD strings for date range.\n\nStep Optimization:\n- The original run used UI interactions and robust XPaths that locate filter cells by header text to remain stable when column order changes. This is retained because Magento admin grids commonly render filters in a thead.filter row and the XPaths provided are deterministic and unique per header.\n- URL-based shortcut (PASS 2) was considered but rejected: Magento admin grid filtering often requires form submission (POST or JS) and uses dynamic tokens; safe, deterministic automation is achieved by interacting with visible filter controls.\n- All filter steps are included and parameter-driven. No conditional branching is implemented: passing empty strings will result in clearing/keeping fields as the caller desires. This follows the requirement to keep the tool sequential and deterministic.\n\nSelector robustness notes:\n- XPaths map the filter cell by matching header text in the first header row then selecting the input/select in the 'filter' row; this approach minimizes brittle class-based selectors.\n- The Search button XPath covers common renderings (button, input[value='Search'], or anchor) and selects the first match.\n- Short waits are added where necessary to allow rendering/refresh; adjust durations if running in a slower environment.\n\nInputs are marked optional except for admin_transactions_url because authentication is handled externally and most filters should be optional for flexible searching.",
+  "name": "search_magento_admin_transactions",
+  "description": "Search the Magento Admin 'Transactions' grid by entering filter values (transaction id, order id, payment method, transaction type, is_closed, created at range) and return the results grid or 'No records found'. Assumes an already-authenticated admin session when running.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Admin Transactions page where the grid and filter row are present.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_transactions_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Short wait to allow the page and JS to render after navigation.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Enter the provided Transaction ID into the Transaction ID filter input. If '{transaction_id}' is empty, the field will be cleared.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table//thead//tr[contains(@class,'filter')]/th[count(preceding-sibling::th)=count(//table//thead//tr[1]/th[a[normalize-space(.)='Transaction ID']]/preceding-sibling::th)]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{transaction_id}"
+    },
+    {
+      "description": "Enter the provided Order ID into the Order ID filter input. If '{order_id}' is empty, the field will be cleared.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table//thead//tr[contains(@class,'filter')]/th[count(preceding-sibling::th)=count(//table//thead//tr[1]/th[a[normalize-space(.)='Order ID']]/preceding-sibling::th)]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{order_id}"
+    },
+    {
+      "description": "Select the provided payment method by visible text in the 'Payment Method Name' dropdown. Provide exact option text or an empty string to leave selection unchanged.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table//thead//tr[contains(@class,'filter')]/th[count(preceding-sibling::th) = count(//table//thead//tr[1]/th[a[normalize-space(.)='Payment Method Name']]/preceding-sibling::th)]//select",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{payment_method}"
+    },
+    {
+      "description": "Select the provided transaction type by visible text (e.g. 'Refund'). Use exact option text or an empty string to leave selection unchanged.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table//thead//tr[contains(@class,'filter')]/th[count(preceding-sibling::th) = count(//table//thead//tr[1]/th[a[normalize-space(.)='Transaction Type']]/preceding-sibling::th)]//select",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{transaction_type}"
+    },
+    {
+      "description": "Select the 'Is Closed' filter option by visible text ('Yes' or 'No'). Use empty string to leave unchanged.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table//thead//tr[contains(@class,'filter')]/th[count(preceding-sibling::th) = count(//table//thead//tr[1]/th[a[normalize-space(.)='Is Closed']]/preceding-sibling::th)]//select",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{is_closed}"
+    },
+    {
+      "description": "Enter the 'Created At' start date (From). Use ISO YYYY-MM-DD or leave empty to not filter by start date.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//table//thead//tr[contains(@class,'filter')]/th[count(preceding-sibling::th) = count(//table//thead//tr[1]/th[a[normalize-space(.)='Created At']]/preceding-sibling::th)]//input)[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_at_from}"
+    },
+    {
+      "description": "Enter the 'Created At' end date (To). Use ISO YYYY-MM-DD or leave empty to not filter by end date.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//table//thead//tr[contains(@class,'filter')]/th[count(preceding-sibling::th) = count(//table//thead//tr[1]/th[a[normalize-space(.)='Created At']]/preceding-sibling::th)]//input)[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_at_to}"
+    },
+    {
+      "description": "Click the Search button to apply the provided filters.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//button[normalize-space(.)='Search'] | //input[@value='Search'] | //a[normalize-space(.)='Search'])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters. Adjust wait if necessary for slow environments.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract the result rows. If no rows match, capture the 'No records found' message and return that instead.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Capture matching transactions rows (columns: ID #, Order ID, Transaction ID, Transaction Type, Is Closed, Created At) or the 'No records found' message; return structured results."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_transactions_url",
+      "type": "string",
+      "format": "url",
+      "description": "Full URL of the Magento Admin transactions page (example: 'http://dockerized-magento.local/index.php/admin/sales_transactions/'). The automation will navigate here first.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "transaction_id",
+      "type": "string",
+      "format": null,
+      "description": "Transaction ID to filter by (enters text into the 'Transaction ID' filter input). Leave empty to not filter by this field.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Order ID to filter by (enters text into the 'Order ID' filter input). Leave empty to not filter by this field.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "payment_method",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the payment method to select from the 'Payment Method Name' dropdown. Use the exact option text as shown in the admin UI. Leave empty to keep the current selection.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "transaction_type",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the transaction type to select from the 'Transaction Type' dropdown (e.g. 'Refund', 'Order', 'Authorization'). Leave empty to keep current selection.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_closed",
+      "type": "string",
+      "format": null,
+      "description": "Visible text for the 'Is Closed' dropdown. Use 'Yes' or 'No' (or exact option text) to filter. Leave empty to keep current selection.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_from",
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "description": "Start date for the 'Created At' range (ISO YYYY-MM-DD). Enter empty string to leave blank.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_to",
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "description": "End date for the 'Created At' range (ISO YYYY-MM-DD). Enter empty string to leave blank.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

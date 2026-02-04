@@ -1,0 +1,141 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigates to the Magento admin Transactions grid, logs in, closes an incoming-message overlay, identifies header-scoped selectors for the filter controls, inputs Order ID and Transaction ID, selects Transaction Type and Is Closed, clicks Search, then extracts the post-search grid state. Several deterministic elementHashes were recorded for the key controls (order input, txn input, txn_type select, is_closed select, Search button), and robust XPath/CSS fallbacks were identified.\n\nTask Definition:\n- Build a reusable, parameterized tool that opens the Magento Transactions grid (authenticated session assumed), optionally closes blocking overlays, applies user-provided filter criteria (order id, transaction id, transaction type, is_closed, payment method, created from/to), clicks Search, and returns structured results from the grid.\n\nAction Plan (detailed):\n1) Navigate to the provided grid_url.\n2) Wait briefly for page and overlays.\n3) Attempt to close any overlay using a label/class-based XPath; elementHash fallback included.\n4) Use an agentic step to conditionally apply only the non-empty filter parameters. This avoids brittle branching in deterministic steps and handles optional inputs reliably in the live DOM, preferring id/name selectors and header-scoped XPaths with recorded elementHash fallbacks.\n5) Click the Search button using the grid-specific id (#submit_filter_top) or button[title='Search'] as fallback; elementHash fallback recorded.\n6) Wait for the grid to update, then extract structured results (row data, total text, or 'No records found').\n\nVariable Identification (inputs required by the tool):\n- grid_url (required): the Transactions grid URL to open.\n- order_id (optional): text input for Order ID filter.\n- transaction_id (optional): text input for Transaction ID filter.\n- txn_type (optional): select option label for Transaction Type (enum: Order, Authorization, Capture, Void, Refund).\n- is_closed (optional): select option label for Is Closed (enum: Yes, No).\n- payment_method (optional): visible option text for Payment Method Name.\n- created_from / created_to (optional): date range strings (format YYYY-MM-DD) for Created At filter.\n- max_rows (optional): cap on rows to extract from the first page.\n\nStep Optimization / Selector Strategy:\n- Prefer explicit id/name selectors when present (e.g. #sales_transactions_grid_filter_txn_id or input[name='txn_id']). These are concise and typically unique on Magento admin grids.\n- Use header-scoped XPaths only when id/name selectors are missing or ambiguous (e.g. //tr[contains(@class,'filter')]/td[position()=count(//th[a[normalize-space(.)='Transaction ID']]/preceding-sibling::th)+1]//input).\n- Use elementHash values captured during the recording as fallbacks for brittle environments; include them in steps but keep them secondary.\n- Do not include authentication steps (session assumed authenticated).\n- Use an agentic step for applying optional filters to avoid conditional branching in the static step list and to ensure the tool only modifies controls users asked for.\n\nNotes on robustness:\n- The tool provides multiple selector fallbacks (id/name CSS first, header-scoped XPath second, elementHash backup) and includes runtime verification in the agent step (the agent should confirm selector uniqueness with document.querySelectorAll and adjust to the top/bottom filter button id if duplicates exist).\n- After extraction the tool returns a structured object 'transactions_search_results' containing 'total', 'no_records_found' boolean, and an array of row objects with the standard columns.\n\nThis tool is deterministic in navigation and final extract, and uses an agent step only for the necessary conditional logic of applying optional filters, which cannot be expressed reliably as static UI interactions without branching.",
+  "name": "search_magento_transactions",
+  "description": "Navigate to a Magento Admin Transactions grid, (optionally) close any incoming-message overlay, apply provided filter criteria (order id, transaction id, transaction type, is_closed, payment method, created_at range), click Search, and extract the grid results (rows, total count, or 'No records found'). Uses robust, header-scoped selectors and recorded elementHashes as fallbacks.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Transactions grid URL in the admin (session is assumed already authenticated).",
+      "output": null,
+      "type": "navigation",
+      "url": "{grid_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Short wait for the grid to render and any overlays to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Close any incoming-message overlay that blocks the filter row. Uses a label-based XPath; elementHash is provided as a recorded fallback. If no such overlay exists this step may be a no-op (click will target nothing).",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Agentic step handles conditional application of optional filters and uses recorded stable selectors or elementHashes as fallbacks.",
+      "output": "applied_filters",
+      "type": "agent",
+      "task": "Apply provided filter parameters to the Transactions grid. For each non-empty input parameter (order_id, transaction_id, txn_type, is_closed, payment_method, created_from, created_to) locate the corresponding filter control using robust selectors (prefer id/name selectors: input[name='order_id'] or #sales_transactions_grid_filter_order_id for Order ID; input[name='txn_id'] or #sales_transactions_grid_filter_txn_id for Transaction ID; select[name='txn_type'] or #sales_transactions_grid_filter_txn_type for Transaction Type; select[name='is_closed'] or #sales_transactions_grid_filter_is_closed for Is Closed; select[name*='payment_method'] for Payment Method; input[name='created_at[from]'] and input[name='created_at[to]'] for dates). For each parameter that is provided and non-empty, fill or select the control accordingly. If an exact option text match is required for selects, choose the option whose visible text exactly equals the provided value. Use the recorded elementHashes as fallback if id/name selectors are absent. After applying all provided filters, store a short audit list of which fields were set and which selectors were used in 'applied_filters'.",
+      "max_steps": 8
+    },
+    {
+      "description": "Click the Search/apply-filters control. Preferred selector is #submit_filter_top (common Magento id); fallbacks target buttons with title='Search'. elementHash is a recorded fallback.",
+      "output": null,
+      "cssSelector": "#id_e9c8dc2d53587c039658ba24a0c03ade",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[2]/button[2]",
+      "elementTag": "button",
+      "elementHash": "f90803903e",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture structured results after applying filters.",
+      "output": "transactions_search_results",
+      "type": "extract_page_content",
+      "goal": "Extract the Transactions grid state: number of rows returned, 'No records found' message if present, total-records summary text, and up to {max_rows} data rows from the first page. For each data row extract columns (ID, Order ID, Transaction ID, Parent Transaction ID, Payment Method Name, Transaction Type, Is Closed, Created At). Return results as 'transactions_search_results'."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "grid_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the Magento admin Transactions grid (example: \"http://dockerized-magento.local/index.php/admin/sales_transactions/\")",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Order ID (increment_id) to filter by; partial or full value is accepted.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "transaction_id",
+      "type": "string",
+      "format": null,
+      "description": "Transaction ID (txn_id) to filter by; partial or full value is accepted.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "txn_type",
+      "type": "string",
+      "format": null,
+      "description": "Transaction Type to filter by. Use one of the exact option labels from the grid (case-sensitive match).",
+      "required": false,
+      "enum": [
+        "Order",
+        "Authorization",
+        "Capture",
+        "Void",
+        "Refund"
+      ]
+    },
+    {
+      "name": "is_closed",
+      "type": "string",
+      "format": null,
+      "description": "Filter by whether the transaction is closed. Use 'Yes' or 'No'.",
+      "required": false,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "payment_method",
+      "type": "string",
+      "format": null,
+      "description": "Payment Method Name visible text to filter by (exact visible option text from the select). Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_from",
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "description": "Start of Created At date range (format YYYY-MM-DD). Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_to",
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "description": "End of Created At date range (format YYYY-MM-DD). Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "max_rows",
+      "type": "number",
+      "format": null,
+      "description": "Maximum number of result rows to extract (if grid returns many rows). Optional; default is to extract all rows visible on first page.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

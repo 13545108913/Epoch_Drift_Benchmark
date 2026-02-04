@@ -1,0 +1,87 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session logs show: navigation to an admin order view, a login step (handled before tool execution), clicking Reorder which navigates to sales_order_create, then clicking the final Submit Order button (scoped selector) to create a new admin order. The session confirms the reorder flow succeeds and results in an admin order view page with a success message and new order id.\n\nTask Definition:\n- Build a deterministic, re-usable tool that: given the admin base URL and a source order_id, navigates to that order, triggers the Reorder action, submits the resulting New Order form, and verifies creation of the new order.\n\nAction Plan (detailed):\n1) Navigate to the specific order view URL to ensure the correct order context.\n2) Trigger Reorder by navigating directly to the conventional reorder URL (/sales_order/reorder/order_id/{id}/) \u2014 this is deterministic and avoids fragile text-only selectors.\n3) Wait for the sales_order_create (New Order) page to load and extract a snapshot of items and totals for verification.\n4) Click the final Submit Order button using a scoped XPath that selects the last 'Submit Order' control on the page (the one near Order Totals).\n5) Wait for navigation/response and extract post-submit content: success message, order header and URL to confirm creation.\n\nVariable Identification:\n- base_admin_url (string, required): the admin base URL including admin frontName (used to construct order and reorder URLs).\n- order_id (string, required): internal numeric order_id to reorder from; inserted into URLs.\n- timeout_seconds (number, optional): to control waits/timeouts (default used if omitted).\n\nStep Optimization and Determinism:\n- The original UI flow clicked visible Reorder and Submit buttons. Because Magento uses predictable admin URLs for reorder (sales_order/reorder/order_id/<id>) and the reorder step typically triggers a GET that opens sales_order_create, we replace the UI 'click' for Reorder with a direct navigation to the constructed reorder URL. This increases reliability and avoids localization issues. For the Submit Order action we must click a button; multiple 'Submit Order' instances exist on the page so we use an XPath that picks the last occurrence (scoped to Order Totals with alternative XPaths provided in the analysis).\n- Navigation steps are deterministic and avoid ambiguous selectors. The Submit click uses a stable XPath that uses position (last()) to avoid clicking the header duplicate. Post-submit verification relies on standard Magento indicators: admin success flash message and redirect to /sales_order/view/.\n\nAssumptions and Caveats:\n- The automation environment is already authenticated into the admin session. The tool will not perform login.\n- The admin frontName and base URL must be accurate; if the site uses custom admin routing other than the provided base, the constructed URLs will need to be adjusted.\n- Some Magento installs may require a form_key parameter for certain actions; in many admin setups sales_order/reorder/order_id/{id}/ works for logged-in admin users. If the environment requires additional tokens, a DOM-based click (extract href from the live DOM and navigate to it) or including form_key may be necessary\u2014this tool uses the conventional URL approach which matched the recorded session.\n- The Submit Order click is performed by XPath selector which assumes the final submit is a <button> or input rendered as last submit control. If the admin theme uses different markup, replace the XPath with a site-specific selector.\n\nThe tool steps are minimal and essential: 1) confirm order view, 2) perform reorder via URL, 3) snapshot new order, 4) click final Submit Order, 5) confirm order creation. No optional exploratory steps are included.",
+  "name": "magento_admin_reorder_create_order",
+  "description": "Navigate to a Magento 1.x admin order, perform the Reorder action for a given order_id, then submit the resulting admin New Order (sales_order_create) form and verify the order was created. Uses direct URL navigation for reliability and scoped XPath to click the final Submit Order button.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the admin Order View page for the provided order_id to ensure we're on the correct order before performing Reorder.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_admin_url}/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Allow the Order View page to finish loading (small pause to let JS render topbar actions).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Perform the Reorder action by navigating directly to the conventional admin reorder URL (avoids brittle text-only button selection). This opens the New Order (sales_order_create) page pre-filled from the original order.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_admin_url}/sales_order/reorder/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the New Order page (sales_order_create) to load and for the cart/items to be pre-filled.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Extract Items list, subtotal, shipping, tax and grand total and basic account info. This is used to assert expected content prior to final submit.",
+      "output": "new_order_snapshot",
+      "type": "extract_page_content",
+      "goal": "Capture a snapshot of the New Order page to verify items, totals and customer context before submitting"
+    },
+    {
+      "description": "Click the scoped final 'Submit Order' control (selects the last matching Submit Order button on the page \u2014 the one in the Order Totals area).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//button[normalize-space(text())='Submit Order' or normalize-space(@title)='Submit Order' or normalize-space(@value)='Submit Order'])[last()]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the submit action to complete and the admin to redirect to the Order View or show a success message.",
+      "output": null,
+      "type": "wait",
+      "seconds": 5.0
+    },
+    {
+      "description": "Extract success messages and page header to confirm a new order was created, and capture the new order identifier shown on the page.",
+      "output": "post_submit_result",
+      "type": "extract_page_content",
+      "goal": "Verify order creation: detect admin success flash message, capture resulting order view header (Order #...), and check the current URL contains '/sales_order/view/'"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Full Magento admin base URL up to the admin frontName (include protocol). Example: \"http://dockerized-magento.local/index.php/admin\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric internal order_id used in admin URLs (e.g. \"204\"). This is the source order to reorder from and will be inserted into admin URLs.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "timeout_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Maximum seconds to wait for each navigation or post-click confirmation. Defaults to 30 if omitted.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

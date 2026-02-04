@@ -1,0 +1,167 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session shows a Magento 1.9 Admin Orders grid with standard filter field name patterns (filter[...] inputs, select[name='filter[status]']), inline store filter anchors for Purchased From (Store), export links, massaction select, per-row checkboxes and per-row View links whose hrefs contain order_id. The tool will navigate to the Orders page, populate UI filters by name or click store anchor, submit Search, wait for the grid to update, then extract visible order rows into structured output.\n\nTask Definition:\n- Purpose: Provide a reusable automation step-set that navigates to a Magento Admin Orders grid and finds orders matching provided UI filter criteria. The tool returns structured order rows (increment, internal entity id, store, dates, totals, status, view_link) suitable for downstream processing.\n\nAction Plan (detailed to-do list):\n1) Navigate to provided Orders grid URL ({base_url}).\n2) Populate text filters: order increment (input[name='filter[increment_id]']), billing name (input[name='filter[billing_name]']).\n3) Populate date filters: purchased on from/to (input[name='filter[created_at][from]'], input[name='filter[created_at][to]']).\n4) Select Status using select[name='filter[status]'] by visible text.\n5) If store filter provided, click the inline anchor for that store in the Purchased From (Store) filter cell using a computed XPath that locates the column by header text and matches anchor text exactly.\n6) Click Search (button[title='Search'] or input[value='Search']).\n7) Wait briefly for grid JS to update.\n8) Extract visible rows and return structured fields: order_increment, order_entity_id (parsed from view href), purchased_from, purchased_on, billing_name, ship_to_name, grand_total, status, view_link_href.\n\nVariable Identification (inputs required):\n- base_url (required): starting URL of the Orders grid. Tool will navigate here.\n- filter[increment_id] (optional): direct mapping to input[name='filter[increment_id]']\n- filter[store] (optional): visible store text to click in Purchased From filter (e.g., 'English')\n- filter[created_at][from] / filter[created_at][to] (optional): date range in MM/DD/YYYY\n- filter[billing_name] (optional): billing name free-text\n- filter[status] (optional): status visible text; selected by visible text in the status select\n- page_wait_seconds (optional): how many seconds to wait for grid updates (tool includes a default wait)\n\nStep Optimization / Selector Choices:\n- Prefer name-based inputs (input[name='filter[...]']) and select[name='filter[status]'] because these are stable across Magento admin installs.\n- The Purchased From (Store) filter in many Magento installs is rendered as inline anchors rather than a <select>. To robustly target the correct anchor we compute the Purchased From column index from the header text and then target the filter cell's anchor with exact visible text. This avoids brittle nth-child assumptions when columns reorder.\n- For Search we use button[title='Search'] or input[value='Search'] to handle theme variations.\n- Extraction reads the per-row View link href and parses order_entity_id from the '/order_id/{id}/' fragment; this value is used by recommended automation to target checkboxes and mass actions if needed.\n\nDeterministic Execution Notes:\n- Every step is parameter-driven and deterministic: navigation, fixed selectors for inputs and selects, computed XPath for store anchor, fixed Search click, and a single extraction step.\n- No conditional branching is included. If an input is left empty the corresponding UI control is left blank/unmodified; the Search button still runs and the grid returns results based on provided filters.\n\nLimitations & Assumptions:\n- The agent must already be authenticated (or base_url should resolve without an intervening login redirect). If redirected to login, login must be performed before using this tool.\n- The Orders grid table id/class may differ; XPaths fall back to header-text computed selectors to remain resilient.\n- For mass-action, export or row selection actions, separate dedicated tools should be created (excluded to keep this tool single-purpose: find + extract orders).\n\nEssential Outputs:\n- order_results (array of objects): [{order_increment, order_entity_id, purchased_from, purchased_on, billing_name, ship_to_name, grand_total, status, view_link_href}]\n\nThis tool focuses exclusively on locating orders by UI filters and returning the matching rows; it intentionally omits mass-action or export operations to remain single-purpose and deterministic.",
+  "name": "magento_find_orders",
+  "description": "Navigate to a Magento Admin Orders grid, apply UI filters (order increment, store, date range, billing name, status), run Search, and extract matching order rows (increment, order_entity_id, store, purchased_on, billing_name, ship_to_name, grand_total, status, view_link). Uses stable name- and href-based selectors observed on Magento 1.9 admin.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Orders grid page at the provided base_url.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Allow the Orders grid to initialize (basic short wait).",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Enter the order increment id into the Order # filter input. If empty this leaves the field blank.",
+      "output": null,
+      "cssSelector": "input[name='filter[increment_id]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[increment_id]}"
+    },
+    {
+      "description": "Enter the billing name into the Bill to Name filter input. If empty this leaves the field blank.",
+      "output": null,
+      "cssSelector": "input[name='filter[billing_name]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[billing_name]}"
+    },
+    {
+      "description": "Enter the Purchased On 'From' date (MM/DD/YYYY). If empty this leaves the field blank.",
+      "output": null,
+      "cssSelector": "input[name='filter[created_at][from]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[created_at][from]}"
+    },
+    {
+      "description": "Enter the Purchased On 'To' date (MM/DD/YYYY). If empty this leaves the field blank.",
+      "output": null,
+      "cssSelector": "input[name='filter[created_at][to]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[created_at][to]}"
+    },
+    {
+      "description": "Select the Status value from the Status filter dropdown by visible text. If empty, the control is left unchanged.",
+      "output": null,
+      "cssSelector": "select[name='filter[status]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{filter[status]}"
+    },
+    {
+      "description": "Click the Purchased From (Store) anchor that matches the visible text provided in {filter[store]}. This XPath computes the column index for the 'Purchased From (Store)' header then finds the matching anchor with exact visible text. If {filter[store]} is empty this step attempts the XPath anyway (will be a no-op if not found).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//tr[contains(@class,'filter')]/td)[count(//th[normalize-space(.)='Purchased From (Store)']/preceding-sibling::th)+1]//a[normalize-space(.)='{filter[store]}']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Click the Search / Apply Filters button to run the grid filter. Matches either a button with title 'Search' or an input submit with value 'Search'.",
+      "output": null,
+      "cssSelector": "button[title='Search'], input[type='submit'][value='Search']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters. If a custom wait time was provided, the runner may replace this with {page_wait_seconds}.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Collect all visible rows in the orders grid and extract: order_increment, order_entity_id (parsed from the View link href), purchased_from (store), purchased_on, billing_name, ship_to_name, grand_total, status, view_link_href. Returns empty array if no rows found.",
+      "output": "order_results",
+      "type": "extract_page_content",
+      "goal": "Extract visible order rows from the grid and return structured records"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the Magento Admin Orders grid (example: \"http://dockerized-magento.local/index.php/admin/sales_order/\"). Page must be accessible and the agent is already authenticated.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "filter[increment_id]",
+      "type": "string",
+      "format": null,
+      "description": "Order increment id to filter by (exact visible order number). Maps to input[name='filter[increment_id]'] on the grid.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[store]",
+      "type": "string",
+      "format": null,
+      "description": "Visible store view text to filter by (e.g., \"English\"). Matches the inline store filter link text in the Purchased From (Store) filter cell.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[created_at][from]",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Start date for Purchased On filter. Maps to input[name='filter[created_at][from]']",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[created_at][to]",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "End date for Purchased On filter. Maps to input[name='filter[created_at][to]']",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[billing_name]",
+      "type": "string",
+      "format": null,
+      "description": "Billing name free-text filter. Maps to input[name='filter[billing_name]']",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[status]",
+      "type": "string",
+      "format": null,
+      "description": "Order status visible text (e.g., 'Pending', 'Complete'). Maps to select[name='filter[status]'] and will be selected by visible text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "page_wait_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait after actions for the grid to update. Default engine waits will also apply.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

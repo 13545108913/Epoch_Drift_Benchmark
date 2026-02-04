@@ -1,0 +1,98 @@
+{
+  "tool_analysis": "Step Analysis:\nThe recorded session logs into the Magento admin, navigates to the Manage Customers grid, and demonstrates mass customer operations: selecting individual customers via row checkboxes, selecting all visible customers using the \"Select Visible\" control, choosing actions from the Actions dropdown (Subscribe to Newsletter, Unsubscribe from Newsletter, Assign a Customer Group), optionally choosing a specific customer group from the Group dropdown (e.g., VIP Member), and clicking Submit to apply the mass action. It also briefly interacts with notification close, but that\u2019s not essential to the core task.\n\nTask Definition:\nCreate a reusable tool that, starting from the Magento admin customer index URL (with an already authenticated admin session), performs a specified mass action on either individually selected customers (by row selection) or on all visible customers using Select Visible. Supported actions are exactly those exposed by the Actions dropdown: Delete, Subscribe to Newsletter, Unsubscribe from Newsletter, Assign a Customer Group. When assigning a group, the tool must also select a group option before submitting.\n\nAction Plan:\n1) Navigate directly to the Manage Customers grid URL (customer index) to ensure we are at the correct grid page.\n2) Optionally filter or sort is not part of the core requirement, so omit; selection is done on the already visible grid.\n3) Select customers:\n   - Either click specific row checkboxes (based on the hashes captured for row checkboxes) to select individual customers; or\n   - Use the \"Select Visible\" control to select all customers on the current page.\n   For this deterministic tool, we\u2019ll model the common bulk pattern: use Select Visible, since IDs for individual row checkboxes repeat and aren\u2019t customer-specific. The original recording showed checkboxes using elementHash 822a6e2ce4, indicating a shared selector for row checkboxes; using Select Visible avoids having to locate specific rows.\n4) Choose the desired mass action from the Actions dropdown (elementHash b202e94e0d) by visible text: \"Delete\", \"Subscribe to Newsletter\", \"Unsubscribe from Newsletter\", or \"Assign a Customer Group\".\n5) If the action is \"Assign a Customer Group\", choose the customer group from the Group dropdown (elementHash 4a4c64c2db) using one of the options demonstrated (General, Wholesale, VIP Member, Private Sales Member). This step is required only for assign_group.\n6) Click the Submit button (elementHash e5da8d6705 / 5a21a6ced1, same control across steps) to apply the selected action to the selected customers.\n7) Optionally, extract the resulting success message and basic grid context so the calling agent can confirm the action.\n\nVariable Identification:\nFrom the flows, the controllable variables that should be exposed as tool inputs are:\n- action (mass_action): which mass action to perform; corresponds to dropdown options.\n- selection_mode: whether to use Select Visible or rely on pre-selected customers. However, pre-selection in a previous step would be outside this tool. To keep the tool self-sufficient and deterministic, we define selection_mode but for this implementation we\u2019ll only support a direct mapping to using Select Visible or skipping selection (assuming external selection). Still, the schema can support both.\n- group (customer_group): only used when action is Assign a Customer Group; must be one of the Group dropdown options.\n\nWe deliberately do NOT parameterize filters or sorting because the primary goal is mass actions; filters were only \"exposed\" not used as part of an essential operation. Likewise, we do not parameterize individual customer IDs because the UI operates on selected rows by checkboxes; the recorded automation didn\u2019t compute ID-based selectors.\n\nStep Optimization:\n- Navigation: Instead of replaying login, we assume the session is authenticated (as per instructions) and navigate directly to the grid URL using a single navigation step.\n- Deterministic Interactions: Use elementHash-based selectors that were captured:\n  * Select Visible link: elementHash 0eefac88df\n  * Actions select dropdown: elementHash b202e94e0d\n  * Group select dropdown (for assign group): elementHash 4a4c64c2db (later run) or 547d16e240 / 135; we choose 4a4c64c2db as used in the final, stable assign-group step.\n  * Submit button: elementHash e5da8d6705 (final assign-group submit) which is the same logical button as earlier (5a21a6ced1).\n- Agent Steps: Not required; all relevant controls have stable hashes and simple interactions.\n- Skip extraneous interactions: We omit closing notifications, exporting, pagination, and all filter/sort controls, as they are not essential to running a mass action.\n\nBecause the core mass-action behavior depends only on choosing the dropdown option, optionally selecting a group, and submitting, the inputs we\u2019ll expose are:\n- mass_action: enum [\"Delete\", \"Subscribe to Newsletter\", \"Unsubscribe from Newsletter\", \"Assign a Customer Group\"]\n- selection_mode: enum [\"select_visible\", \"no_selection\"] \u2014 where \"select_visible\" causes the tool to click Select Visible before applying the action; \"no_selection\" assumes selection was done beforehand. This keeps the tool usable in different compositions while still deterministic.\n- customer_group: only used when mass_action is \"Assign a Customer Group\"; enum [\"General\", \"Wholesale\", \"VIP Member\", \"Private Sales Member\"].\n\nThe last step will perform an extraction of the page to capture the success message, so an orchestrating agent can validate the outcome.\n",
+  "name": "magento_admin_customer_mass_actions",
+  "description": "Perform mass customer actions (delete, subscribe/unsubscribe newsletter, assign customer group) on selected customers from the Magento Admin Manage Customers grid.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Manage Customers grid page where mass actions are available.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/customer/index/",
+      "url_operation": null
+    },
+    {
+      "description": "If selection_mode is 'select_visible', click the 'Select Visible' control to select all customers currently shown in the grid. (Caller should ensure selection_mode logic; this step is defined for composition.)",
+      "output": null,
+      "cssSelector": "tr > td > a[href=\"#\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td/a[3]",
+      "elementTag": "a",
+      "elementHash": "0eefac88df",
+      "type": "click"
+    },
+    {
+      "description": "Choose the desired mass action from the Actions dropdown using the provided mass_action value.",
+      "output": null,
+      "cssSelector": "#customerGrid_massaction-select",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span/select",
+      "elementTag": "select",
+      "elementHash": "b202e94e0d",
+      "type": "select_change",
+      "selectedText": "{mass_action}"
+    },
+    {
+      "description": "When mass_action is 'Assign a Customer Group', select the target customer_group from the Group dropdown to specify which group the selected customers will be assigned to.",
+      "output": null,
+      "cssSelector": "select[name=\"group\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[3]/div/span/select",
+      "elementTag": "select",
+      "elementHash": "4a4c64c2db",
+      "type": "select_change",
+      "selectedText": "{customer_group}"
+    },
+    {
+      "description": "Click the Submit button to execute the chosen mass action on the currently selected customers.",
+      "output": null,
+      "cssSelector": "button[title=\"Submit\"][title=\"Submit\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[4]/button",
+      "elementTag": "button",
+      "elementHash": "e5da8d6705",
+      "type": "click"
+    },
+    {
+      "description": "Capture the resulting page content, including confirmation messages like 'Total of X record(s) were updated.' for verification.",
+      "output": "mass_action_result",
+      "type": "extract_page_content",
+      "goal": "Extract any success or error messages and a brief summary of the Manage Customers grid after applying the mass action to confirm results."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "mass_action",
+      "type": "string",
+      "format": null,
+      "description": "Mass action to perform from the Actions dropdown on the Manage Customers grid: one of Delete, Subscribe to Newsletter, Unsubscribe from Newsletter, or Assign a Customer Group.",
+      "required": true,
+      "enum": [
+        "Delete",
+        "Subscribe to Newsletter",
+        "Unsubscribe from Newsletter",
+        "Assign a Customer Group"
+      ]
+    },
+    {
+      "name": "selection_mode",
+      "type": "string",
+      "format": null,
+      "description": "How to select customers before applying the mass action. 'select_visible' clicks the 'Select Visible' control to select all customers on the current page. 'no_selection' assumes customers are already selected externally and skips any selection clicks.",
+      "required": true,
+      "enum": [
+        "select_visible",
+        "no_selection"
+      ]
+    },
+    {
+      "name": "customer_group",
+      "type": "string",
+      "format": null,
+      "description": "Customer group to assign when mass_action is 'Assign a Customer Group'. Ignored for other actions. Must match one of the options in the Group dropdown.",
+      "required": false,
+      "enum": [
+        "General",
+        "Wholesale",
+        "VIP Member",
+        "Private Sales Member"
+      ]
+    }
+  ]
+}

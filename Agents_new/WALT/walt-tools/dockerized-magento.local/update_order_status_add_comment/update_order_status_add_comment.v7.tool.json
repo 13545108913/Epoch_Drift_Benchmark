@@ -1,0 +1,125 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded steps navigate to the Magento Admin order view, locate the Add Order Comments form, type a comment into the textarea, set status, toggled two checkboxes (notify customer, visible on frontend), and clicked Submit Comment. The live run changed the DOM after typing, so selectors must be scoped to the specific comment form to avoid collisions with other similarly-labeled fields on the order page.\n\nTask Definition:\n- Build a reusable tool that, given an order_id and a comment, will post an order history comment and optionally change the order status, notify the customer by email, and make the comment visible on the frontend. The tool must reliably target unique elements in the Add Order Comments block.\n\nAction Plan (detailed to-do list):\n1. Navigate to the admin order view URL for the provided order_id. 2s wait for page load.\n2. Fill the comment textarea scoped to the Add Order Comments form.\n3. Small wait to let the DOM stabilize after input.\n4. Change the status select (by visible text) in the same scoped form. Caller must provide the visible text to select.\n5. Use an agentic step to inspect and set the two checkboxes to the intended boolean values (this avoids blind toggling and handles dynamic checked state).\n6. Click the Submit Comment control (handle both button and input variants) inside the same form.\n7. Wait for server processing and then extract the latest history entry and visible order status to verify success.\n\nVariable Identification (tool inputs):\n- order_id (string, required): used directly in the order view URL. Crucial to navigate to the correct order.\n- comment (string, required): content to post.\n- status (string, optional): visible text of status option to select. If caller doesn't wish to change status they may pass the current status text.\n- notify_customer (bool, optional): whether to notify customer by email. Agent step enforces desired final state.\n- visible_on_front (bool, optional): whether to mark the comment visible on frontend. Agent step enforces desired final state.\n- base_url (string, optional): base admin URL; default 'http://dockerized-magento.local' recorded during session.\n\nStep Optimization and Selector Choices:\n- Use XPath selectors anchored to the form that contains the Submit Comment control. This scoping avoids selecting other 'Status' or 'Comment' fields on the page (common in order view headers or other panels).\n- Where possible, deterministic UI actions are used (navigation, input, select_change, click). Checkbox handling is agentic because safely setting a boolean property requires checking current checkedness to avoid accidental toggles when state already matches requested value.\n- ElementHash values recorded during the session exist (e.g., textarea element_hash 'fcc90341f4', select 'a29f177603', submit button '63aead8a95'), but the tool uses robust XPath text-anchored selectors to remain resilient across environments and minor DOM changes. Those element_hash values can be used as fallbacks in the test harness if available.\n\nDeterminism and Reliability Notes:\n- Before running this tool in a different Magento install or localized admin, verify the label text used in XPaths ('Comment', 'Status', 'Notify Customer by Email', 'Visible on Frontend', 'Submit Comment') matches the target installation language. If localized, replace the visible text in the XPath selectors accordingly.\n- The tool assumes the calling context is already authenticated as an admin (recorded session was authenticated). It does not perform authentication.\n\nWhy agent step for checkboxes:\n- Recorded failures in prior attempts included selector ambiguity and unexpected toggling. The agentic step reads the checkbox state and only clicks when a change is required, preventing accidental state flips and ensuring idempotence.\n\nEssential-only rule compliance:\n- The tool includes only the steps essential to the core task: navigate, add comment, set status, set checkboxes, submit, and verify. No extra filtering or UI exploration steps are included.",
+  "name": "magento_admin_add_order_comment",
+  "description": "Add an order history comment to a Magento Admin order view, optionally change the order status, mark the comment visible on frontend, and notify the customer. Navigation and selectors are scoped to the 'Add Order Comments' form using XPath anchored to the Submit Comment control to ensure uniqueness across the page.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Admin order view page for the specified order_id. If base_url is omitted, callers should set it to 'http://dockerized-magento.local'.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the order page to stabilize and the Add Order Comments form to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Type the provided comment into the Add Order Comments textarea scoped to the form that contains the Submit Comment control.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//form[.//button[normalize-space(.)='Submit Comment' or normalize-space(@value)='Submit Comment']])[1]//label[normalize-space(.)='Comment']/following::textarea[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{comment}"
+    },
+    {
+      "description": "Short pause to allow DOM updates after typing the comment.",
+      "output": null,
+      "type": "wait",
+      "seconds": 0.5
+    },
+    {
+      "description": "Select the requested order status by visible text in the Add Order Comments form. Provide the current status if you do not want to change it.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//form[.//button[normalize-space(.)='Submit Comment' or normalize-space(@value)='Submit Comment']])[1]//label[normalize-space(.)='Status']/following::select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Agentic step to reliably set checkbox states without accidentally toggling them when they already match the desired value.",
+      "output": null,
+      "type": "agent",
+      "task": "Set the 'Notify Customer by Email' and 'Visible on Frontend' checkbox states inside the Add Order Comments form to match the requested booleans: notify_customer={notify_customer}, visible_on_front={visible_on_front}. Use the XPath selectors anchored to the same Submit Comment form to find each checkbox: notify_xpath=(//form[.//button[normalize-space(.)='Submit Comment' or normalize-space(@value)='Submit Comment']])[1]//label[normalize-space(.)='Notify Customer by Email']/preceding::input[@type='checkbox'][1] and visible_xpath=(//form[.//button[normalize-space(.)='Submit Comment' or normalize-space(@value)='Submit Comment']])[1]//label[normalize-space(.)='Visible on Frontend']/preceding::input[@type='checkbox'][1]. For each checkbox, read its current checked state and click it only if it differs from the requested state. Report which checkboxes were clicked (if any).",
+      "max_steps": 6
+    },
+    {
+      "description": "Click the Submit Comment control (handles both <button> and <input type='submit'> variants) inside the Add Order Comments form to post the comment and apply status/notification changes.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//form[.//button[normalize-space(.)='Submit Comment' or normalize-space(@value)='Submit Comment']])[1]//button[normalize-space(.)='Submit Comment' or normalize-space(@title)='Submit Comment'][1] | (//form[.//button[normalize-space(.)='Submit Comment' or normalize-space(@value)='Submit Comment']])[1]//input[( @type='submit' or @type='button') and normalize-space(@value)='Submit Comment'][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the server to process the submission and for the page to refresh/update the Comments History and Order Status.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract the updated comments history and order status to confirm the operation succeeded.",
+      "output": "result",
+      "type": "extract_page_content",
+      "goal": "Verify that the most recent Comments History entry contains the provided comment text and capture the visible Order Status. Output should include 'history_entry' (text of the latest comment) and 'order_status' (visible status on the page)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Order ID shown in the admin URL (example: '204'). This will be inserted into the order view URL: http://dockerized-magento.local/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment",
+      "type": "string",
+      "format": null,
+      "description": "The order history comment text to add (plain text).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the order status to select (e.g., 'Processing', 'Complete'). If you want to leave the status unchanged, provide the current visible status text or repeat the current value.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "notify_customer",
+      "type": "bool",
+      "format": null,
+      "description": "Set to true to notify the customer by email about this comment. Set to false to leave unchecked.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visible_on_front",
+      "type": "bool",
+      "format": null,
+      "description": "Set to true to make the comment visible on the storefront/frontend. Set to false to leave unchecked.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base admin URL for the Magento instance. Default used in recorded steps: 'http://dockerized-magento.local'. If your admin uses a different host or path, provide it here (no trailing slash).",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

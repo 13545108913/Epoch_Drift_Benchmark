@@ -36,7 +36,7 @@ ACCOUNTS = {
         "username": "emma.lopez@gmail.com",
         "password": "Password.123",
     },
-    "shopping_admin": {"username": "admin", "password": "admin1234"},
+    "shopping_admin": {"username": "admin", "password": "password123"},
     "shopping_site_admin": {"username": "admin", "password": "admin1234"},
 }
 

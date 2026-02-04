@@ -1,0 +1,153 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigated from an order view to the credit memo creation page, adjusted per-item qtys, shipping and adjustments, attempted to submit using Refund Offline, and encountered a validation error: 'Credit memo's total must be positive.' The session showed the page in a JS-disabled snapshot which prevented live recalculation; form_key and exact input names were not present in the provided text dump. The recorded interactive indices (e.g., 124..145) map to page controls but are dynamic; the tool must discover input name attributes at runtime.\n\nTask Definition:\n- Tool purpose: From a given admin order_id, create a credit memo for specified order_item_ids and quantities along with optional shipping or adjustment amounts, optionally emailing the customer, and submit via either Refund Offline or Refund. The tool must reliably discover the form, form_key and per-item input names in the live DOM (JS-enabled), set values, trigger recalculation (Update Qty), and submit. On completion it should report success/failure and created credit memo id if available.\n\nAction Plan:\n1) Directly navigate to the credit memo create page for the given order_id (URL contains order_id). 2) Wait for the page to load and verify page identity. 3) Discover the creditmemo form element and the hidden CSRF token (form_key). 4) Enumerate qty inputs inside the form to find exact per-item input names (creditmemo[items][<id>][qty] or fallbacks). 5) Fill each qty from the provided {items_json}; set shipping, adjustment_positive and adjustment_negative fields if present; set comment and send_email checkbox. 6) Click Update Qty's to force recalculation (if present). 7) Submit with the requested refund action (Refund Offline or Refund). 8) Capture success or error messages and created credit memo id.\n\nVariable Identification (tool inputs):\n- order_id (string, required) \u2014 used in the navigation URL and potentially as POST parameter.\n- items_json (string, required) \u2014 JSON mapping order_item_id -> qty to refund (must use the actual order_item_id values present in the DOM). Example: '{\"627\":1}'.\n- shipping_amount (string, optional) \u2014 decimal string.\n- adjustment_positive (string, optional) \u2014 decimal string.\n- adjustment_negative (string, optional) \u2014 decimal string.\n- send_email (bool, optional) \u2014 whether to check 'Email Copy of Credit Memo'.\n- comment_text (string, optional) \u2014 optional admin comment.\n- refund_mode (string enum, optional) \u2014 'refund_offline' or 'refund'.\n- base_url (string, optional) \u2014 base host if different from default.\n- update_qty_after_changes (bool, optional) \u2014 whether to click Update Qty's after changes.\n\nStep Optimization:\n- Use direct URL navigation to the credit memo new page to avoid needing to click the 'Credit Memo' header link.\n- Use a small wait and then DOM discovery instead of relying solely on recorded index positions (which are not stable). The per-item inputs include order_item ids in their name attributes and must be read from the live DOM at runtime; therefore an agentic discovery step is required.\n- Prefer XPath selectors scoped to form[action*='sales_order_creditmemo'] for robustness (scopes to the correct form). Buttons that depend on visible text (Refund Offline / Update Qty) are selected with XPath normalize-space comparisons to avoid locale whitespace issues.\n- If form_key or form[action] are missing from the DOM snapshot, the tool must run in a JS-enabled browser (Playwright/Selenium) to obtain them. As a fallback the tool provides a direct POST recipe that requires retrieving form_key from an authenticated GET first.\n\nEdge cases and error handling:\n- If the page returns the visible JS-disabled warning, automation must run with JS enabled (headless Playwright/Selenium). The tool will abort with a clear diagnostic if form_key is missing or required inputs cannot be discovered.\n- The tool will extract and return validation error messages (e.g., 'Credit memo's total must be positive.') to the caller when submission fails.\n\nDeterministic steps: navigation, waits, and page extraction are deterministic. Agent steps are used only where dynamic discovery and looping are necessary (per-item qty mapping and choosing the correct submit control).",
+  "name": "magento_create_creditmemo_v1",
+  "description": "Given an admin Magento order_id, open the admin credit memo create page and create a credit memo using specified per-item quantities and amounts. The tool enables JS-driven flow (Playwright-like) when required by the site, discovers form inputs and form_key in the live DOM, fills per-item qtys, shipping and adjustments, optionally updates quantities (recalculate totals) and submits either an online or offline refund. On completion it extracts success or error messages and the created credit memo id when available.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the 'New Credit Memo' page for the specified order_id. Uses direct URL navigation (faster and deterministic).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_order_creditmemo/new/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the page to load and for any JS-driven initialization to run.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Sanity-check page identity and visible messages before interacting.",
+      "output": "initial_page_check",
+      "type": "extract_page_content",
+      "goal": "Verify the page is the New Credit Memo page and that the creditmemo form exists; capture any visible errors/warnings (e.g., 'JavaScript seems to be disabled')."
+    },
+    {
+      "description": "Dynamic DOM discovery and form filling: required because per-item input names include order_item ids and form_key is runtime.",
+      "output": null,
+      "type": "agent",
+      "task": "Discover the credit memo form and its runtime inputs, then set fields per inputs: read form[action] and hidden form_key, enumerate per-item qty inputs inside the form to discover the order_item_id keys. For each mapping in {items_json}, locate the matching qty input (name pattern 'creditmemo[items][{id}][qty]' or fallback patterns 'qty[{id}]' / 'qtys[{id}]') and set its value to the requested integer. Then, if {shipping_amount} is provided, set input[name='creditmemo[shipping_amount]'] to {shipping_amount}. If {adjustment_positive} or {adjustment_negative} provided, set their respective inputs. If {comment_text} provided, set comment textarea (candidate name 'comment_text' or fallback). If {send_email} is true, ensure the send_email checkbox is checked (candidate names 'send_email' or 'creditmemo[send_email]'). Record the exact input names discovered into context (form_action, form_key, item_input_map). If any required element is not found, return a clear error with suggestions to enable JS or fetch raw DOM. Max steps: 40",
+      "max_steps": 40
+    },
+    {
+      "description": "Click the 'Update Qty' button (if present) to trigger totals recalculation on the page after changing quantities/amounts. If the control is absent this click will be a no-op.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//form[contains(@action,'sales_order_creditmemo')]//button[contains(normalize-space(.),\"Update Qty\") or contains(normalize-space(.),\"Update Qty's\") or //input[@value=\"Update Qty's\"]]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for any recalculation/AJAX to finish (loader hide or network idle).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Choose and click the appropriate submit control (Refund Offline or Refund). Using an agent step ensures the correct button is targeted even if the DOM renders button as <button> or <input>.",
+      "output": null,
+      "type": "agent",
+      "task": "Submit the credit memo using the chosen submit action. If {refund_mode} equals 'refund_offline' click the button inside the creditmemo form whose visible text is 'Refund Offline' or input[type=submit] with value 'Refund Offline'. If {refund_mode} equals 'refund' click the button whose visible text is 'Refund'. Wait for navigation or response, then extract success or error messages and, on success, extract the created credit memo id from the success text (regex '#\\s*([0-9]+)'). Max steps: 20",
+      "max_steps": 20
+    },
+    {
+      "description": "Wait briefly for the submission to complete and resulting page to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Read the page messages and locate success or error text; extract credit memo id using regex when available.",
+      "output": "result",
+      "type": "extract_page_content",
+      "goal": "Capture the submission result: success messages, any validation errors (e.g., 'Credit memo's total must be positive.'), and the created credit memo id if present. Output keys: success (bool), credit_memo_id (string|null), messages (array)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric admin order id (the internal order_id used in admin URLs). Example: \"204\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "items_json",
+      "type": "string",
+      "format": null,
+      "description": "JSON string mapping order_item_id to integer qty to refund. Example: '{\"627\":1, \"628\":0}' . Use the actual order_item_id values from the order (not SKU).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "shipping_amount",
+      "type": "string",
+      "format": null,
+      "description": "Shipping refund amount as a decimal string (e.g. '25.00'). Leave empty or '0.00' to not change shipping.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "adjustment_positive",
+      "type": "string",
+      "format": null,
+      "description": "Positive adjustment to add to the refund (creditmemo[adjustment_positive]) as decimal string (e.g. '1.00').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "adjustment_negative",
+      "type": "string",
+      "format": null,
+      "description": "Negative adjustment (fee) to subtract from the refund (creditmemo[adjustment_negative]) as decimal string (e.g. '0.00').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "send_email",
+      "type": "bool",
+      "format": null,
+      "description": "Whether to check 'Email Copy of Credit Memo' (true/false). Default false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "comment_text",
+      "type": "string",
+      "format": null,
+      "description": "Optional credit memo comment text to append (comment_text).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "refund_mode",
+      "type": "string",
+      "format": null,
+      "description": "Which submit action to use: 'refund_offline' to create credit memo and mark refund offline, or 'refund' for an online refund. Default: 'refund_offline'.",
+      "required": false,
+      "enum": [
+        "refund_offline",
+        "refund"
+      ]
+    },
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base site URL (include protocol and host). Example: 'http://dockerized-magento.local'. If omitted the tool will use 'http://dockerized-magento.local' as default.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "update_qty_after_changes",
+      "type": "bool",
+      "format": null,
+      "description": "Whether to click the 'Update Qty' control after changing quantities so totals are recalculated (true/false). Default true.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

@@ -1,0 +1,335 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session logs into Magento Admin, navigates directly to the Sales > Orders grid, exercises each of the key filters (Order #, Purchased On date range, Purchased From (Store), Status, G.T. (Base) and G.T. (Purchased) ranges), uses Search and Reset Filter, changes the View-per-page selector, navigates pagination (Next page), and confirms row-level View links.\n- Previous failures referenced brittle selectors such as 'input#username'. This session instead relied on element indices and hashes. For the reusable tool we should: (a) use direct navigation to the Orders grid URL, (b) perform deterministic login using elementHash-based selectors captured here (since we see three login elements with hashes), and (c) then deterministically interact with each filter control using their captured elementHash and/or stable structural selectors.\n\nTask Definition:\n- Create a reusable, parameterized tool that, given a set of filter values and pagination options, will:\n  1) Navigate to the Magento admin orders grid (logging in if landing on login page),\n  2) Apply the requested filters (any subset) using the Orders grid filter row and toolbar controls,\n  3) Trigger Search to refresh the grid,\n  4) Optionally change page size and then move to a desired page via Next-page steps, and\n  5) Extract the resulting grid rows, including order metadata and the row-level View links.\n\nAction Plan:\n1) Navigation to Orders grid URL using navigation step.\n2) Login flow on Magento Admin login page:\n   - Input username into username field (element_hash: 3597a5c5e6).\n   - Input password into password field (element_hash: 1c47a5217e).\n   - Click Login button (element_hash: 6831836d17).\n   We will not rely on fragile CSS ids; instead we use these element hashes mapped by the controller.\n3) Wait a short period (or rely on next actions) until Orders grid loads at /admin/sales_order/.\n4) Close the floating notice panel blocking a portion of the grid using its close link (element_hash: df76c6ce85).\n5) Clear any previous filters using Reset Filter button (element_hashes observed: 19d1bc1ae1, 9542e5c776 \u2013 same logical control). We'll pick one stable hash; the controller will map it to CSS/XPath.\n6) For each filter input, deterministically input the parameterized values if non-empty:\n   - Order # text: element_hash 230585ef85.\n   - Purchased On From date: element_hash edfcce685d.\n   - Purchased On To date: element_hash d97875576f.\n   - Purchased From (Store) dropdown: element_hash 2e752431bb.\n   - Status dropdown: element_hash 301a5525e7.\n   - G.T. (Base) From: element_hash 0615c0f675.\n   - G.T. (Base) To: element_hash b3f9a08198.\n   - G.T. (Purchased) From: element_hash 84e80f48e8.\n   - G.T. (Purchased) To: element_hash ad2f402eb2.\n   We must always apply these unconditionally in the sequence (empty string means nothing typed, so field remains blank). Because the tool framework has no conditional branching, we simply feed the values from inputs\u2014if the caller wants field blank they pass an empty string.\n7) Set page size via the View-per-page select (element_hash: 4193f2ffe1).\n8) Click Search (button element_hash examples: 0cd7b5ca78, 90708cd5ce, a338c1063a, a9a11bbb41 \u2013 same logical control). We'll choose one consistent hash.\n9) Perform pagination (Next page) a specified number of times using the pagination control link (element_hash: 19e6ae1c81 for Next page). Because we lack direct page-number input, we parameterize it as number_of_next_clicks.\n10) Extract the grid content with extract_page_content, capturing order rows and their View link hrefs.\n\nVariable Identification:\nInputs tied directly to Magento grid controls:\n- login_username (string, required): value for admin username.\n- login_password (string, required): value for admin password.\n- filter_order_number (string, optional): Order # text filter.\n- filter_purchased_from_store (string, optional, enum of visible store options): Store view filter.\n- filter_purchased_on_from (string, optional, format MM/DD/YYYY): Date range From.\n- filter_purchased_on_to (string, optional, format MM/DD/YYYY): Date range To.\n- filter_status (string, optional, enum of known statuses from page).\n- filter_gt_base_from (string, optional, numeric text): Grand total base From.\n- filter_gt_base_to (string, optional): Grand total base To.\n- filter_gt_purchased_from (string, optional): Grand total purchased From.\n- filter_gt_purchased_to (string, optional): Grand total purchased To.\n- page_size (string, optional, enum [\"20\",\"30\",\"50\",\"100\",\"200\"]): View-per-page selector; defaults to 20 if empty.\n- next_page_clicks (number as string, optional): how many times to click the Next page control (0 for none).\n\nWe do not model Search/Reset as separate inputs; Search is always executed once after applying filters. Initial Reset assures a clean state.\n\nStep Optimization & URL Manipulation:\n- Magento admin orders grid uses form POST for filters; URL parameters are not obviously exposed for each filter. Reconstructing a GET with all filter params is error-prone and brittle. We keep UI interaction.\n- Navigation to the starting orders grid can be a single navigation step to the URL http://dockerized-magento.local/index.php/admin/sales_order/ (system-provided). No need to click through admin menus.\n- Authentication: previous failures came from waiting on a specific #username selector. This tool instead logs in deterministically using element hashes, which controller resolves. The login step will execute immediately after hitting the URL.\n- Some elements (Search/Reset/Next) appeared multiple times with different hashes throughout the session due to page reloads; we choose the hashes from the later, stable state when filters and pagination were working: Reset Filter (9542e5c776), Search (a9a11bbb41), Next page (19e6ae1c81).\n- To keep tool deterministic and simple, we don\u2019t attempt conditional flows (e.g., skip login if already logged in). The caller can start from a known fresh state; repeated login on an already-authenticated session usually no-ops or redirects.\n\nJustification for no additional inputs:\n- We do not parameterize clicking a specific View link; the core goal is to return all rows with View hrefs from the selected page. The client can then decide which order to open. Adding a View-click step would require choosing specific row by content, which introduces branching.\n- We do not add separate inputs for toggling Search vs Reset; Reset is always done first to standardize state, Search always executed after filters.\n\nOverall, this yields a single-purpose, deterministic search+paginate tool for Magento orders grid with robust selectors and parameter-driven filters, addressing prior #username selector failures entirely by avoiding them and using element hashes from this successful run.",
+  "name": "tool_search_orders_v5",
+  "description": "Search and paginate Magento admin sales orders grid with flexible filters, then return the resulting grid rows and their View links. Includes robust login that avoids brittle #username selectors, uses all major filters (order number, date range, store, status, grand total ranges), supports page size and pagination navigation, and extracts the orders grid content.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Sales Orders grid URL, which may show a login form if not authenticated.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_order/",
+      "url_operation": null
+    },
+    {
+      "description": "Enter the Magento admin username into the login form username field using a stable element hash.",
+      "output": null,
+      "cssSelector": "input[name=\"login[username]\"][type=\"text\"]",
+      "xpath": "html/body/div/div/form/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "3597a5c5e6",
+      "type": "input",
+      "value": "{login_username}"
+    },
+    {
+      "description": "Enter the Magento admin password into the login form password field using a stable element hash.",
+      "output": null,
+      "cssSelector": "#login",
+      "xpath": "html/body/div/div/form/div/div[3]/input[2]",
+      "elementTag": "input",
+      "elementHash": "1c47a5217e",
+      "type": "input",
+      "value": "{login_password}"
+    },
+    {
+      "description": "Click the Login button on the Magento Admin login form to authenticate.",
+      "output": null,
+      "cssSelector": "input[title=\"Login\"]",
+      "xpath": "html/body/div/div/form/div/div[5]/input",
+      "elementTag": "input",
+      "elementHash": "6831836d17",
+      "type": "click"
+    },
+    {
+      "description": "Wait a few seconds for the Magento Admin Orders grid page to fully load after login.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Close the floating notice/message box on the Orders grid that may obscure filter controls, using its close link.",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[7]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Click the Reset Filter button on the Orders grid toolbar to clear any previously applied filters and start from a clean state.",
+      "output": null,
+      "cssSelector": "#id_7800ac1f84250492de3daace69b704b7",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[3]/button",
+      "elementTag": "button",
+      "elementHash": "9542e5c776",
+      "type": "click"
+    },
+    {
+      "description": "Type the Order # filter text into the Order # column filter input (blank if no order number filtering desired).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_real_order_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "230585ef85",
+      "type": "input",
+      "value": "{filter_order_number}"
+    },
+    {
+      "description": "Enter the Purchased On From date in MM/DD/YYYY format into the left date field (leave blank to omit).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_created_at1769943056.2262_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "edfcce685d",
+      "type": "input",
+      "value": "{filter_purchased_on_from}"
+    },
+    {
+      "description": "Enter the Purchased On To date in MM/DD/YYYY format into the right date field (leave blank to omit).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_created_at1769943056.2262_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "d97875576f",
+      "type": "input",
+      "value": "{filter_purchased_on_to}"
+    },
+    {
+      "description": "Select the Purchased From (Store) filter dropdown option by visible text (empty string leaves the default selection).",
+      "output": null,
+      "cssSelector": "select[name=\"store_id\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/select",
+      "elementTag": "select",
+      "elementHash": "2e752431bb",
+      "type": "select_change",
+      "selectedText": "{filter_purchased_from_store}"
+    },
+    {
+      "description": "Select the Status filter dropdown option by visible text (empty string leaves the default selection).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_status",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "301a5525e7",
+      "type": "select_change",
+      "selectedText": "{filter_status}"
+    },
+    {
+      "description": "Enter the G.T. (Base) From numeric value for the base grand total range filter (blank for no lower bound).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_base_grand_total_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "0615c0f675",
+      "type": "input",
+      "value": "{filter_gt_base_from}"
+    },
+    {
+      "description": "Enter the G.T. (Base) To numeric value for the base grand total range filter (blank for no upper bound).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_base_grand_total_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "b3f9a08198",
+      "type": "input",
+      "value": "{filter_gt_base_to}"
+    },
+    {
+      "description": "Enter the G.T. (Purchased) From numeric value for the purchased grand total range filter (blank for no lower bound).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_grand_total_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "84e80f48e8",
+      "type": "input",
+      "value": "{filter_gt_purchased_from}"
+    },
+    {
+      "description": "Enter the G.T. (Purchased) To numeric value for the purchased grand total range filter (blank for no upper bound).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_grand_total_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "ad2f402eb2",
+      "type": "input",
+      "value": "{filter_gt_purchased_to}"
+    },
+    {
+      "description": "Change the View-per-page selector to control how many orders are shown per page (empty string keeps default).",
+      "output": null,
+      "cssSelector": "select[name=\"limit\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td/select",
+      "elementTag": "select",
+      "elementHash": "4193f2ffe1",
+      "type": "select_change",
+      "selectedText": "{page_size}"
+    },
+    {
+      "description": "Click the Search button on the Orders grid toolbar to apply all configured filters and reload the grid.",
+      "output": null,
+      "cssSelector": "#id_07e916e9e70a79139f9124142d1625cc",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "a9a11bbb41",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the Orders grid to refresh after submitting the Search filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Use an agentic subtask to handle a variable number of Next-page pagination clicks based on the provided next_page_clicks value and grid state.",
+      "output": null,
+      "type": "agent",
+      "task": "Click the Next page pagination control exactly {next_page_clicks} times on the Magento Orders grid to move forward in the result pages, if next_page_clicks is greater than 0. Stop early if there is no further Next page link.",
+      "max_steps": 6
+    },
+    {
+      "description": "Capture structured search results and pagination metadata from the Orders grid after filters and pagination have been applied.",
+      "output": "orders_grid_data",
+      "type": "extract_page_content",
+      "goal": "From the currently visible Magento Orders grid page, extract structured data for each order row, including Order #, Purchased From (Store), Purchased On, Bill to Name, Ship to Name, G.T. (Base), G.T. (Purchased), Status, and the href of the row-level 'View' link in the Action column. Also capture pagination state (current page, total pages, total records) and active filter values shown in the filter row and toolbar."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "login_username",
+      "type": "string",
+      "format": null,
+      "description": "Magento Admin username for login (maps to username field on login form).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "login_password",
+      "type": "string",
+      "format": null,
+      "description": "Magento Admin password for login (maps to password field on login form).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "filter_order_number",
+      "type": "string",
+      "format": null,
+      "description": "Order # filter text entered in the Order # column filter input. Leave empty to not filter by order number.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_purchased_on_from",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Purchased On date range start (From) in MM/DD/YYYY format. Leave empty to omit lower bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_purchased_on_to",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Purchased On date range end (To) in MM/DD/YYYY format. Leave empty to omit upper bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_purchased_from_store",
+      "type": "string",
+      "format": null,
+      "description": "Purchased From (Store) dropdown selection. Use one of the visible store view labels or empty string for no store filter.",
+      "required": false,
+      "enum": [
+        "",
+        "English",
+        "French",
+        "German",
+        "[ deleted ]"
+      ]
+    },
+    {
+      "name": "filter_status",
+      "type": "string",
+      "format": null,
+      "description": "Order Status dropdown filter. Use empty string to avoid filtering by status.",
+      "required": false,
+      "enum": [
+        "",
+        "Canceled",
+        "Cancelled Ogone",
+        "Closed",
+        "Complete",
+        "Declined Ogone",
+        "Suspected Fraud",
+        "On Hold",
+        "Payment Review",
+        "PayPal Canceled Reversal",
+        "PayPal Reversed",
+        "Pending",
+        "Pending Ogone",
+        "Pending Payment",
+        "Pending PayPal",
+        "Processed Ogone Payment",
+        "Processing",
+        "Processing Ogone Payment",
+        "Waiting Authorization"
+      ]
+    },
+    {
+      "name": "filter_gt_base_from",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Base) numeric range From value. Leave empty for no lower bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_gt_base_to",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Base) numeric range To value. Leave empty for no upper bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_gt_purchased_from",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Purchased) numeric range From value. Leave empty for no lower bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_gt_purchased_to",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Purchased) numeric range To value. Leave empty for no upper bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "page_size",
+      "type": "string",
+      "format": null,
+      "description": "View-per-page selector value. Empty string keeps Magento default (usually 20).",
+      "required": false,
+      "enum": [
+        "",
+        "20",
+        "30",
+        "50",
+        "100",
+        "200"
+      ]
+    },
+    {
+      "name": "next_page_clicks",
+      "type": "number",
+      "format": null,
+      "description": "Number of times to click the Next page pagination control after search (0 for none). Represents how many pages forward to move from the first results page.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

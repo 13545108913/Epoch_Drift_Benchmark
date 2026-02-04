@@ -1,0 +1,292 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session logs show a full edit workflow on a Magento 1.9 admin product edit page for product id 2796 (and later duplicate id 2802). Key interactions used stable element hashes for General fields (name, sku, weight), Prices and Inventory tabs, top action buttons (Save, Save and Continue, Duplicate, Delete), Websites checkboxes, and an ExtJS category tree loaded via AJAX. The Categories tree and some buttons rely on JS/AJAX, so reading/writing category checkboxes and delete URLs needs dynamic handling.\n\nTask Definition:\n- Create a reusable tool to edit a Magento product by product_id: set name, sku, weight, price, status, visibility, inventory qty, assign websites and categories, and then save. Optionally, duplicate and/or delete the product when explicitly requested. The tool must use stable selectors (elementHash where recorded) and agentic steps for dynamic content (category tree, website mapping, delete confirmation) and must not attempt destructive actions without explicit confirmation and the live form_key.\n\nAction Plan:\n1) Navigate to the product edit URL for {product_id}.\n2) Ensure page load and set General fields (name, sku, weight) using stable selectors.\n3) Open Prices tab and set price using canonical id/name selectors.\n4) Open Inventory tab and set qty if provided using stock_data name patterns.\n5) Select Status and Visibility via recorded select element hashes.\n6) Use an agentic routine to toggle website checkboxes by reading input[name='product[website_ids][]'] values and matching them to {product_website_ids}.\n7) Use an agentic routine to open the Categories tab (AJAX) and toggle product[category_ids][] inputs by value or by locating labels by text when IDs are not provided.\n8) Click Save or Save and Continue based on {save_action}. Wait and verify the success message.\n9) Optionally click Duplicate and follow redirect to new product id; capture new id.\n10) Optionally delete (destructive): only after reading the Delete control's onclick/href and the session form_key from the live DOM and only with explicit user consent.\n\nVariable Identification (inputs):\n- product_id (required): product edit id in URL.\n- name (required), sku (required), weight (required), price (required), status (required), visibility (required) \u2014 based on Magento form required fields.\n- qty (optional): product[stock_data][qty]. If omitted, inventory won't be changed.\n- product_website_ids (optional): comma-separated website ids matching input[name='product[website_ids][]'] values.\n- product_category_ids (optional): comma-separated category ids matching input[name='product[category_ids][]'] values; if omitted, category toggling is skipped.\n- save_action (optional): 'save' or 'save_and_continue'.\n- duplicate_after_edit (optional): bool; duplicate product after save if true.\n- delete_after_edit (optional): bool; destructive, only executed if the agent can extract the delete URL and form_key and user confirms.\n\nStep Optimization:\n- Use direct URL navigation to open the product edit page (faster and deterministic).\n- Use recorded elementHash values for inputs and tab clicks where available (df3020a86b for Name, 1349f1ca81 for SKU, d929abfc8b for Weight, e457e89369 for Price, 15f8e67c9f for Qty, etc.) to ensure uniqueness and avoid ambiguous selectors.\n- Use canonical id/name-based CSS selectors as fallbacks (#name, #sku, #weight, #price, input[name='product[stock_data][qty]']).\n- Treat Websites selection and Categories tree as agentic steps because their DOM depends on AJAX/ExtJS and value mapping (product[website_ids][] and product[category_ids][]) may vary by installation. Agent steps will locate inputs by name, map labels, and toggle by value.\n- For Delete (destructive) do NOT guess the form_key or delete URL. The tool reads the exact onclick/href and the form_key from the live DOM before executing deletion. If these cannot be read, deletion is skipped and the tool reports the missing values.\n\nDeterministic & Safety Notes:\n- The tool assumes the admin session is already authenticated; it does not perform login.\n- Destructive actions (Delete) are gated: the tool will only attempt deletion if user explicitly requests and the delete URL/form_key are confirmed from the live DOM.\n- The tool uses a small number of waits after navigation/tab clicks to allow admin widgets to initialize. If running in a headless browser, ensure JS execution is enabled so the Categories tree and deleteConfirm behavior work.\n\nRequired/Optional fields decisions:\n- Name, SKU, Weight, Price, Status, Visibility are marked required because the Magento form shows '*' for these fields.\n- Inventory Qty, Websites, Categories are optional because they may not always be changed.\n\nThis tool provides a deterministic edit flow for stable fields and agentic handling for website/category/delete interactions that require runtime DOM interrogation.",
+  "name": "magento_edit_product_tool",
+  "description": "Edit a Magento 1.x product from the admin product edit page. Navigates to the product edit URL, updates General/Prices/Inventory fields, toggles website and category assignments (via agentic steps for dynamic trees), and saves changes. Designed for the admin already-authenticated session. Does not perform login.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento product edit page for the requested product id.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/catalog_product/edit/id/{product_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the product edit page to load and JS widgets to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Set the product Name (General tab). Uses recorded elementHash for stability; also provides a common CSS fallback.",
+      "output": null,
+      "cssSelector": "#name",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "df3020a86b",
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Set the SKU (General tab).",
+      "output": null,
+      "cssSelector": "#sku",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[4]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "1349f1ca81",
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Set the product Weight (General tab).",
+      "output": null,
+      "cssSelector": "input[name=\"product[weight]\"][type=\"text\"]",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[5]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "d929abfc8b",
+      "type": "input",
+      "value": "{weight}"
+    },
+    {
+      "description": "Set the Status select (Website/Global scope). Uses recorded elementHash; falls back to common name/id selectors.",
+      "output": null,
+      "cssSelector": "select[name=\"product[status]\"]",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[8]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "d7baed0536",
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Set the Visibility select (Store View scope).",
+      "output": null,
+      "cssSelector": "select[name=\"product[visibility]\"]",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[10]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "2d6f7788e8",
+      "type": "select_change",
+      "selectedText": "{visibility}"
+    },
+    {
+      "description": "Open the Prices tab so the price input is present (recorded elementHash for the Prices tab).",
+      "output": null,
+      "cssSelector": "#product_info_tabs_group_8",
+      "xpath": "html/body/div/div[7]/div/div/div/ul/li[2]/a",
+      "elementTag": "a",
+      "elementHash": "86ed7ee82d",
+      "type": "click"
+    },
+    {
+      "description": "Wait for Prices tab content to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set the Price field in the Prices tab (standard #price or product[price] name).",
+      "output": null,
+      "cssSelector": "#price",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[4]/div/div[2]/div/table/tbody/tr/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "e457e89369",
+      "type": "input",
+      "value": "{price}"
+    },
+    {
+      "description": "Open the Inventory tab to reveal stock fields (recorded elementHash for the Inventory tab).",
+      "output": null,
+      "cssSelector": "#product_info_tabs_inventory",
+      "xpath": "html/body/div/div[7]/div/div/div/ul/li[8]/a",
+      "elementTag": "a",
+      "elementHash": "71d44f34a7",
+      "type": "click"
+    },
+    {
+      "description": "Wait for Inventory tab to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set the Inventory Qty field (product[stock_data][qty]). If {qty} is empty or not provided the step will still attempt to run but no change will be made.",
+      "output": null,
+      "cssSelector": "#inventory_qty",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[10]/div/fieldset/table/tbody/tr[2]/td[2]/input[2]",
+      "elementTag": "input",
+      "elementHash": "15f8e67c9f",
+      "type": "input",
+      "value": "{qty}"
+    },
+    {
+      "description": "Select the product websites. This is done using an agentic step because website checkbox placement and values may vary; the agent will map labels to input values and toggle as requested.",
+      "output": null,
+      "type": "agent",
+      "task": "Toggle website checkboxes specified in {product_website_ids}. Locate inputs named 'product[website_ids][]' and select/deselect by value to match the provided comma-separated list. Use label text fallbacks if numeric values are not found. After toggling, verify checked state. Max steps: 6",
+      "max_steps": 6
+    },
+    {
+      "description": "Toggle categories in the ExtJS category tree. This step is agentic because the category chooser is an AJAX/JS ExtJS tree that requires dynamic handling.",
+      "output": null,
+      "type": "agent",
+      "task": "Open the Categories tab (click the Categories tab link) and toggle category checkboxes for ids in {product_category_ids}. If the category tree loads via AJAX, wait for the tree container (e.g. '#categories' or '.category-tree') then find inputs named 'product[category_ids][]' or 'category_ids[]' and toggle by value. If values are not provided, find nodes by label text using the names provided in {product_category_ids}. Dispatch change events after toggling. Max steps: 8",
+      "max_steps": 8
+    },
+    {
+      "description": "Allow any JS handlers to process the website/category toggles (change events).",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Click Save (default). If {save_action} is 'save_and_continue' a different button will be clicked by the conditional step below.",
+      "output": null,
+      "cssSelector": "#id_c6cce326f907d9c08bbfbc618a449ea0",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/div[2]/div/p/button[5]",
+      "elementTag": "button",
+      "elementHash": "c4b33b552d",
+      "type": "click"
+    },
+    {
+      "description": "Agentic conditional to handle Save vs Save and Continue (some admin themes render different element types).",
+      "output": null,
+      "type": "agent",
+      "task": "If {save_action} equals 'save_and_continue' then click the 'Save and Continue Edit' control using selectors: button[title='Save and Continue Edit'], button#save_and_continue, or button[onclick*='saveAndContinueEdit']. Otherwise, do nothing. Max steps: 2",
+      "max_steps": 2
+    },
+    {
+      "description": "Wait for the save request to complete and for the success message to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Optionally duplicate the product after saving; duplication typically redirects to the edit page for the new product and is dynamic.",
+      "output": null,
+      "type": "agent",
+      "task": "If {duplicate_after_edit} is true, click the Duplicate control (button[title='Duplicate'] or anchor with href containing '/catalog_product/duplicate/id/{product_id}/') and wait for the redirect to the new product edit page. Capture the new product id from the redirected URL. Max steps: 6",
+      "max_steps": null
+    },
+    {
+      "description": "Destructive action (DELETE). Tool will only attempt deletion if delete_after_edit is true and the agent can read the exact delete URL and form_key from the live DOM. This is intentionally agentic and limited to avoid unsafe guesses.",
+      "output": null,
+      "type": "agent",
+      "task": "If {delete_after_edit} is true and only after explicit user confirmation: locate the Delete control, extract its onclick/href and the page form_key (input[name='form_key']). Confirm the delete URL contains the expected product id and form_key, then perform the deleteConfirm click or GET to the delete URL. Handle the JS confirmation dialog if present. Max steps: 8",
+      "max_steps": 8
+    },
+    {
+      "description": "Extract the page success message and the current edit URL to confirm changes persisted and capture any new product id (if duplicated).",
+      "output": "final_result",
+      "type": "extract_page_content",
+      "goal": "Capture top-of-page success messages and final product edit URL after operations to report final product id and status"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "product_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric product ID from Magento admin URL (used to open the edit page). Example: \"2796\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Product Name (visible 'Name *' field). This is required by Magento product form.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "format": null,
+      "description": "Product SKU (visible 'SKU *' field). Must be unique for the store.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "weight",
+      "type": "string",
+      "format": null,
+      "description": "Product weight (text/number). Use decimal format (e.g. \"2.5000\").",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "price",
+      "type": "string",
+      "format": null,
+      "description": "Product price (decimal). Example: \"24.99\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Product status visible text (e.g. \"Enabled\" or \"Disabled\"). Matches exact visible option text in the Status select.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "visibility",
+      "type": "string",
+      "format": null,
+      "description": "Visibility option visible text (e.g. \"Catalog, Search\", \"Not Visible Individually\"). Use exact visible option text.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "qty",
+      "type": "string",
+      "format": null,
+      "description": "Inventory quantity to set (numeric). If omitted, inventory Qty will not be changed.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "product_website_ids",
+      "type": "string",
+      "format": null,
+      "description": "Comma-separated website ids to assign the product to (matches input[name='product[website_ids][]'] value attributes). Example: \"1,2\". Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "product_category_ids",
+      "type": "string",
+      "format": null,
+      "description": "Comma-separated category ids to toggle in the category tree (matches input[name='product[category_ids][]' value]). Example: \"123,456\". Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "save_action",
+      "type": "string",
+      "format": null,
+      "description": "Which save action to click after edits. Allowed values: \"save\" (default) or \"save_and_continue\" (stays on edit page).",
+      "required": false,
+      "enum": [
+        "save",
+        "save_and_continue"
+      ]
+    },
+    {
+      "name": "duplicate_after_edit",
+      "type": "bool",
+      "format": null,
+      "description": "If true, click the 'Duplicate' action after saving. Default: false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "delete_after_edit",
+      "type": "bool",
+      "format": null,
+      "description": "If true, attempt to delete the product after duplication/save. WARNING: destructive. Tool will only proceed if the Delete button attributes (delete URL and form_key) can be read from the live DOM and user explicitly requests deletion. Default: false.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

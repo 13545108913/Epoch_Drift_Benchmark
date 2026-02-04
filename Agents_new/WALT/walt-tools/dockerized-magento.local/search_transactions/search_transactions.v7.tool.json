@@ -1,0 +1,196 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigates to the Magento Admin Transactions grid, dismisses an overlay, fills the header filter row (Order ID, Transaction ID, Transaction Type, Payment Method, Is Closed, Created At from/to), clicks Search and extracts the resulting grid and message. Element interactions were recorded with stable elementHash identifiers which are used below for deterministic interactions.\n\nTask Definition:\n- Provide a reusable, parameterized tool that applies user-supplied transaction filters on the Magento Admin 'Transactions' grid and returns the filtered results (rows / 'No records found' message) along with visible filter values for verification.\n\nAction Plan (detailed):\n1) Navigate to the admin transactions URL. 2) Wait for page readiness and close the 'Incoming Message' overlay (if present). 3) Fill the Order ID and Transaction ID text inputs. 4) Select Transaction Type, Payment Method and Is Closed from their dropdowns (by visible text). 5) Enter Created At from/to dates. 6) Click the Search button and wait for the grid to update. 7) Extract page content: grid rows, total count text, and visible filter values for verification.\n\nVariable Identification (inputs required):\n- base_url: optional; target Magento host. Recorded host used if omitted.  \n- order_id: optional text for 'Order ID' filter.  \n- transaction_id: optional text for 'Transaction ID' filter.  \n- txn_type: optional visible label for 'Transaction Type' select (Order, Authorization, Capture, Void, Refund).  \n- payment_method: optional visible label for payment method select (use exact visible option).  \n- is_closed: optional visible label for 'Is Closed' (Yes or No).  \n- created_at_from / created_at_to: optional date strings in YYYY-MM-DD format.\n\nStep Optimization and Selector Decisions:\n- Navigation is implemented via direct URL to avoid unnecessary UI clicks.  \n- Where stable elementHash values were recorded they are used for deterministic interactions to avoid ambiguous selectors that resolved to multiple elements in earlier attempts. Recorded elementHash values: order input (2e1ab70e63), transaction input (aa9671f0a9), transaction type select (eaf63619c9), is_closed select (de66e8a7e6), created_at from (aea5784012), created_at to (f593ca16a2), Search button (90708cd5ce), overlay close (df76c6ce85).\n- The tool avoids conditional branching; inputs may be empty strings which will leave controls at their default state (All).  \n- Kept a small wait after navigation and after clicking Search to allow overlays/loaders to settle (recorded waits: 2s).  \n- Extraction step uses header-relative selectors (recorded during session) and returns 'search_results' for downstream verification.\n\nWhy these parameters and steps only (no extras):\n- The original task required demonstrating the exact filter interactions (transaction/order id, type, payment method, closed/open state, date range) and Search. Auxiliary actions (sorting, pagination changes) were explicitly excluded per instructions; this tool performs only the essential steps required to replicate the recorded search behavior.\n\nNotes on robustness:\n- If a different Magento instance uses different DOM ids, the base_url parameter allows running against the correct host; the tool uses elementHash values recorded in the demo session. If automation fails due to differing DOM, the header-relative XPath/CSS selectors captured in the session logs should be used instead of elementHash values (these are available in the session notes).",
+  "name": "magento_admin_transactions_search",
+  "description": "Search the Magento Admin Transactions grid using header-relative, deterministic selectors recorded from a demo session. Inputs fill the grid filter controls (Order ID, Transaction ID, Transaction Type, Payment Method, Is Closed, Created At range), click Search, then extract the resulting grid rows and summary.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to the Transactions grid page. If {base_url} is not provided the caller should supply 'http://dockerized-magento.local'.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/sales_transactions/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the page to render and any loading masks to disappear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Close the 'Incoming Message' overlay if present (recorded close button). Safe no-op if overlay is not present.",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Set Order ID filter input (recorded elementHash for the Order ID text input).",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_increment_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "2e1ab70e63",
+      "type": "input",
+      "value": "{order_id}"
+    },
+    {
+      "description": "Set Transaction ID filter input (recorded elementHash for the Transaction ID text input).",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_txn_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[3]/div/input",
+      "elementTag": "input",
+      "elementHash": "aa9671f0a9",
+      "type": "input",
+      "value": "{transaction_id}"
+    },
+    {
+      "description": "Select the Transaction Type dropdown option by visible text (recorded elementHash). Pass empty string to leave at default/All.",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_txn_type",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[6]/select",
+      "elementTag": "select",
+      "elementHash": "eaf63619c9",
+      "type": "select_change",
+      "selectedText": "{txn_type}"
+    },
+    {
+      "description": "Select the Is Closed dropdown option by visible text ('Yes' or 'No'). Pass empty string to leave at default/All.",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_is_closed",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[7]/select",
+      "elementTag": "select",
+      "elementHash": "de66e8a7e6",
+      "type": "select_change",
+      "selectedText": "{is_closed}"
+    },
+    {
+      "description": "Select the Payment Method dropdown by visible label. Note: elementHash for payment method shares the same recorded select container as transaction type in the demo grid; selecting an empty string leaves it unchanged.",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_txn_type",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[6]/select",
+      "elementTag": "select",
+      "elementHash": "eaf63619c9",
+      "type": "select_change",
+      "selectedText": "{payment_method}"
+    },
+    {
+      "description": "Enter the 'Created At' FROM date (YYYY-MM-DD) into the recorded 'from' date input.",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_created_at1769979447.6325_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[8]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "aea5784012",
+      "type": "input",
+      "value": "{created_at_from}"
+    },
+    {
+      "description": "Enter the 'Created At' TO date (YYYY-MM-DD) into the recorded 'to' date input.",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_created_at1769979447.6325_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[8]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "f593ca16a2",
+      "type": "input",
+      "value": "{created_at_to}"
+    },
+    {
+      "description": "Click the Search button (recorded elementHash for the grid 'Search' action).",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[2]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture the grid data (rows), the 'No records found' message if present, and the visible filter values for verification.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Extract resulting transactions grid rows, total record count and applied filter visible values"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base URL of the Magento instance (example: 'http://dockerized-magento.local'). If omitted the recorded host 'http://dockerized-magento.local' will be used by the navigation step.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Order increment id to filter by (text). Matches the 'Order ID' filter column.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "transaction_id",
+      "type": "string",
+      "format": null,
+      "description": "Gateway transaction identifier to filter by (text). Matches the 'Transaction ID' filter column.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "txn_type",
+      "type": "string",
+      "format": null,
+      "description": "Visible Transaction Type option to select in the 'Transaction Type' column. Use the visible label exactly (e.g. 'Capture'). Leave empty for All.",
+      "required": false,
+      "enum": [
+        "Order",
+        "Authorization",
+        "Capture",
+        "Void",
+        "Refund"
+      ]
+    },
+    {
+      "name": "payment_method",
+      "type": "string",
+      "format": null,
+      "description": "Visible Payment Method label to select from the 'Payment Method Name' dropdown (e.g. 'PayPal Express Checkout'). Use the exact visible label. Leave empty for All.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_closed",
+      "type": "string",
+      "format": null,
+      "description": "Visible 'Is Closed' dropdown option label: 'Yes' or 'No'. Leave empty for All.",
+      "required": false,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "created_at_from",
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "description": "Start date for Created At range filter. Format: 'YYYY-MM-DD'. Leave empty to omit.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_to",
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "description": "End date for Created At range filter. Format: 'YYYY-MM-DD'. Leave empty to omit.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

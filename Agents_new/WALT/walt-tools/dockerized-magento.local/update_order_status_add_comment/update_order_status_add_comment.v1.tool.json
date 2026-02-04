@@ -1,0 +1,123 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigates to a Magento admin order view and manipulates the 'Add Order Comments' controls (textarea, status select, notify and visible checkboxes) and clicks 'Submit Comment'. Multiple attempts to change the status select by visible label failed in the session, so the select is sometimes unreliable via UI automation. The session captured stable element hashes for the textarea (fcc90341f4), status select (a29f177603), notify checkbox (6ff6db733b), visible checkbox (394ae2565e), and a submit button (1c2a87153e).\n\nTask Definition:\n- Single purpose: Add an order history comment to a given order (order_id) and optionally update the order status and notification/visibility flags. The tool must return verification that the header order status and latest comment reflect the requested changes.\n\nAction Plan (detailed to-do list):\n1) Navigate to the admin order view URL for {order_id} under {base_url} (deterministic URL navigation).\n2) Wait for DOM/JS to initialize.\n3) Read the page to capture form_key and form action (useful if direct UI selection fails).\n4) Fill the comment textarea with {history[comment]} using the recorded elementHash (deterministic).\n5) Attempt to set the status select via recorded elementHash 'a29f177603' using the provided {history[status]} (if any). If setting via UI fails, fetch the add-comment form HTML, parse the select/options and form_key, and POST the addComment payload directly to the inferred action URL (/admin/sales_order/addComment/order_id/{order_id}/) including history fields and form_key.\n6) Ensure notify and visible checkboxes reflect requested values using the recorded element hashes, toggling as necessary.\n7) Click the recorded Submit Comment button (elementHash '1c2a87153e') if UI path is used. If POST path was used in step 5, skip clicking but still verify the result by reloading the order view.\n8) Wait for processing and extract page content to confirm the order header status and latest comment entry.\n\nVariable Identification (tool inputs):\n- order_id (required): internal numeric id used in URLs.\n- base_url (optional): target Magento host.\n- history[comment] (required): comment text to add.\n- history[status] (optional): internal status code to set (e.g., 'processing').\n- history[is_customer_notified] (optional): whether to notify the customer (bool).\n- history[is_visible_on_front] (optional): whether the comment is visible on frontend (bool).\n- form_key (optional): CSRF token; if omitted the tool will attempt to read it from the DOM.\n\nStep Optimization and Notes:\n- Navigation uses direct URL to the order view, avoiding UI menu clicks.\n- Interactions use elementHash values recorded in the session for deterministic targeting where available (textarea, select, checkboxes, submit button).\n- Because select_change by visible text failed repeatedly in the recording session, the tool uses an agentic step to handle that complexity: try the stable select change first, and if it fails fall back to reading the form HTML (commentsHistory or order view DOM) to extract the exact option value and form_key, then POST the addComment payload directly. This avoids unreliable repeated UI attempts.\n- The tool does not include optional exploratory steps, filtering, or sorting; it only performs actions necessary to add the comment and optionally update status/flags and verify the result.\n- The tool assumes the agent is already authenticated in admin. If a login page is encountered the agentic step may attempt to read the form_key and fail; the tool is designed to surface the failure in the verification output so a user can supply credentials or a form_key if needed.\n\nDeterministic behavior:\n- Sequential steps are deterministic. Agentic fallback is used to handle dynamic failure modes when selecting dropdown options via the UI is unreliable. The agentic step has a bounded max_steps to avoid uncontrolled behavior.\n\nOutputs:\n- The final extract_page_content step returns 'update_verification' containing order header status and the latest comment details so the caller can confirm success.",
+  "name": "magento_admin_add_order_comment",
+  "description": "Add an order history comment to a Magento 1.x admin order view and optionally update the order status and notification/visibility flags. Uses recorded admin selectors when possible and falls back to reading the form and POSTing if direct UI selection fails.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the admin order view page for the specified order_id (use {base_url} or default host).",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the order view page to load and for JavaScript to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture form_key (if present), form action URL (addComment), and visible current order status for verification after update.",
+      "output": "order_view_meta",
+      "type": "extract_page_content",
+      "goal": "Read the order view DOM to capture hidden inputs (form_key), verify Add Order Comments form presence, and confirm stable selectors for the status select and submit button."
+    },
+    {
+      "description": "Fill the Add Order Comments textarea with the provided comment (elementHash recorded in the session).",
+      "output": null,
+      "cssSelector": "#history_comment",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/span[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "fcc90341f4",
+      "type": "input",
+      "value": "{history[comment]}"
+    },
+    {
+      "description": "Agentic step to handle setting the status and checkboxes; this step handles cases where direct select_change by visible text may fail and will fall back to reading the form and submitting via POST.",
+      "output": "set_controls_result",
+      "type": "agent",
+      "task": "Set the Add Order Comments controls to the requested values:\n- If {history[status]} is provided: try to set the status select (elementHash 'a29f177603') to visible option matching {history[status]} by visible text or value. If the UI select cannot be changed reliably, fetch the form markup (from the currently loaded DOM or from {base_url}/index.php/admin/sales_order/commentsHistory/order_id/{order_id}/), extract the form_key and the exact option value for the 'Processing' label (or the provided {history[status]} label), and prepare a POST payload to /admin/sales_order/addComment/order_id/{order_id}/ with fields: history[status], history[comment], history[is_customer_notified]=1 if requested, history[is_visible_on_front]=1 if requested, and form_key. Execute the POST if UI selection fails.\n- Ensure checkboxes for notify (elementHash '6ff6db733b') and visible (elementHash '394ae2565e') are set to match {history[is_customer_notified]} and {history[is_visible_on_front]} respectively (click or unclick as needed).",
+      "max_steps": 8
+    },
+    {
+      "description": "Click the 'Submit Comment' button to post the comment/update. Uses the recorded submit button elementHash from the session.",
+      "output": null,
+      "cssSelector": "button[title=\"Submit Comment\"][title=\"Submit Comment\"]",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/div[3]/button",
+      "elementTag": "button",
+      "elementHash": "1c2a87153e",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the server to process the update and for the page to refresh the Comments History area.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Return page-extracted confirmation details so the caller can verify success (order status string, latest comment text, and notification/visibility state as shown on page).",
+      "output": "update_verification",
+      "type": "extract_page_content",
+      "goal": "Confirm the update: extract current Order Status from the Order Information block and the most recent comment entry (timestamp, status shown, notification flag, and comment text)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Internal order id used in admin URLs (example: '204'). This is the numeric id present in the admin URL /admin/sales_order/view/order_id/<order_id>/",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base URL for the Magento store including scheme and host (example: 'http://dockerized-magento.local'). If omitted the tool will default to 'http://dockerized-magento.local'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "history[comment]",
+      "type": "string",
+      "format": null,
+      "description": "The comment text to add to the order history (POST field name 'history[comment]' and used to fill the textarea).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "history[status]",
+      "type": "string",
+      "format": null,
+      "description": "Order status code to set in the Add Comment form (POST field name 'history[status]'). Use Magento internal codes (example: 'processing', 'complete'). If omitted, the tool will attempt to add the comment without changing status.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "history[is_customer_notified]",
+      "type": "bool",
+      "format": null,
+      "description": "Set to true to notify the customer by email when adding the comment (POST field name 'history[is_customer_notified]' value 1). Default false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "history[is_visible_on_front]",
+      "type": "bool",
+      "format": null,
+      "description": "Set to true to mark the comment visible on the storefront (POST field name 'history[is_visible_on_front]' value 1). Default false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "form_key",
+      "type": "string",
+      "format": null,
+      "description": "Optional CSRF form_key token. If provided the tool will use it when constructing a POST payload; if omitted the tool will attempt to read the token from the order view DOM before submitting.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

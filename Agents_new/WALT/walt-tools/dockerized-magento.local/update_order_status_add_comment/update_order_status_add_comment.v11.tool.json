@@ -1,0 +1,84 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session logs show a successful login to Magento admin, navigation to the order view page for order_id 204, detection of the 'Add Order Comments' form, and subsequent interactions: filling the comment textarea, selecting the 'Processing' status, checking the 'Notify Customer by Email' and 'Visible on Frontend' checkboxes, and clicking the submit control. Stable selectors observed repeatedly were: form[action*='/addComment'] select[name='status'], form[action*='/addComment'] textarea[name='comment'], form[action*='/addComment'] input[type='checkbox'][name='is_customer_notified'], form[action*='/addComment'] input[type='checkbox'][name='is_visible_on_front'], and the form submit button (button[type=\"submit\"] or input[type='submit']).\n\nTask Definition:\n- Create a reusable, parameterized automation tool that: navigates to a Magento admin order view by order_id, adds an order history comment (required), and optionally updates the order status, notifies the customer, and marks the comment visible on the frontend. The tool must capture and use stable CSS/XPath selectors based on the recorded session.\n\nAction Plan (step-by-step):\n1) Navigate to the order view URL constructed from {base_url} and {order_id}.\n2) Wait briefly for the page and 'Add Order Comments' form to load.\n3) Within the 'Add Order Comments' form (prefer form[action*='/addComment']):\n   - Optionally select the requested status.\n   - Fill the comment textarea with the provided comment text.\n   - Toggle the notify and visible checkboxes to the requested states (only enable if parameter true).\n   - Click the submit control to add the comment and apply the status change.\n4) Extract verification information: the latest comment text and current order status to return to the caller.\n\nVariable Identification (inputs required):\n- base_url (string, required): The Magento base host to construct the admin URL.\n- order_id (string, required): The admin order view id used in the URL path.\n- comment (string, required): Text to add to order history.\n- status (string, optional): Visible option text to select (e.g., 'Processing'). If omitted, do not change status.\n- notify_customer (bool, optional): If true, ensure the 'Notify Customer by Email' checkbox is checked.\n- visible_on_front (bool, optional): If true, ensure the 'Visible on Frontend' checkbox is checked.\n\nStep Optimization:\n- Navigation replaced multiple UI clicks and menu traversal by directly forming the admin order URL (fast and deterministic).\n- Element interactions use scoped CSS selectors anchored to form[action*='/addComment'] to reduce fragility across Magento admin themes.\n- Conditional operations (status change, checkbox toggles) are encapsulated inside a single agentic step so the tool can decide at runtime whether to act, while keeping the public step list deterministic and simple. This avoids fragile conditional branching in the static step list and allows robust handling of presence/absence of attributes like form[action].\n- A verification extraction step is included to confirm the tool's action succeeded.\n\nNotes and constraints:\n- The tool assumes the caller provides an already-authenticated admin session; authentication steps are intentionally omitted per instructions.\n- Selectors were chosen based on observed Magento 1 admin conventions from the recorded session. If a target instance uses different form names/structures, the agent fallback will operate relative to the 'Add Order Comments' header.\n- The tool intentionally avoids brittle index-based selectors and prefers attribute-based and label-relative lookups. If you control the target app, adding data-test attributes to these form elements will improve reliability.\n",
+  "name": "magento_admin_add_order_comment",
+  "description": "Add an order history comment to a Magento 1 admin order view and optionally update status, notify the customer, and make the comment visible on the storefront. Uses stable selectors observed during a recorded session: form[action*='/addComment'] select[name='status'], textarea[name='comment'], input[type='checkbox'][name='is_customer_notified'], input[type='checkbox'][name='is_visible_on_front'], and the form submit button. Assumes the automation runner is already authenticated in the admin session.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento admin order view page for the specified order_id.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the order view and its 'Add Order Comments' form to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Perform form interactions (status select, fill comment, set checkboxes, submit) and verify the comment was added.",
+      "output": "submission_result",
+      "type": "agent",
+      "task": "Within the 'Add Order Comments' form on the loaded order view page, perform the following actions deterministically using the stable selectors provided:\n1) If {status} is non-empty, select the option with visible text exactly matching {status} in the select located by CSS selector \"form[action*='/addComment'] select[name='status']\".\n2) Enter the text {comment} into the textarea located by CSS selector \"form[action*='/addComment'] textarea[name='comment']\" (clear any existing text first).\n3) If {notify_customer} is true, ensure the checkbox located by CSS selector \"form[action*='/addComment'] input[type='checkbox'][name='is_customer_notified']\" is checked; if it is not checked click it once. If {notify_customer} is false or omitted, leave it as-is.\n4) If {visible_on_front} is true, ensure the checkbox located by CSS selector \"form[action*='/addComment'] input[type='checkbox'][name='is_visible_on_front']\" is checked; if not click it once. If {visible_on_front} is false or omitted, leave it as-is.\n5) Click the submit control inside the same form using CSS selector \"form[action*='/addComment'] button[type='submit'], form[action*='/addComment'] input[type='submit']\" and wait for the response/page refresh.\n\nUse the form[action*='/addComment'] scope for all element lookups. If the action attribute is not present, fallback by locating the form that follows the visible heading 'Add Order Comments' and operate inside that form. After submission, verify the last entry in the Comments History contains the beginning of {comment} or that the order status changed (if {status} provided).",
+      "max_steps": 6
+    },
+    {
+      "description": "Extract the most recent entry under 'Comments History' and the current value/text of the Status select to return as verification output.",
+      "output": "verification",
+      "type": "extract_page_content",
+      "goal": "Verify the comment was added and capture the top-most comment entry text and current selected status after submission."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base URL of the Magento instance, e.g. 'http://dockerized-magento.local' (no trailing slash).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Internal order_id used in the admin view URL (numeric). This maps directly to the URL segment /admin/sales_order/view/order_id/{order_id}/.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment",
+      "type": "string",
+      "format": null,
+      "description": "The order history comment text to add (will be entered into textarea[name='comment']).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Optional visible status option to select (e.g., 'Processing' or 'Complete'). If omitted or empty, the order status will not be changed.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "notify_customer",
+      "type": "bool",
+      "format": null,
+      "description": "If true, the tool will ensure the 'Notify Customer by Email' checkbox (name='is_customer_notified') is checked before submitting. Default: false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visible_on_front",
+      "type": "bool",
+      "format": null,
+      "description": "If true, the tool will ensure the 'Visible on Frontend' checkbox (name='is_visible_on_front') is checked before submitting. Default: false.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

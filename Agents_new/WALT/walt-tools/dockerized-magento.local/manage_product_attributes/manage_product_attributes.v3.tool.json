@@ -1,0 +1,137 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigated to the Magento admin Manage Attributes grid, used the filter row to search for an attribute (attribute_code='color'), applied Scope and System filters, clicked Search, and then opened the attribute edit (or New Attribute) page. The session recorded stable elementHashes for the Attribute Code input, Scope select, System select and Search button which can be reused deterministically.\n\nTask Definition:\n- This tool's single purpose is to locate a specific product attribute in the Magento Admin Attributes grid (by attribute code), apply optional Scope/System filters, run the grid search, and open the attribute's Edit page. It returns the edit page content to allow further automation (for example detecting Save buttons).\n\nAction Plan:\n1. Navigate to the provided Manage Attributes URL.\n2. Wait briefly for the grid to render.\n3. Input the provided attribute_code into the Attribute Code filter input (use recorded elementHash b8d714807e).\n4. Set Scope (if provided) using the recorded Scope select elementHash (9b26bb1a98).\n5. Set System (if provided) using the recorded System select elementHash (97ddd773aa).\n6. Click the Search button using recorded elementHash (81b51f5d2f).\n7. Wait for grid refresh.\n8. Click the attribute row link by matching the attribute_code text and the typical Magento edit-controller href pattern (XPath). This step is frontName-agnostic and does not rely on elementHash (no stable elementHash was recorded for the per-row link).\n9. Wait for edit page load and extract page content to capture Save/Save-and-Continue/Back controls.\n\nVariable Identification (inputs required):\n- admin_attributes_url (required): exact URL to the attributes grid used for navigation.\n- attribute_code (required): the exact visible attribute code to search and open.\n- scope (optional): 'Store View' | 'Website' | 'Global' \u2014 applied to the Scope select filter if provided.\n- system (optional): 'Yes' | 'No' | 'Any' \u2014 applied to the System select filter if provided.\n- wait_seconds (optional): number of seconds to wait after navigation/clicks; default waits of 1 second are used in the steps.\n\nStep Optimization:\n- Navigation uses a direct URL to the Manage Attributes grid instead of clicking through menus (more reliable).\n- Where stable elementHashes were recorded (Attribute Code input, Scope select, System select, Search button), the tool uses them to perform deterministic interactions and avoid brittle CSS heuristics.\n- The attribute row click cannot rely on elementHash (per-row anchors vary), so the tool uses a robust XPath that matches the attribute_code text and expected edit-controller href. This XPath is frontName-agnostic and narrows matches to edit links only.\n- Removed non-essential exploratory steps: notifications, cache/index links, Add New Attribute flow and modal dismissal are not part of this single-purpose tool. They can be implemented in separate tools if needed.\n\nNotes about limitations and reliability:\n- The tool assumes the browser session is already authenticated and that the grid structure matches Magento 1 admin grid patterns. If the grid uses different DOM structure or different classes/ids, the XPath selectors may need minor adjustments. The provided elementHashes are from the recorded run and are used for reliable targeting; if the target environment rebuilds DOM between sessions these hashes may differ and XPath alternatives should be used.\n",
+  "name": "magento_attributes_open_edit_by_code",
+  "description": "Navigate to Magento Manage Attributes grid, apply filters (attribute code + optional Scope/System), run Search, and open the attribute's Edit page. Returns page content of the opened edit form (to locate Save / Save and Continue / Back controls). Assumes the user is already authenticated in the browser session.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento Manage Attributes grid page.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_attributes_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Allow the grid to render after navigation.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Enter the attribute code into the Attribute Code filter input (deterministic elementHash from recording).",
+      "output": null,
+      "cssSelector": "#attributeGrid_filter_attribute_code",
+      "xpath": "html/body/div/div[9]/div/div[3]/div/div/div/table/thead/tr[2]/th/div/input",
+      "elementTag": "input",
+      "elementHash": "b8d714807e",
+      "type": "input",
+      "value": "{attribute_code}"
+    },
+    {
+      "description": "Set the Scope filter to the requested value. This step is deterministic (elementHash recorded). If {scope} is not provided, this step will still be executed but will attempt to select an empty/undefined value (caller should provide scope when needed).",
+      "output": null,
+      "cssSelector": "#attributeGrid_filter_is_global",
+      "xpath": "html/body/div/div[9]/div/div[3]/div/div/div/table/thead/tr[2]/th[6]/select",
+      "elementTag": "select",
+      "elementHash": "9b26bb1a98",
+      "type": "select_change",
+      "selectedText": "{scope}"
+    },
+    {
+      "description": "Set the System filter to the requested value ('Yes' or 'No'). This uses the recorded elementHash for the System select control. Use 'Any' to leave unchanged (pass 'Any' to the parameter will select no-op text if supported).",
+      "output": null,
+      "cssSelector": "#attributeGrid_filter_is_user_defined",
+      "xpath": "html/body/div/div[9]/div/div[3]/div/div/div/table/thead/tr[2]/th[4]/select",
+      "elementTag": "select",
+      "elementHash": "97ddd773aa",
+      "type": "select_change",
+      "selectedText": "{system}"
+    },
+    {
+      "description": "Click the Search button in the grid toolbar to apply filters (deterministic elementHash from recording).",
+      "output": null,
+      "cssSelector": "#id_8fe15b175b515677da1a92bce6372dc0",
+      "xpath": "html/body/div/div[9]/div/div[3]/div/table/tbody/tr/td[2]/button[2]",
+      "elementTag": "button",
+      "elementHash": "81b51f5d2f",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Click the attribute row link that opens the Edit page. Uses an XPath scoped to the attribute_code and the expected edit-controller href pattern (frontName-agnostic).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(text())='{attribute_code}' and contains(@href,'catalog_product_attribute/edit')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the attribute Edit page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Capture page content and locate primary edit-form controls (Save, Save and Continue, Back) so the caller can take further actions.",
+      "output": "attribute_edit_controls",
+      "type": "extract_page_content",
+      "goal": "Verify edit form loaded and extract Save / Save and Continue / Back control presence and labels"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_attributes_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL to the Magento admin Manage Attributes page (example: 'http://dockerized-magento.local/index.php/admin/catalog_product_attribute/'). Must point to the attributes grid page.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "attribute_code",
+      "type": "string",
+      "format": null,
+      "description": "Attribute code to search for and open (exact visible text as shown in the grid, e.g. 'color').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "scope",
+      "type": "string",
+      "format": null,
+      "description": "Optional Scope filter to apply in the grid. If omitted, the tool will not change the Scope filter.",
+      "required": false,
+      "enum": [
+        "Store View",
+        "Website",
+        "Global"
+      ]
+    },
+    {
+      "name": "system",
+      "type": "string",
+      "format": null,
+      "description": "Optional System filter (Yes/No). Use 'Any' to leave the System filter unchanged.",
+      "required": false,
+      "enum": [
+        "Yes",
+        "No",
+        "Any"
+      ]
+    },
+    {
+      "name": "wait_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Number of seconds to wait after navigation or clicks to allow the page to update (default behavior: 1 second if omitted).",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

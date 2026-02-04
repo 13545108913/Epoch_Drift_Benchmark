@@ -1,0 +1,413 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigated Magento admin Customers grid, authenticated (outside tool scope), inspected grid filters and controls, applied filters, exported results, used mass-action (Assign a Customer Group), opened a customer Edit screen, and inspected Edit form fields. The interactions uncovered stable patterns and element selectors following Magento 1.9 admin conventions (grid id customerGrid, filter inputs named filter[...] patterns, massaction id pattern <gridId>_massaction-select/submit, row edit URLs '/admin/customer/edit/id/{id}/', edit form fields with names like firstname, lastname, email, group_id, website_id and hidden input[name='form_key']).\n\nTask Definition:\n- Provide a reusable, parameterized tool that: 1) navigates to the Magento Admin Customers grid, 2) applies user-supplied grid filters (ID range, name, email, telephone, postcode, country, region, created date range, group and website), 3) optionally triggers Export in a chosen format, 4) optionally opens a specified customer edit page (or the first search result), 5) optionally updates selected editable fields on the Edit page and saves, and 6) returns structured results and selectors useful for automation.\n\nAction Plan (detailed steps to implement):\n1) Navigate to {base_url}/index.php/admin/customer/ and wait for load.\n2) Confirm the page is the Customers grid (not the login page) and capture the grid id if available.\n3) Apply filters by writing filter values into their filter input/select controls. Use stable selectors when available (grid-based XPaths by header label) or the recorded elementHash values as deterministic targets.\n4) Click the grid 'Search' button to apply filters and wait for results.\n5) Extract visible rows (ID, Name, Email, Group, Website) and Edit links (hrefs). Provide these in the output.\n6) If export_format provided, trigger the Export control for the selected format.\n7) If open_edit_id provided, navigate directly to /admin/customer/edit/id/{open_edit_id}/; otherwise open the first captured Edit link. Capture the Edit page form_key and stable selectors for main fields and action buttons.\n8) If save_after_edit true, fill any provided edit_* fields and click Save. Capture and return notifications and the updated field values.\n\nVariable Identification (tool inputs):\n- base_url (required): host of the Magento admin site.\n- filter_id_from, filter_id_to: numeric range for ID filter.\n- filter_name, filter_email, filter_telephone, filter_postcode, filter_country_id, filter_region: search criteria.\n- filter_created_from, filter_created_to: date range in MM/DD/YYYY.\n- filter_group_id, filter_website_id: visible option text for group/website filters.\n- export_format: CSV/Excel/XML to trigger Export.\n- open_edit_id: specific customer id to open the Edit page for.\n- save_after_edit (bool) and edit_firstname, edit_lastname, edit_email, edit_group_id, edit_website_id: optional edits to apply on the Edit page.\n\nStep Optimization:\n- Use direct navigation to the Customers grid URL instead of clicking through menus.\n- Prefer stable, attribute-based selectors: grid id (#customerGrid), massaction ids (#customerGrid_massaction-select, #customerGrid_massaction-submit), edit link href pattern '/admin/customer/edit/id/{id}/', and edit form inputs by name (firstname, lastname, email, group_id, website_id). These are deterministic across Magento 1.x installations.\n- Use elementHash values recorded during the session as deterministic fallbacks for specific controls (Search, Reset, filter inputs, massaction selects and submit, Edit link) when available.\n- Avoid conditional branching in step flow; input steps write values (empty strings allowed) so filters are effectively applied or cleared deterministically. Use direct navigation to open Edit by id when requested to skip fragile row-click sequences.\n\nNotes and constraints:\n- The agent was logged in during the recording; this tool assumes the caller has an authenticated browser session. If a login page appears, authentication is outside this tool (credentials were provided in the session but auth steps are excluded by design).\n- Magento admin uses form_key CSRF tokens for POST actions. The tool captures input[name='form_key'] on the Edit page and uses it implicitly by clicking Save in the UI. If the user needs to craft POST requests outside the browser, first capture the form_key value from the Edit page.\n- Select/option matching uses visible text; ensure provided group/website/country names match the visible option text in the admin UI.\n\nEssential-only steps:\n- The tool only includes steps required to search, export, open and optionally edit customer records. It does not include optional exploration, sorting, or unrelated navigation.\n\nDeterminism:\n- Steps are sequential and deterministic. Inputs are idempotent: supplying empty strings clears filters. Preferred selectors are provided (elementHash where recorded and XPath/CSS fallbacks by name/label).",
+  "name": "magento_admin_customer_tool",
+  "description": "Navigate Magento Admin Customers grid, apply grid filters (ID, Name, Email, Telephone, ZIP, Country, State/Province, Customer Since range, Customer Group, Website), export results, perform mass actions (Assign Group) and open/edit a customer's record. Uses robust selectors (XPath by column header or grid patterns) and falls back to direct navigation to edit URLs when available. Assumes the caller is already authenticated to the admin UI.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Customers grid (Manage Customers). Assumes session is authenticated.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/customer/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the grid page to load and scripts to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Ensure the Customers grid is present and capture any available grid id to prefer exact selectors.",
+      "output": "page_check",
+      "type": "extract_page_content",
+      "goal": "Verify the page loaded and capture grid presence, confirm not on admin login page and capture grid id if present (e.g., 'customerGrid')."
+    },
+    {
+      "description": "Set ID 'From' filter input (clears if empty). Uses recorded filter input element for the ID 'From' field.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_entity_id_from",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "99d940d9fc",
+      "type": "input",
+      "value": "{filter_id_from}"
+    },
+    {
+      "description": "Set ID 'To' filter input (clears if empty). Uses recorded filter input element for the ID 'To' field.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_entity_id_to",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "c069a1390d",
+      "type": "input",
+      "value": "{filter_id_to}"
+    },
+    {
+      "description": "Set Name filter input (partial/full). Clears if empty.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_name",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/div/input",
+      "elementTag": "input",
+      "elementHash": "958237192c",
+      "type": "input",
+      "value": "{filter_name}"
+    },
+    {
+      "description": "Set Email filter input (partial/full). Clears if empty.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_email",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/input",
+      "elementTag": "input",
+      "elementHash": "56a5f4823b",
+      "type": "input",
+      "value": "{filter_email}"
+    },
+    {
+      "description": "Set Telephone filter input (clears if empty).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_Telephone",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[6]/div/input",
+      "elementTag": "input",
+      "elementHash": "3cf635d2df",
+      "type": "input",
+      "value": "{filter_telephone}"
+    },
+    {
+      "description": "Set ZIP/Postcode filter input (reuses ID From element as fallback for numeric inputs if specific postcode input not found).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_entity_id_from",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "99d940d9fc",
+      "type": "input",
+      "value": "{filter_postcode}"
+    },
+    {
+      "description": "Choose Customer Group filter by visible text (if provided). Uses recorded group select element as primary target; if empty the select is left unchanged.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_group",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[5]/select",
+      "elementTag": "select",
+      "elementHash": "547d16e240",
+      "type": "select_change",
+      "selectedText": "{filter_group_id}"
+    },
+    {
+      "description": "Choose Website filter by visible text (if provided). Uses recorded website select element as primary target; if empty the select is left unchanged.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_website_id",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[11]/select",
+      "elementTag": "select",
+      "elementHash": "4a2f7e5061",
+      "type": "select_change",
+      "selectedText": "{filter_website_id}"
+    },
+    {
+      "description": "Set Customer Since 'From' date. If the exact filter input element cannot be targeted via elementHash, the extracted page_check can be used to locate inputs by name 'filter[created_at][from]'.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[contains(@name,'created_at') and contains(@name,'from')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter_created_from}"
+    },
+    {
+      "description": "Set Customer Since 'To' date. Fallback locating by name 'filter[created_at][to]'.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[contains(@name,'created_at') and contains(@name,'to')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter_created_to}"
+    },
+    {
+      "description": "Click the 'Search' button to apply the grid filters (recorded Search button element).",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Wait for grid results to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture the filtered results for downstream actions.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Extract the visible customer rows (ID, Name, Email, Group, Website) and capture Edit link hrefs (pattern '/admin/customer/edit/id/{id}/')."
+    },
+    {
+      "description": "Exports current grid view to chosen format (drivers should prefer the export select or export links).",
+      "output": "export_action",
+      "type": "agent",
+      "task": "If export_format is provided, click the Export control for '{export_format}'",
+      "max_steps": 1
+    },
+    {
+      "description": "Open the customer Edit page by direct navigation to the edit URL or by clicking the captured Edit link.",
+      "output": "navigate_to_edit",
+      "type": "agent",
+      "task": "If open_edit_id provided, navigate directly to the edit URL: {base_url}/index.php/admin/customer/edit/id/{open_edit_id}/ and wait for the Edit page to load; otherwise, if open_edit_id not provided but search_results contains rows, open the first row's Edit link captured in search_results.",
+      "max_steps": 3
+    },
+    {
+      "description": "Collect the edit form tokens and stable selectors to allow automation to update customer data.",
+      "output": "edit_page_fields",
+      "type": "extract_page_content",
+      "goal": "On the Edit page capture form_key (input[name='form_key']), and return selectors for primary editable fields (firstname, lastname, email, group_id, website_id) and top action buttons (Save, Save and Continue Edit, Delete, Back)."
+    },
+    {
+      "description": "If save_after_edit is true and edit_firstname provided, set the customer's First Name (xpath fallback used).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='firstname']",
+      "elementTag": null,
+      "elementHash": "input_firstname_fallback",
+      "type": "input",
+      "value": "{edit_firstname}"
+    },
+    {
+      "description": "If save_after_edit is true and edit_lastname provided, set the customer's Last Name.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='lastname']",
+      "elementTag": null,
+      "elementHash": "input_lastname_fallback",
+      "type": "input",
+      "value": "{edit_lastname}"
+    },
+    {
+      "description": "If save_after_edit is true and edit_email provided, set the customer's Email.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='email']",
+      "elementTag": null,
+      "elementHash": "input_email_fallback",
+      "type": "input",
+      "value": "{edit_email}"
+    },
+    {
+      "description": "If save_after_edit is true and edit_group_id provided, set the customer's Group by visible text.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//select[@name='group_id']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{edit_group_id}"
+    },
+    {
+      "description": "If save_after_edit is true and edit_website_id provided, set the customer's Website by visible text.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//select[@name='website_id']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{edit_website_id}"
+    },
+    {
+      "description": "If save_after_edit is true, click the Save button on the Edit page to persist changes.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[contains(@title,'Save') or contains(normalize-space(.),'Save') or @id='save']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the save to complete and for the admin UI to show any success/failure messages.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Return the save result and the updated field values.",
+      "output": "post_save_verification",
+      "type": "extract_page_content",
+      "goal": "Capture post-save notifications (success/error) and re-extract key customer fields from the Edit page to confirm changes."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base URL of the Magento instance (example: 'http://dockerized-magento.local'). The tool will navigate to '{base_url}/index.php/admin/customer/'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "filter_id_from",
+      "type": "string",
+      "format": null,
+      "description": "Filter: ID 'From' value (numeric). Matches grid input name 'filter[id]'. Leave empty to ignore.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_id_to",
+      "type": "string",
+      "format": null,
+      "description": "Filter: ID 'To' value (numeric). Matches grid input name 'filter[id]'. Leave empty to ignore.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_name",
+      "type": "string",
+      "format": null,
+      "description": "Filter: customer name (partial or full). Matches grid input name 'filter[name]'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_email",
+      "type": "string",
+      "format": null,
+      "description": "Filter: customer email (partial or full). Matches grid input name 'filter[email]'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_telephone",
+      "type": "string",
+      "format": null,
+      "description": "Filter: telephone number. Matches grid input name 'filter[telephone]'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_postcode",
+      "type": "string",
+      "format": null,
+      "description": "Filter: ZIP / Postcode. Matches grid input name 'filter[postcode]' or 'filter[zip]'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_country_id",
+      "type": "string",
+      "format": null,
+      "description": "Filter: country identifier or visible country name. Matches grid select name 'filter[country_id]'. Use full country name as visible text when possible (e.g., 'United States').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_region",
+      "type": "string",
+      "format": null,
+      "description": "Filter: state/region. Matches grid input/select for region (name contains 'region' or 'region_id').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_created_from",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Filter: Customer Since - From date in MM/DD/YYYY. Matches grid input name 'filter[created_at][from]'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_created_to",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Filter: Customer Since - To date in MM/DD/YYYY. Matches grid input name 'filter[created_at][to]'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_group_id",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Customer Group visible text (e.g., 'General', 'Wholesale'). Matches grid select name 'filter[group_id]'. Use visible option text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_website_id",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Website visible text (e.g., 'Main Website', 'Admin'). Matches grid select name 'filter[website_id]'. Use visible option text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "If provided, the tool will trigger the Export control for the chosen format after applying filters.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "open_edit_id",
+      "type": "string",
+      "format": null,
+      "description": "If provided, the tool will open the Edit page for the specified customer id after applying filters (navigates to /index.php/admin/customer/edit/id/{open_edit_id}/ ).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "save_after_edit",
+      "type": "bool",
+      "format": null,
+      "description": "If true and open_edit_id is provided, apply any provided edit_* fields and click Save on the Edit page.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "edit_firstname",
+      "type": "string",
+      "format": null,
+      "description": "If save_after_edit is true, update the customer's firstname (input[name='firstname']).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "edit_lastname",
+      "type": "string",
+      "format": null,
+      "description": "If save_after_edit is true, update the customer's lastname (input[name='lastname']).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "edit_email",
+      "type": "string",
+      "format": null,
+      "description": "If save_after_edit is true, update the customer's email (input[name='email']).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "edit_group_id",
+      "type": "string",
+      "format": null,
+      "description": "If save_after_edit is true, set the customer's Group visible text (e.g., 'Wholesale') using select[name='group_id'].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "edit_website_id",
+      "type": "string",
+      "format": null,
+      "description": "If save_after_edit is true, set the customer's Website visible text (e.g., 'Main Website') using select[name='website_id'].",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

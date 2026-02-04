@@ -1,0 +1,357 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session shows a Magento 1.9 admin product edit flow where the agent: logs in, opens the product edit page, edits General fields (Name, SKU, Weight), opens Prices and sets Price, changes Status and Visibility, opens Inventory and sets Manage Stock/Qty/Stock Availability, opens Categories and Websites panes to assign categories and websites, uses Save/Save and Continue Edit, and demonstrates Duplicate/Delete. The session captured stable selectors (ids, name attributes) and element hashes for many interacted elements.\n\nTask Definition:\n- Create a reusable, parameterized automation tool that: navigates to a product edit page by product_id, updates core product fields (name, sku, weight, price), sets status and visibility, updates inventory fields (manage stock, qty, is_in_stock), assigns categories and websites by id, and performs final actions (Save or Save and Continue). Optionally duplicate or initiate delete (but not accept native confirm). The tool should use the stable selectors observed in the recording and fall back to robust name/value selectors and runtime DOM queries for dynamic tree content.\n\nAction Plan (detailed):\n1) Navigate directly to the product edit URL for {product_id}.\n2) Wait shortly for rendering and any JS to initialize.\n3) Set General fields: Name, SKU, Weight using id/name selectors and recorded elementHash where available.\n4) Open Prices tab and set Price with stable id/name for price input.\n5) Set Status and Visibility selects using recorded selectors.\n6) Open Inventory tab; set Manage Stock, Qty and Stock Availability using product[stock_data] name attributes.\n7) Open Categories pane and select categories by value using runtime DOM queries (agentic step) because category tree uses dynamic markup.\n8) Open Websites pane and set website checkboxes by value using runtime DOM queries (agentic step).\n9) Perform final save action (Save or Save and Continue) using an agentic step that waits for loading overlays and verifies success.\n10) Optionally Duplicate (agentic step) and/or trigger Delete (agentic step that reports the confirmation type without auto-accepting native confirms).\n11) Extract page content summary and return the result.\n\nVariable Identification (input parameters):\n- product_id (required) \u2014 used to build the edit URL. Absolutely required.\n- name, sku, weight, price, status, visibility \u2014 primary fields to edit (labels show asterisks on the page; mark as required per the UI snapshot).\n- category_ids, website_ids \u2014 comma-separated lists to assign categories and websites; optional (skip if empty).\n- qty, manage_stock, is_in_stock \u2014 inventory controls; optional.\n- save_action \u2014 required (save or save_and_continue) to determine final click action.\n- do_duplicate, do_delete \u2014 optional booleans to request post-save duplicate or delete initiation.\n- wait_seconds \u2014 optional generic short wait used as baseline pause before interactions.\n\nStep Optimization / Robustness Notes:\n- Use direct URL navigation to reach the product edit page (deterministic). This skips clicks through the catalog grid which are unnecessary.\n- Prefer id and name attributes for stability (input#name, input#sku, input#price, input[name='product[stock_data][qty]'], input[name='product[website_ids][]']). These are stable across Magento 1.x.\n- For dynamic trees (Categories) and website lists that may be rendered by JS, use an agentic step that runs a runtime DOM query to locate checkboxes by value and click them. This avoids brittle nth-of-type indexes.\n- Detect and wait for Magento loading overlays: '#loading-mask' or '.loading-mask' and ajax-loader images (ajax-loader.gif / ajax-loader-tr.gif). Many recorded failures were caused by clicking while loading overlays were present; explicit waiting is necessary.\n- For Save/Save and Continue/Duplicate/Delete use title attributes or ids when available (button[title='Save'], button[title='Save and Continue Edit'], button[title='Duplicate'], button[title='Delete']). For Delete, do not auto-accept native confirm(); instead report the confirmation type so the caller can choose whether to proceed.\n- ElementHash values from the recording are included as deterministic backups. When running in a different instance these may differ; the tool falls back to CSS/XPath selectors based on name/id/value attributes.\n\nTwo-pass optimization note:\n- Attempted to reduce UI interaction where possible by navigating directly to the product edit URL instead of clicking through the admin menu. Category assignment still requires DOM interaction because the tree is generated in-page by JS, so an agentic runtime step is preserved for that.\n\nConstraints and Safety:\n- The agent will not accept native browser confirm dialogs automatically for destructive actions (Delete). The tool reports whether a native or DOM confirmation is presented and returns the message so the caller can explicitly proceed.\n- The tool assumes the automation runner is already authenticated with sufficient admin privileges.\n\nThis tool definition encodes the essential deterministic steps for the product-edit workflow and uses agentic steps where the UI is dynamic (category tree, website list, and confirmation handling).",
+  "name": "magento_edit_product_tool",
+  "description": "Automate editing a Magento 1.x product in admin: update General fields (name, sku, weight), Prices (price), Status/Visibility, Inventory (manage stock, qty, stock availability), assign Categories and Websites, and perform Save / Save and Continue / Duplicate / Delete actions. Uses recorded stable selectors (ids, names, element hashes) captured during a replay session against http://dockerized-magento.local/. Assumes the automation runner is already authenticated to the admin panel.",
+  "version": "2026-02-02",
+  "steps": [
+    {
+      "description": "Open the product edit page for the specified product_id.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/catalog_product/edit/id/{product_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Give the page a short moment to render. Also let any loading overlays begin if present (tool will wait later for overlay disappearance).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Set the product Name field in the General section.",
+      "output": null,
+      "cssSelector": "#name",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "df3020a86b",
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Set the SKU field (Global scope).",
+      "output": null,
+      "cssSelector": "#sku",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[4]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "1349f1ca81",
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Set the Weight field (Global scope).",
+      "output": null,
+      "cssSelector": "input[name=\"product[weight]\"][type=\"text\"]",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[5]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "d929abfc8b",
+      "type": "input",
+      "value": "{weight}"
+    },
+    {
+      "description": "Open the Prices tab so the Price input is available.",
+      "output": null,
+      "cssSelector": "#product_info_tabs_group_8",
+      "xpath": "html/body/div/div[7]/div/div/div/ul/li[2]/a",
+      "elementTag": "a",
+      "elementHash": "86ed7ee82d",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the Prices tab content to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set the Price in the Prices tab.",
+      "output": null,
+      "cssSelector": "#price",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[4]/div/div[2]/div/table/tbody/tr/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "e457e89369",
+      "type": "input",
+      "value": "{price}"
+    },
+    {
+      "description": "Return to the General tab to continue edits (if required by UI).",
+      "output": null,
+      "cssSelector": "#product_info_tabs_group_7",
+      "xpath": "html/body/div/div[7]/div/div/div/ul/li/a",
+      "elementTag": "a",
+      "elementHash": "a9039ad57d",
+      "type": "click"
+    },
+    {
+      "description": "Set the Status select (Enabled / Disabled).",
+      "output": null,
+      "cssSelector": "select[name=\"product[status]\"]",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[8]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "d7baed0536",
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Set the Visibility select (Not Visible Individually / Catalog / Search / Catalog, Search).",
+      "output": null,
+      "cssSelector": "select[name=\"product[visibility]\"]",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[10]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "2d6f7788e8",
+      "type": "select_change",
+      "selectedText": "{visibility}"
+    },
+    {
+      "description": "Open the Inventory tab to update stock fields.",
+      "output": null,
+      "cssSelector": "#product_info_tabs_inventory",
+      "xpath": "html/body/div/div[7]/div/div/div/ul/li[8]/a",
+      "elementTag": "a",
+      "elementHash": "71d44f34a7",
+      "type": "click"
+    },
+    {
+      "description": "Wait for Inventory panel to become visible.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set Manage Stock (Use Config Settings / Yes / No). Leave parameter empty to skip changing.",
+      "output": null,
+      "cssSelector": "#inventory_manage_stock",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[10]/div/fieldset/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "74075b0eaf",
+      "type": "select_change",
+      "selectedText": "{manage_stock}"
+    },
+    {
+      "description": "Set product Qty (stock_data[qty]). Leave parameter empty to skip changing.",
+      "output": null,
+      "cssSelector": "#inventory_qty",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[10]/div/fieldset/table/tbody/tr[2]/td[2]/input[2]",
+      "elementTag": "input",
+      "elementHash": "15f8e67c9f",
+      "type": "input",
+      "value": "{qty}"
+    },
+    {
+      "description": "Set Stock Availability (In Stock / Out of Stock). Leave empty to skip.",
+      "output": null,
+      "cssSelector": "#inventory_stock_availability",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[10]/div/fieldset/table/tbody/tr[12]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "09a76db7af",
+      "type": "select_change",
+      "selectedText": "{is_in_stock}"
+    },
+    {
+      "description": "Open the Categories tab / pane (navigates to the categories tree UI).",
+      "output": null,
+      "cssSelector": "#product_info_tabs_categories",
+      "xpath": "html/body/div/div[7]/div/div/div/ul/li[10]/a",
+      "elementTag": "a",
+      "elementHash": "3d2947188b",
+      "type": "click"
+    },
+    {
+      "description": "Select or deselect category checkboxes for the supplied category_ids. Uses runtime DOM searching since tree nodes are dynamic.",
+      "output": null,
+      "type": "agent",
+      "task": "Toggle category checkboxes by id list: {category_ids}. For each id in the comma-separated list, locate checkbox inputs by value matching that id inside the categories tree (examples: input[name='product[categories][]'][value='{id}'], input[name='category_ids[]'][value='{id}']). For each found checkbox: ensure page ready (no visible loading mask '#loading-mask' or '.loading-mask' and any ajax-loader images are hidden), scroll it into view, click it, dispatch a change event, and verify it is selected. Return a JSON array of {id, found, clicked}. If {category_ids} is empty or not provided, return immediately with empty array.",
+      "max_steps": 8
+    },
+    {
+      "description": "Open the Websites tab / section (Product In Websites).",
+      "output": null,
+      "cssSelector": "#product_info_tabs_websites",
+      "xpath": "html/body/div/div[7]/div/div/div/ul/li[9]/a",
+      "elementTag": "a",
+      "elementHash": "3d30f36949",
+      "type": "click"
+    },
+    {
+      "description": "Assign/unassign product to specified websites using the stable name/value pattern.",
+      "output": null,
+      "type": "agent",
+      "task": "Toggle website checkboxes by id list: {website_ids}. For each id in the comma-separated list, locate input[name='product[website_ids][]'][value='{id}'] in the Product In Websites block. For each found checkbox: wait until page ready (no visible loading mask), scroll into view, click if not already in desired state, and verify. Return a JSON array of {id, found, clicked}. If {website_ids} is empty or not provided, return immediately with empty array.",
+      "max_steps": 6
+    },
+    {
+      "description": "Perform the chosen save action and wait for completion; uses runtime checks for overlays and success messages.",
+      "output": null,
+      "type": "agent",
+      "task": "Final action: click the requested save action determined by {save_action}. If {save_action} == 'save' click the Save control (selector candidates: button[title='Save'], input[title='Save'], button#save). If {save_action} == 'save_and_continue' click Save and Continue Edit (selector candidates: button[title='Save and Continue Edit'], button#save_and_continue). Before clicking ensure no visible loading mask or ajax-loader images are present. After clicking wait for the loading mask to appear (if any) then disappear, and confirm a success message or that the page remains on the edit page (for save_and_continue) or that the Save completed. Return the post-save URL and any flash messages found.",
+      "max_steps": 8
+    },
+    {
+      "description": "Duplicate the product when requested and return the new product id.",
+      "output": null,
+      "type": "agent",
+      "task": "If {do_duplicate} == true: click the Duplicate control (selector candidates: button[title='Duplicate'], input[title='Duplicate']). Wait for the loading mask and then detect the new product id in the resulting edit page URL (pattern '/edit/id/<newId>/') or confirm '+ The product has been duplicated.' notice. Return the new product id or message. If {do_duplicate} is false, return immediately.",
+      "max_steps": 6
+    },
+    {
+      "description": "Trigger Delete and report the confirmation mechanism (do not accept native browser confirm automatically).",
+      "output": null,
+      "type": "agent",
+      "task": "If {do_delete} == true: click the Delete control (selector candidates: button[title='Delete'], input[title='Delete']). Do NOT automatically accept native browser confirm(); instead detect whether a native confirm would appear (onclick with confirm) or a DOM modal appears. If a DOM modal appears, return its selector and text; if a native confirm is expected, return an instruction for the caller to accept (the agent should not accept destructive native confirms automatically). Return {confirmation: 'native'|'modal'|'none', messageText: <text>}. If {do_delete} is false, return immediately.",
+      "max_steps": 4
+    },
+    {
+      "description": "Return a summary of page state after edits: url, product id, flash messages, and key field values.",
+      "output": "result_summary",
+      "type": "extract_page_content",
+      "goal": "After final actions extract product edit page URL, product id, top flash messages (success/error), and current values for Name, SKU, Price, Qty, Status, Visibility, assigned category ids and website ids (if present)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "product_id",
+      "type": "string",
+      "format": null,
+      "description": "Product internal id shown in the admin URL (example: '2796'). This is used to build the product edit URL.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Product Name (visible 'Name *' field). Provide the full product title to set.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "format": null,
+      "description": "Product SKU (visible 'SKU *' field).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "weight",
+      "type": "string",
+      "format": null,
+      "description": "Product weight as displayed in admin (use numeric string, e.g. '1.5000').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "price",
+      "type": "string",
+      "format": null,
+      "description": "Product base price (decimal string, e.g. '29.99').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Product Status select visible text. Use the exact option text as shown in admin (e.g. 'Enabled').",
+      "required": true,
+      "enum": [
+        "Enabled",
+        "Disabled"
+      ]
+    },
+    {
+      "name": "visibility",
+      "type": "string",
+      "format": null,
+      "description": "Product Visibility visible text. Use exact option text (e.g. 'Catalog, Search').",
+      "required": true,
+      "enum": [
+        "Not Visible Individually",
+        "Catalog",
+        "Search",
+        "Catalog, Search"
+      ]
+    },
+    {
+      "name": "category_ids",
+      "type": "string",
+      "format": null,
+      "description": "Comma-separated list of category ids to check (e.g. '70,12'). Uses category checkbox value attributes to toggle categories. Leave empty to skip category changes.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "website_ids",
+      "type": "string",
+      "format": null,
+      "description": "Comma-separated list of website ids to check (e.g. '1,2'). Uses input[name='product[website_ids][]'][value='<id>'] to toggle websites. Leave empty to skip website changes.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty",
+      "type": "string",
+      "format": null,
+      "description": "Inventory Qty value to set (example '50'). Leave empty to skip qty update.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "manage_stock",
+      "type": "string",
+      "format": null,
+      "description": "Manage Stock select visible text under Inventory (Use Config Settings / Yes / No). Leave empty to skip changing this field.",
+      "required": false,
+      "enum": [
+        "Use Config Settings",
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "is_in_stock",
+      "type": "string",
+      "format": null,
+      "description": "Stock Availability / Is In Stock visible text. Leave empty to skip changing this field.",
+      "required": false,
+      "enum": [
+        "In Stock",
+        "Out of Stock"
+      ]
+    },
+    {
+      "name": "save_action",
+      "type": "string",
+      "format": null,
+      "description": "Which top action to click after edits: 'save' = Save (persist and possibly return to grid), 'save_and_continue' = Save and Continue Edit (persist and remain on edit page).",
+      "required": true,
+      "enum": [
+        "save",
+        "save_and_continue"
+      ]
+    },
+    {
+      "name": "do_duplicate",
+      "type": "bool",
+      "format": null,
+      "description": "If true, click Duplicate after saving to create a copy of the product. Default false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "do_delete",
+      "type": "bool",
+      "format": null,
+      "description": "If true, click Delete (will trigger a confirmation). This tool will only press the Delete action; the agent will not accept native browser confirm automatically. Default false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Generic short wait to allow UI to render before interactions (seconds). Defaults to 2.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

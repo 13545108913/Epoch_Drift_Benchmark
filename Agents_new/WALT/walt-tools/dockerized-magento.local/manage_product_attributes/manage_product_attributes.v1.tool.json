@@ -1,0 +1,121 @@
+{
+  "tool_analysis": "Step Analysis: The recorded session navigated Magento admin attribute grid, logged in, applied filters, opened New Attribute, and attempted to find the per-row Edit link for attribute 'color' but static snapshots lacked anchor hrefs. The tool will reproduce these actions deterministically and include runtime JS/XPath fallbacks to locate the edit anchor and extract edit page controls.Task Definition: A parameterized automation that: 1) navigates to Manage Attributes grid, 2) fills filters (attribute_code, frontend_label, scope), 3) applies Search, 4) optionally clicks Add New Attribute, 5) locates and opens attribute edit for the given attribute_code using robust XPath and JS fallback, 6) extracts Save/Back/attribute_code/is_global/frontend_input selectors and values.Action Plan: - Navigate to provided grid URL - Wait for grid - Fill attribute_code input - Fill frontend_label input if provided - Set scope select if provided - Click Search - Wait for grid reload - Locate edit anchor via XPath by matching row cell text, prefer anchors with '/edit' or 'attribute_id' in href. - If anchor found, click it (or fetch href and parse edit page HTML to avoid navigation) - After navigation or fetch, extract controls and return selectors/valuesVariable Identification: Inputs: attribute_code (required), frontend_label (optional), scope_value (optional), click_add_new (optional boolean), base_url (required)Step Optimization: Use direct navigation to URL and name/id-based selectors when present; use observed element hashes for stable interactions; provide JS fallback snippet to run in live browser to find anchors when static snapshots lack hrefs. Ensure the agent does not attempt to guess IDs/hrefs; instead it reads at runtime. Deterministic steps and minimal actions included.",
+  "name": "magento_attribute_tool",
+  "description": "Automate common interactions on Magento 1 Manage Attributes page: filter attributes, open Add New Attribute, open attribute edit by code, and extract edit page controls. Uses robust XPaths/selectors and provides runtime JS fallbacks when anchors are not present in static snapshots.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to Manage Attributes grid URL.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for page to load and grid to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Fill the Attribute Code filter input with the provided attribute_code. Uses observed element hash from the session.",
+      "output": null,
+      "cssSelector": "#attributeGrid_filter_attribute_code",
+      "xpath": "html/body/div/div[9]/div/div[3]/div/div/div/table/thead/tr[2]/th/div/input",
+      "elementTag": "input",
+      "elementHash": "b8d714807e",
+      "type": "input",
+      "value": "{attribute_code}"
+    },
+    {
+      "description": "Fill the Attribute Label filter input with the provided frontend_label. Uses observed element hash from the session.",
+      "output": null,
+      "cssSelector": "#attributeGrid_filter_frontend_label",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "b09783d79a",
+      "type": "input",
+      "value": "{frontend_label}"
+    },
+    {
+      "description": "Select Scope filter option matching visible text (Store View / Website / Global). Uses observed element hash.",
+      "output": null,
+      "cssSelector": "#attributeGrid_filter_is_global",
+      "xpath": "html/body/div/div[9]/div/div[3]/div/div/div/table/thead/tr[2]/th[6]/select",
+      "elementTag": "select",
+      "elementHash": "9b26bb1a98",
+      "type": "select_change",
+      "selectedText": "{scope_value}"
+    },
+    {
+      "description": "Click the Search button to apply filters (uses observed element hash for Search).",
+      "output": null,
+      "cssSelector": "#id_11845bf63051b2c0aee9754a1493fad8",
+      "xpath": "html/body/div/div[9]/div/div[3]/div/table/tbody/tr/td[2]/button[2]",
+      "elementTag": "button",
+      "elementHash": "7c696e7520",
+      "type": "click"
+    },
+    {
+      "description": "Wait for grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Use runtime DOM operations when static anchor href is not present; limited to 8 steps.",
+      "output": null,
+      "type": "agent",
+      "task": "Locate and open edit link for attribute_code '{attribute_code}' using XPath //table//tr[td[1][normalize-space()='{attribute_code}']]//a[contains(@href,'/edit') or contains(@href,'attribute_id')][1]. Try anchor.click(); if not present, fetch href and parse edit page HTML. If click occurs, after navigation extract Save/Back/attribute_code/is_global/frontend_input.",
+      "max_steps": 8
+    },
+    {
+      "description": "Extract key controls from the attribute edit page to confirm selectors and current values.",
+      "output": "edit_page_controls",
+      "type": "extract_page_content",
+      "goal": "After navigation to edit page, extract Save/Back buttons and fields attribute_code, is_global, frontend_input and return selectors/values."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "attribute_code",
+      "type": "string",
+      "format": null,
+      "description": "Exact attribute code to filter and open (e.g. 'color')",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "frontend_label",
+      "type": "string",
+      "format": null,
+      "description": "Attribute frontend label to filter by (e.g. 'Color')",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "scope_value",
+      "type": "string",
+      "format": null,
+      "description": "Scope filter visible text: 'Store View', 'Website', or 'Global' - tool will select by visible text",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "click_add_new",
+      "type": "bool",
+      "format": null,
+      "description": "If true, click the Add New Attribute button before other actions",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base admin URL, e.g. 'http://dockerized-magento.local/index.php/admin/catalog_product_attribute/'",
+      "required": true,
+      "enum": null
+    }
+  ]
+}

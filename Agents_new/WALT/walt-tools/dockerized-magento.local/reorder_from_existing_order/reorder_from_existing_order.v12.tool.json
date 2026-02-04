@@ -1,0 +1,90 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session logs show a successful manual automation flow to create a new admin order from an existing order: 1) navigate to an order view URL, 2) click the Reorder control in the order header (button with id 'order_reorder' or onclick containing '/reorder/'), 3) on the Create New Order page ensure no blocking modals/overlays are visible and dismiss them (dialogs: Gift Options, Configure Product; loader: 'Please wait...'), 4) click the Submit Order button (top instance) and 5) confirm the new order id on the resulting confirmation/order view page.\n\nTask Definition:\n- Single purpose tool: given an admin base URL and an order_id for an existing order, create a new admin order that re-uses that order's items by invoking the Reorder action and finalizing the Create New Order flow. The tool will return the created order number (from confirmation page) or fail if any required steps cannot be completed.\n\nAction Plan (step-by-step):\n1) Navigate directly to the order view URL constructed from {admin_base_url} and {order_id}. This avoids brittle menu clicks and secret-key complexity. (navigation)\n2) Confirm the page loaded (extract minimal page content) and click the Reorder control using a prioritized selector list: prefer button#order_reorder, fallback to XPath matching onclick/href containing '/reorder/' or visible text 'Reorder'. (extract + click)\n3) Wait briefly for navigation/AJAX to settle. (wait)\n4) Run an agentic check to detect and dismiss any visible modal dialogs or overlays that would block interaction. This step is agentic because visibility/appearance is dynamic; use modal headings (\"Gift Options for\", \"Configure Product\") and loader strings (\"Please wait...\", ajax-loader images) to find and click their Cancel/OK controls or wait until they disappear. Limit iterations to avoid infinite loops. (agent)\n5) Click the Submit Order action using a robust selector that targets the first/top instance: (//button[normalize-space(text())='Submit Order' or @value='Submit Order'])[1]. (click)\n6) Wait for the resulting confirmation/order view to load and extract the created order number from the header to return as output. (wait + extract)\n\nVariable Identification (inputs):\n- admin_base_url (string, required): The site root (protocol + host + optional base path) for admin URLs, e.g. \"http://dockerized-magento.local\". Tool will construct the order view and other admin URLs from this base.\n- order_id (string, required): The numeric internal order id used in admin order view URLs (e.g. \"204\" or \"531\").\n- wait_after_click (number, optional): Seconds to wait after clicks when transitions are expected (default 3). Not required but included to tune timing if needed.\n\nStep Optimization:\n- Use direct URL navigation to the admin order view (deterministic and faster than clicking menus). This relies on admin URLs remaining stable; the recorded session succeeded with direct navigation.\n- Prefer id-based and attribute-based selectors (button#order_reorder) for the Reorder control; fallback XPath includes onclick/href match to capture setLocation(...) patterns used by Magento admin.\n- Because modal/overlay visibility is dynamic, use a short agentic routine to detect and dismiss them rather than fragile unconditional UI clicks. That keeps the main flow deterministic but handles runtime UI states.\n- Use a first-instance XPath for Submit Order to avoid ambiguity when multiple 'Submit Order' controls are present.\n- Essential-only: the flow excludes extra navigation, filtering, or optional UI actions (e.g., changing quantities, applying coupons). The tool only performs the exact actions required to create a new order from the existing order.\n\nEdge-case notes and failure modes:\n- If admin_base_url + direct order path requires a secret key in the URL and it is enforced, the navigation may redirect to login or an error. The recorded environment allowed direct navigation; if your admin has 'Add Secret Key to URLs' enabled, navigation may still work for index.php paths or require extra handling (not included to keep single-purpose deterministic). If this fails, use UI navigation through Sales > Orders (not implemented here to keep the tool minimal).\n- If JavaScript is disabled (page banner present) or the Reorder/Submit actions rely on JS onclick handlers, the click may not work; the tool attempts to dismiss modals and would fail with a clear error if the Submit action is not actionable.\n- The agentic modal dismissal step is bounded (max_steps) to avoid indefinite retries.\n\nConclusion: The tool will deterministically navigate to the order view URL, click Reorder (id or onclick/href fallback), ensure no blocking modal/overlay is visible by running a bounded agentic dismiss routine, click the top Submit Order, then extract and return the new order number from the confirmation page.",
+  "name": "magento_admin_reorder_from_order",
+  "description": "Navigate to a Magento 1 admin order view, invoke the Reorder action to open the Create New Order flow, dismiss any blocking modals/overlays, click Submit Order to create the new order, and return the new order number. Uses robust XPaths and id-based selectors observed during recording.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the admin order view page for the given order_id by navigating directly to the constructed URL.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_base_url}/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Extract minimal page content to verify the page contains order header and action toolbar (look for 'Order #' and 'Reorder').",
+      "output": "order_view_snapshot",
+      "type": "extract_page_content",
+      "goal": "Confirm order view loaded and capture header text (order number and action toolbar) to ensure we are on the correct page."
+    },
+    {
+      "description": "Click the Reorder control. Prefer button with id 'order_reorder'; fallback to XPath matching onclick/href containing '/reorder/' or visible text 'Reorder'.",
+      "output": null,
+      "cssSelector": "button#order_reorder",
+      "xpath": "//button[contains(@onclick,'/reorder/') or contains(@id,'reorder') or normalize-space(.)='Reorder' or //a[contains(@href,'/reorder/') and normalize-space(.)='Reorder']]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the Create New Order page to load after Reorder click. Use {wait_after_click} if provided by caller (controller should substitute).",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Dynamic modal/overlay dismissal. This agentic step handles runtime UI states that cannot be deterministically targeted in all sessions.",
+      "output": null,
+      "type": "agent",
+      "task": "Detect any visible modal dialogs or blocking overlays on the Create New Order page (examples: 'Gift Options for', 'Configure Product', 'Please wait...') and dismiss them if visible by clicking the modal's Cancel or OK button as appropriate. Also wait until any AJAX overlay/loader (images ajax-loader.gif or text 'Please wait...') is hidden. Try up to 6 iterations and stop when no blocker is visible.",
+      "max_steps": 6
+    },
+    {
+      "description": "Click the top/first 'Submit Order' button instance to finalize and create the new order.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//button[normalize-space(text())='Submit Order' or @value='Submit Order'])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the order creation to complete and for the confirmation/order view page to load. Use {wait_after_click} if provided.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Capture the created order identifier and confirmation message from the resulting page after Submit Order.",
+      "output": "created_order",
+      "type": "extract_page_content",
+      "goal": "Extract the new order number from the confirmation page header (e.g., 'Order # 145000036') and any success notice."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_base_url",
+      "type": "string",
+      "format": null,
+      "description": "Admin site base URL (protocol + host, no trailing slash). Example: \"http://dockerized-magento.local\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Internal admin order id to reorder (the numeric id found in the admin URL). Example: \"204\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "wait_after_click",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait after navigation/clicks to allow page load/AJAX (default 3).",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

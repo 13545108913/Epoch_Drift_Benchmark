@@ -1,0 +1,60 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser steps locate the 'Recent Comments' sidebar widget on a WordPress archive page and enumerate anchors that point to post comment fragments (href contains '#comment-<id>'). The agent repeatedly reloaded and extracted the page to determine deterministic selectors for each comment anchor (exact href and contextual selectors). The final intended action is to click one of these anchors to open the corresponding post anchored at the specific comment, then extract the opened post page for verification.\n\nTask Definition:\n- Build a reusable tool that: 1) opens a provided archive/start URL, 2) deterministically clicks the Recent Comments anchor that points to a specific comment fragment (by comment id), and 3) extracts basic information from the opened post page (page URL, title, and the comment text for that comment id). The user will supply the starting URL and the target comment id (numeric, e.g. '23').\n\nAction Plan (detailed steps):\n1. Navigate to the provided start_url (direct URL navigation rather than clicking through menus). This is deterministic and faster.\n2. Wait briefly for page load/render (short static wait). If the environment supports robust waiting, replace with a DOM-ready wait; here we use a small explicit wait to match recorded behaviour.\n3. Click the anchor whose href ends with '#comment-{target_comment_id}' using a CSS exact/ends-with selector (a[href$='#comment-{target_comment_id}']). This avoids clicking commenter/external links inside the same list item and is deterministic even when author anchors appear earlier in the same li.\n4. Wait briefly for the navigation to complete and the browser to scroll to the fragment target.\n5. Extract page content: capture current URL, page title, and the HTML/text of the element that corresponds to the comment fragment (query selector '#comment-{target_comment_id}' or fallback to locating an anchor with that href and following its target). Return this as the tool output.\n\nVariable Identification (input parameters):\n- start_url (string, required): the archive/page URL where the Recent Comments widget is present. (Example: 'http://localhost:8000/?m=202512&paged=2')\n- target_comment_id (string, required): the numeric id of the comment fragment to open (e.g. '23' \u2014 the tool will target '#comment-23'). Use numeric string, not including '#comment-'.\n\nStep Optimization / Justification:\n- Navigation replaced UI clicks: Instead of clicking through menus or archive links, the tool navigates directly to the provided start_url for determinism and speed.\n- Deterministic selector: Using a[href$='#comment-{target_comment_id}'] is robust across themes and avoids accidentally clicking author/external links because it matches the post comment fragment anchor specifically. Exact-href selectors (including full URL) are more specific but brittle to host/protocol changes; matching fragment with ends-with is a stable compromise. When available, prefer full-href exact match (if automation environment uses same origin); this tool uses fragment suffix for portability.\n- Minimal, single-purpose sequence: The tool only performs the essential actions required by the original task \u2014 open the archive page, click the chosen recent comment anchor, and extract the opened post page. It avoids any unrelated filtering, sorting, or extra navigation.\n- Error handling notes (not implemented as branching steps): If a login prompt appears, recorded instructions require typing credentials (admin/password123) and pressing Enter on the password field. If the page returns HTTP 500, recorded instructions recommend clicking an on-page \"Reload/Try Again\" button. These are not implemented as conditional steps to keep the tool deterministic; callers should ensure the page is accessible or pre-authenticated.\n\nDeterminism considerations:\n- The CSS selector used for clicking is deterministic for the intended purpose and avoids ambiguous matches. If the site uses different widget markup, the ends-with fragment selector will still locate the comment anchor anywhere on the page: a[href$='#comment-{target_comment_id}'].\n\nOutputs produced by tool:\n- The extract step returns the opened page URL, page title, and text/HTML of the comment element with id 'comment-{target_comment_id}' as 'opened_comment'.\n\nNo optional or unrelated steps were added \u2014 tool focuses strictly on the task requested.",
+  "name": "open_recent_comment",
+  "description": "Navigate to a WordPress archive page, locate the Recent Comments widget, and open a specific recent-comment entry by clicking the anchor that points to the comment fragment (e.g. #comment-23). Then extract the opened post page content (title, URL, and the targeted comment text).",
+  "version": "2026-02-04-1",
+  "steps": [
+    {
+      "description": "Navigate directly to the provided archive/start URL that contains the Recent Comments widget.",
+      "output": null,
+      "type": "navigation",
+      "url": "{start_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the page to load and DOM to stabilise before interacting.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Click the Recent Comments anchor that points to the desired comment fragment (matches anchors whose href ends with '#comment-{target_comment_id}'). Uses fragment-based selector to avoid clicking external author links.",
+      "output": null,
+      "cssSelector": "a[href$='#comment-{target_comment_id}']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Allow the navigation/scroll-to-fragment to complete and the post page to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.5
+    },
+    {
+      "description": "Capture the post title, current URL, and the specific comment element so the caller can confirm the comment thread opened correctly.",
+      "output": "opened_post",
+      "type": "extract_page_content",
+      "goal": "Extract the opened post page URL, title, and the content (text or HTML) of the comment element with id 'comment-{target_comment_id}'."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "start_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the archive or page that contains the 'Recent Comments' widget (e.g. 'http://localhost:8000/?m=202512&paged=2'). The agent will navigate here first.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "target_comment_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric id of the comment fragment to open (e.g. '23'). The tool will click the anchor whose href ends with '#comment-{target_comment_id}'. Do not include the '#' prefix.",
+      "required": true,
+      "enum": null
+    }
+  ]
+}

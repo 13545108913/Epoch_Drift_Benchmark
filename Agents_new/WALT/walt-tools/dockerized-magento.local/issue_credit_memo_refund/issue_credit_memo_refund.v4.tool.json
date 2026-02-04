@@ -1,0 +1,157 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session opened the Magento admin Order View for order_id 204, clicked the 'Credit Memo' top action, edited 'Qty to Refund' inputs, clicked 'Update Qty\\'s', set adjustment fields, and clicked 'Refund Offline' to submit the credit memo. The session identified stable name-based patterns for inputs (creditmemo[items][<id>][qty], creditmemo[adjustment_positive], creditmemo[adjustment_negative]) and form-based submit buttons (input[type='submit'][value='Refund Offline']).\n\nTask Definition:\n- Create a reusable tool that performs the full credit memo workflow for a specified Magento order: open credit memo creation page, set per-item refund quantities, set adjustments/shipping if provided, update totals, and submit the credit memo by clicking the chosen submit button.\n\nAction Plan:\n1) Navigate directly to the credit memo creation URL for the provided order_id to avoid brittle UI clicks. 2) Verify the presence of the credit memo form and collect the form_key if present. 3) Set per-item Qty to Refund inputs based on a mapping of order_item_id -> qty. 4) Click the 'Update Qty\\'s' control to recalc totals. 5) Set any adjustment/shipping/comment fields if provided. 6) Locate the exact submit button by the provided visible text and click it. 7) Extract page content to verify the operation succeeded and capture created credit memo number or success message.\n\nVariable Identification:\n- order_id (required) to build the direct credit memo URL. \n- item_qty_map (required) JSON mapping order_item_id -> qty. Using order_item_id is deterministic because the credit memo form names inputs by item id. \n- adjustment_positive, adjustment_negative, shipping_amount, comment, append_comment, email_copy (optional) to map directly to standard credit memo form inputs. \n- submit_button_text (required) to deterministically select the correct submit action ('Refund Offline' vs 'Refund').\n\nStep Optimization:\n- Replaced clicking the top-action 'Credit Memo' link with direct navigation to the credit memo creation URL: /admin/sales_order_creditmemo/new/order_id/{order_id}/. This is deterministic and avoids brittle top-bar selectors/hovers.\n- Use name-based selectors for item qtys and adjustments where possible (e.g., input[name='creditmemo[items][<id>][qty]'], input[name='creditmemo[adjustment_positive]']). These selectors are stable across Magento 1.x installs.\n- Use agentic steps for two dynamic tasks: mapping the provided item_qty_map into actual DOM inputs (handles unknown item id naming and row searches by SKU/name), and locating the final submit button by visible text. These tasks require flexible DOM queries and are less reliably captured with a single static selector.\n- Kept an explicit 'Update Qty\\'s' click step using a resilient CSS/text match for the update control. If the exact control differs on an installation, the agentic item-mapping step and final agentic submit step will help recover.\n\nDeterminism & Robustness Notes:\n- The tool favors attribute-based selectors and direct URL navigation. Where input names are unknown for an installation, the agent steps will search by product row (SKU/name) and then find descendant inputs. This satisfies the requirement to generate working selectors while handling dynamic variations.\n- The submit action is resolved via exact visible button text provided by the caller ({submit_button_text}) to avoid ambiguous clicks. If localization changes the text, callers must pass the correct localized button text.\n\nAssumptions & Safety:\n- The operator is already authenticated in the admin session (no auth steps included). \n- The provided mapping item_qty_map must use the numeric order_item_id values used by the credit memo form. If the caller only has SKUs, they should first extract mappings from the order view to determine item ids.\n- The tool does not attempt to bypass server-side protections; it extracts and uses form_key if present. \n- The tool waits for page updates after Update Qty's and after submit before verifying the result.\n\nRequired Verifications for Automation Consumers:\n- Ensure {submit_button_text} matches the admin language in use. \n- Confirm item ids in {item_qty_map} are the same ids present in the credit memo form input names. If not, use the SKU-to-item-id mapping step in a pre-flight run to gather correct ids.\n\nThis tool provides a single-purpose, parameter-driven, reproducible sequence to create a credit memo for a Magento 1.x admin order while handling the dynamic parts with limited agentic steps for reliable operation.",
+  "name": "magento_create_credit_memo_tool_v1",
+  "description": "Navigate to a Magento 1.x admin credit memo creation page for a specific order_id, set item refund quantities and adjustment/shipping amounts, update totals, and submit the credit memo using the specified submit button text. Uses attribute-based selectors where possible and agentic steps for mapping item ids to inputs and locating the final submit button by visible text.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Magento admin 'Create Credit Memo' page directly for the specified order_id.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_order_creditmemo/new/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the credit memo page to load and scripts to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture identify of the credit memo form (form#edit_form or form with id containing 'creditmemo') and any existing form_key.",
+      "output": "initial_form_snapshot",
+      "type": "extract_page_content",
+      "goal": "Verify credit memo form is present and capture form metadata (form id/action, form_key if present). Output used for post-submit verification."
+    },
+    {
+      "description": "Set 'Qty to Refund' values for each provided order_item_id. This agentic step handles variable order_item_id naming and row-to-input mapping.",
+      "output": null,
+      "type": "agent",
+      "task": "For each order_item_id -> qty entry in the JSON mapping {item_qty_map}, find the corresponding quantity input inside the credit memo form and set its value to the provided qty. The inputs typically have names like \"creditmemo[items][<item_id>][qty]\". If an input for an item_id is not found, search the item row by SKU or product name and locate the qty input descendant. Report any missing item_ids. Limit attempts to 8 steps.",
+      "max_steps": 8
+    },
+    {
+      "description": "Click the 'Update Qty's' control to recalculate refund totals after changing quantities. Uses text/title/value matching to locate the update control inside the form.",
+      "output": null,
+      "cssSelector": "button[title*=\"Update Qty\"], input[value*=\"Update Qty\"], button:contains(\"Update Qty\")",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for totals to refresh after clicking 'Update Qty's'.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Set adjustment, shipping and comment-related fields when provided.",
+      "output": null,
+      "type": "agent",
+      "task": "If {adjustment_positive} or {adjustment_negative} or {shipping_amount} are provided (non-empty), set the matching inputs inside the credit memo form: creditmemo[adjustment_positive], creditmemo[adjustment_negative], creditmemo[shipping_amount]. If any of these inputs are not found by name, search near the 'Refund Totals' area for numeric inputs and set the first matching fields. Also, if {comment} is provided, set the comment textarea (name contains 'comment') and if {append_comment} is true, enable the nearby 'Append Comments' checkbox. If {email_copy} is true, enable the 'Email Copy of Credit Memo' checkbox (name candidates: comment_mail, send_email). Limit to 6 steps.",
+      "max_steps": 6
+    },
+    {
+      "description": "Find and click the final 'Refund' or 'Refund Offline' submit button using the exact text provided in {submit_button_text}.",
+      "output": null,
+      "type": "agent",
+      "task": "Locate the submit button inside the credit memo form that matches the exact visible value/text {submit_button_text} (case-insensitive). Prefer input[type='submit'][value='{submit_button_text}'], button[title='{submit_button_text}'], or button whose text equals '{submit_button_text}'. If not found by exact match, fall back to case-insensitive contains. Click the located element to submit the credit memo. Limit to 5 steps.",
+      "max_steps": 5
+    },
+    {
+      "description": "Wait for the submission to process and for the admin to redirect or display a result message.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "After submit, capture page text to confirm that a credit memo was created (look for success messages or new credit memo ID).",
+      "output": "creditmemo_result",
+      "type": "extract_page_content",
+      "goal": "Confirm submission result: extract success/error messages, and if possible capture the generated credit memo number/link or the updated order credit memo list."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric order_id used by Magento admin URLs (e.g. '204'). This is placed into the credit memo creation URL: /admin/sales_order_creditmemo/new/order_id/{order_id}/",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "item_qty_map",
+      "type": "string",
+      "format": null,
+      "description": "JSON string mapping order_item_id to refund quantity. Example: '{\"127\":1, \"129\":0, \"131\":1}'. Keys must be the numeric order_item_ids used in the credit memo form (these appear in input name attributes as creditmemo[items][<item_id>][qty]).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "adjustment_positive",
+      "type": "string",
+      "format": null,
+      "description": "Optional positive adjustment amount to add to refund (creditmemo[adjustment_positive]). Use a numeric string with two decimals, e.g. '25.00'. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "adjustment_negative",
+      "type": "string",
+      "format": null,
+      "description": "Optional negative adjustment (fee) to deduct from refund (creditmemo[adjustment_negative]). Use a numeric string with two decimals, e.g. '0.00'. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "shipping_amount",
+      "type": "string",
+      "format": null,
+      "description": "Optional shipping refund amount to set (creditmemo[shipping_amount]). Use a numeric string with two decimals, e.g. '25.00'. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "form_key",
+      "type": "string",
+      "format": null,
+      "description": "Optional form_key value if the admin form requires a CSRF/form_key override. If not provided, the tool will try to submit using the page's form_key if present.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "submit_button_text",
+      "type": "string",
+      "format": null,
+      "description": "Exact visible value/text of the submit button to click inside the credit memo form. Example values: 'Refund Offline' or 'Refund'. This value is used to find and click the correct submit button in the creditmemo form.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "append_comment",
+      "type": "bool",
+      "format": null,
+      "description": "If true and a 'comment' is provided, check the 'Append Comments' option (if present) so the comment gets attached to the credit memo.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "email_copy",
+      "type": "bool",
+      "format": null,
+      "description": "If true, check 'Email Copy of Credit Memo' before submitting (if present).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "comment",
+      "type": "string",
+      "format": null,
+      "description": "Optional comment text to include in the credit memo comment textarea.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

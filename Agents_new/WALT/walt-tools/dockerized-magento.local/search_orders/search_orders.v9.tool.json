@@ -1,0 +1,223 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session logs navigating to Magento admin orders, authenticating, closing a message popup, filling filters (increment id, Bill to Name, Status, store), clicking Search, Reset, Export (CSV), selecting a row checkbox, using mass-action ('Print Invoices'), submitting, and opening a 'View' link. The orders grid uses header filters and stable patterns (e.g., input[name='increment_id'], input[name='created_at[from]'], select[name='status'], select[name='store_id'], input[name='order_ids[]'], anchor href containing '/admin/sales_order/view/order_id/').\n\nTask Definition:\n- Build a deterministic, reusable tool that navigates to the Magento admin orders grid (assumes authenticated session), applies supplied header filters (order number, date range, bill-to name, status, store view), clicks Search, waits for results, and extracts the matching order rows (order_number/increment_id, numeric order_id from the view URL, created_at, customer name, grand_total, status, view_url). The tool must use stable attribute-based selectors and fallback XPaths scoped to the grid.\n\nAction Plan (detailed steps):\n1) Navigate to {admin_url} (orders grid). 2) Wait briefly for page load. 3) Input increment_id into the increment id filter input (primary: input[name='increment_id'] or input[name='filter[increment_id]']; fallback: id contains 'increment_id'). 4) Input created_at[from] and created_at[to] into their respective date inputs (primary: input[name='created_at[from]'], input[name='created_at[to]']). 5) Input Bill to Name into the Bill to Name header input (XPath scoped to the 'Bill to Name' header). 6) Select Status using select[name='status'] (or header-scoped select). 7) Select store view if provided using select[name='store_id'] (or header-scoped select). 8) Set per_page and page controls if provided. 9) Click the Search button (button[title='Search'] or input[value='Search']). 10) Wait for grid to update (2s). 11) Extract visible orders: for each visible row create record fields order_number, order_id (parsed from view_url), created_at, customer_name (bill_to_name), grand_total, status, view_url. Limit to {max_results} if provided.\n\nVariable Identification (inputs):\n- admin_url (required): admin orders page to navigate to.\n- increment_id: order number filter (maps to input[name='increment_id']).\n- created_at_from / created_at_to: date-range filters mapping to grid date inputs. Format MM/DD/YYYY.\n- bill_to_name: free-text filter for Bill to Name.\n- status: dropdown selection mapping to select[name='status'] (enum provided from the recorded session).\n- store_view: store view selector (select[name='store_id'] or header-scoped select).\n- per_page: number of rows per page selector.\n- page: page number to navigate to.\n- max_results: safety limit on rows returned.\n\nStep Optimization and Stability Review:\n- Prefer attribute-based selectors (name/id) when available: input[name='increment_id'], input[name='created_at[from]'], select[name='status'], select[name='store_id'], input[name='order_ids[]'], a[href*='/admin/sales_order/view/order_id/']. These are stable across Magento 1 installs used in the recording.\n- When name/id attributes are absent or unknown, use XPaths scoped to the grid root and the header cell text (e.g., locate the <th> whose link text is 'Bill to Name' then pick its input). This reduces collisions with other page controls.\n- Avoid relying on numeric DOM indices (recorded highlight indexes) because they are brittle. Where the run-time environment has those exact elementHash values available it's acceptable to use them as deterministic fallbacks; primary selectors remain attribute-based.\n- No conditional branching: every filter input will be filled with the provided parameter (empty string if omitted) so the sequence is deterministic. This keeps the tool simple and re-executable without runtime branching.\n\nMissing/Optional Steps & Rationale:\n- Authentication is intentionally omitted (developer note: session is already authenticated). Mass actions and Export are not part of the core 'find orders and return rows' task; to keep the tool single-purpose they are excluded from the main sequence. If callers want to perform export or mass-action, a separate tool should be created to avoid side effects.\n\nExecution Notes:\n- The tool includes short waits after navigation and Search to allow the grid to reload. If automation runs against very slow instances, callers should increase the waits.\n- Date inputs are passed as text in MM/DD/YYYY; if the site expects different formats or JS datepickers, additional runtime formatting may be required.\n",
+  "name": "magento_admin_find_orders",
+  "description": "Navigate to a Magento admin Orders grid, apply header filters (order/increment id, date range, customer name, store view, status), run Search, and extract the matching order rows (order number, internal order_id from View URL, created_at, customer name, grand total, status, view_url). The tool assumes an already-authenticated admin session (no login step).",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento admin Orders grid (caller must supply an already-authenticated admin orders URL).",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the Orders grid page to settle after navigation.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set the Order # / increment_id filter. If {increment_id} is empty string, this will clear/leave the filter empty.",
+      "output": null,
+      "cssSelector": "input[name='increment_id'], input[name='filter[increment_id]'], input[id*='increment_id']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{increment_id}"
+    },
+    {
+      "description": "Set the 'Purchased On' From date filter (MM/DD/YYYY). If empty, leaves blank.",
+      "output": null,
+      "cssSelector": "input[name='created_at[from]'], input[id*='created_at'][name*='from']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_at_from}"
+    },
+    {
+      "description": "Set the 'Purchased On' To date filter (MM/DD/YYYY). If empty, leaves blank.",
+      "output": null,
+      "cssSelector": "input[name='created_at[to]'], input[id*='created_at'][name*='to']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_at_to}"
+    },
+    {
+      "description": "Set the 'Bill to Name' free-text filter using an XPath scoped to the header cell.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[normalize-space()='Bill to Name' or contains(normalize-space(.),'Bill to Name')]]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{bill_to_name}"
+    },
+    {
+      "description": "Select the Status filter option. If {status} is empty the select will not change (depends on framework handling empty selection).",
+      "output": null,
+      "cssSelector": "select[name='status'], select[id*='status']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Select the Purchased From (Store) / store view filter by visible text. If {store_view} is empty the select will not change.",
+      "output": null,
+      "cssSelector": "select[name='store_id'], select[id*='store']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{store_view}"
+    },
+    {
+      "description": "Optional: set rows per page (20,30,50,100,200). If omitted, the grid keeps its current page size.",
+      "output": null,
+      "cssSelector": "select[name='limit'], select[id*='limit']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{per_page}"
+    },
+    {
+      "description": "Optional: set page number input or page control. Many Magento installs use pager links instead; this input is best-effort and may be a no-op if the site uses links. If omitted, stay on current page.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='p' or contains(@name,'page') or contains(@id,'page')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{page}"
+    },
+    {
+      "description": "Click the Search button to apply filters and refresh the grid.",
+      "output": null,
+      "cssSelector": "#id_82e5c4f4b971a4ef271be830f16fab15",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "2e2396541c",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to reload after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Parse each visible grid row: read the Order # cell, the 'Action' column View href (extract numeric order_id), created on, Bill to Name, G.T., Status and return structured records.",
+      "output": "order_list",
+      "type": "extract_page_content",
+      "goal": "Extract visible orders from the grid and return array of records (order_number, order_id, created_at, customer_name, grand_total, status, view_url). Limit to {max_results} rows if provided."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Full admin Orders URL (must be an orders-grid URL). Example: \"http://dockerized-magento.local/index.php/admin/sales_order/\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Order number / increment_id to filter (exact or partial). Maps to input[name='increment_id'] or grid increment_id filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_from",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Start of Purchased On date range (MM/DD/YYYY). Maps to input[name='created_at[from]'] if present.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_to",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "End of Purchased On date range (MM/DD/YYYY). Maps to input[name='created_at[to]'] if present.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "bill_to_name",
+      "type": "string",
+      "format": null,
+      "description": "Free-text filter for 'Bill to Name' column (exact or partial).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Order status to select from the Status filter dropdown. Use one of the listed values exactly as visible in the admin UI.",
+      "required": false,
+      "enum": [
+        "Canceled",
+        "Cancelled Ogone",
+        "Closed",
+        "Complete",
+        "Declined Ogone",
+        "Suspected Fraud",
+        "On Hold",
+        "Payment Review",
+        "PayPal Canceled Reversal",
+        "PayPal Reversed",
+        "Pending",
+        "Pending Ogone",
+        "Pending Payment",
+        "Pending PayPal",
+        "Processed Ogone Payment",
+        "Processing",
+        "Processing Ogone Payment",
+        "Waiting Authorization"
+      ]
+    },
+    {
+      "name": "store_view",
+      "type": "string",
+      "format": null,
+      "description": "Store view label to select for 'Purchased From (Store)' filter (e.g. 'Main Website / Madison Island / English'). Prefer the visible label text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "per_page",
+      "type": "string",
+      "format": null,
+      "description": "Number of rows per page to set in the grid (20, 30, 50, 100, 200). If omitted the grid default is used.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "page",
+      "type": "string",
+      "format": null,
+      "description": "Page number to navigate to after filtering (1-based). If omitted stays on current page.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "max_results",
+      "type": "string",
+      "format": null,
+      "description": "Maximum number of order rows to extract (used to limit returned rows). If omitted returns all rows visible on current page.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

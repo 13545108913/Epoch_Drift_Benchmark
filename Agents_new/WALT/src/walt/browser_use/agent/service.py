@@ -298,7 +298,7 @@ class Agent(Generic[Context]):
 	def _set_tool_calling_method(self) -> Optional[ToolCallingMethod]:
 		tool_calling_method = self.settings.tool_calling_method
 		if tool_calling_method == 'auto':
-			if self.model_name == 'deepseek-reasoner' or self.model_name.startswith('deepseek-r1'):
+			if self.model_name == 'deepseek-reasoner' or self.model_name.startswith('deepseek-r1') or self.model_name.startswith('claude'):
 				return 'raw'
 			elif self.chat_model_library == 'ChatGoogleGenerativeAI':
 				return None
@@ -495,7 +495,7 @@ class Agent(Generic[Context]):
 
 	def _convert_input_messages(self, input_messages: list[BaseMessage]) -> list[BaseMessage]:
 		"""Convert input messages to the correct format"""
-		if self.model_name == 'deepseek-reasoner' or self.model_name.startswith('deepseek-r1'):
+		if self.model_name == 'deepseek-reasoner' or self.model_name.startswith('deepseek-r1') or self.model_name.startswith('claude'):
 			return convert_input_messages(input_messages, self.model_name)
 		else:
 			return input_messages

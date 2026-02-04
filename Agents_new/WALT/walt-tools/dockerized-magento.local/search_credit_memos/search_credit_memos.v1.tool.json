@@ -1,0 +1,187 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session logged into Magento Admin, closed a blocking notification popup, inspected the Sales > Credit Memos admin grid, applied filters (Credit Memo # and Refunded range), executed Search, exported results, used mass-action (PDF Credit Memos) on the visible row, and opened a credit memo View.\n\nTask Definition:\n- Build a deterministic, re-usable automation tool that visits the Magento Admin Credit Memos page, applies user-supplied filters (credit memo increment id and refunded amount range), runs the grid Search, exports results in a selectable format, selects the first visible row and applies a mass-action option, and opens the credit memo View and extracts its details.\n\nAction Plan (ordered deterministic steps):\n1) Navigate to provided admin_url.\n2) Close the incoming-message popup using the recorded close anchor.\n3) Input the Credit Memo # into the recorded filter input.\n4) Input Refunded From and To values into the recorded range inputs.\n5) Click the Search button to apply filters.\n6) Choose the export format in the Export select and click Export.\n7) Select the first visible row checkbox.\n8) Choose the mass-action option in the Actions select and click Submit.\n9) Click the 'View' link for the first visible row to open the credit memo detail.\n10) Extract the credit memo view content (items, totals, addresses) for return.\n\nVariable Identification (inputs required/recommended):\n- admin_url (required): direct URL to the credit memos admin page (starting point). The run must navigate here.\n- filter_increment_id (optional): the Credit Memo # to filter by. If left empty, the step still attempts to set the input to an empty string (no filter applied).\n- filter_grand_total_from / filter_grand_total_to (optional): refunded range values. Optional to allow range or single-sided filters.\n- export_format (optional): visible export option text (CSV / Excel / XML). Tool will attempt to select the provided visible option text.\n- mass_action_option (optional): visible text of the Actions select option to apply (recorded example 'PDF Credit Memos').\n- open_first_view (optional boolean): included in schema for UI but the recorded step always clicks the recorded View link for the first visible row; the step is included in the deterministic sequence (no conditional branching).\n\nStep Optimization & Determinism:\n- Use recorded stable element hashes when available for deterministic interactions (elementHash values recorded during the session). These replace fragile text-based selectors when replaying the same UI instance.\n- Navigating directly to admin_url is preferred over clicking through menus; this speeds up runs and reduces DOM-dependence.\n- Export and Mass-action steps use the recorded selects and buttons by elementHash; the select options are chosen by visible text (selectedText) to avoid relying on internal option values that may vary.\n- The tool avoids conditional branching. Steps that reference optional inputs still execute; providing empty inputs results in no-op or empty values being sent to the inputs but retains deterministic execution.\n- If JavaScript-driven controls are required (e.g., Select Visible, JS-based mass-selection), the tool uses the recorded individual-row checkbox click to ensure the mass-action operates even if 'Select Visible' link would have been JS-dependent.\n\nNotes and Limitations:\n- The tool assumes the automation runner is already authenticated or can reach the admin_url (the original recording used admin/password123 to log in). Authentication is intentionally not included in this tool (login is out-of-scope) per instructions.\n- Recorded element hashes are used for determinism; if the target site DOM differs significantly from the recorded session, these element hashes may not resolve. Fallback selectors (CSS/XPath) were documented during recording and should be used by the runner if hash-based targeting fails.\n- The tool always clicks the recorded 'View' link (first visible). To target a specific credit memo when multiple rows are present, call the tool with narrow filters (e.g., filter_increment_id) to ensure the desired row appears first.\n\nEssentiality:\n- All included steps are essential to achieve the task as recorded: close popup, apply filters, search, export, select row, perform mass-action, open view, and extract details. No exploratory or optional UI flows were added beyond the necessary inputs to parameterize the tool.\n",
+  "name": "magento_creditmemo_locator",
+  "description": "Navigate Magento Admin Credit Memos grid, apply filters (credit memo #, refunded range), run Search, Export results, perform a mass action (e.g., PDF Credit Memos) on visible rows, and open a Credit Memo View. Uses recorded stable element hashes where available.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Admin Credit Memos page (starting point).",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Close the top 'Incoming Message' popup so the grid controls are accessible (recorded selector: a[title='close']).",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Fill the 'Credit Memo #' filter input (recorded element for the Credit Memo # filter).",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_filter_increment_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "03c157e592",
+      "type": "input",
+      "value": "{filter_increment_id}"
+    },
+    {
+      "description": "Fill the 'Refunded' filter 'From' input (recorded element for refunded-from).",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_filter_grand_total_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "625428c813",
+      "type": "input",
+      "value": "{filter_grand_total_from}"
+    },
+    {
+      "description": "Fill the 'Refunded' filter 'To' input (recorded element for refunded-to).",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_filter_grand_total_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "ffd5265d96",
+      "type": "input",
+      "value": "{filter_grand_total_to}"
+    },
+    {
+      "description": "Click the Search button to apply filters (recorded Search button element).",
+      "output": null,
+      "cssSelector": "#id_11d8c9a2390101ca5bf620b8510a73ec",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "6bfe6f2377",
+      "type": "click"
+    },
+    {
+      "description": "Choose the Export format from the Export select (recorded select element). If {export_format} is empty or not present, the selection will attempt to set the visible option text exactly.",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_export",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "6d263e26f7",
+      "type": "select_change",
+      "selectedText": "{export_format}"
+    },
+    {
+      "description": "Click the Export button to start export (recorded Export button element).",
+      "output": null,
+      "cssSelector": "#id_e2a3ccc260ceb153c21b956ae2691f07",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "319e21522d",
+      "type": "click"
+    },
+    {
+      "description": "Click the checkbox of the first visible row to select it for mass action (recorded first-row checkbox).",
+      "output": null,
+      "cssSelector": "input[name=\"creditmemo_ids\"][type=\"checkbox\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/tbody/tr/td/input",
+      "elementTag": "input",
+      "elementHash": "6ef10b7568",
+      "type": "click"
+    },
+    {
+      "description": "Select the requested mass-action option from the Actions dropdown (recorded Actions select). Provide exact visible option text, e.g. 'PDF Credit Memos'.",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_massaction-select",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span/select",
+      "elementTag": "select",
+      "elementHash": "dbb92199d2",
+      "type": "select_change",
+      "selectedText": "{mass_action_option}"
+    },
+    {
+      "description": "Click the mass-action Submit button to apply the selected action to the selected rows (recorded Submit element).",
+      "output": null,
+      "cssSelector": "button[title=\"Submit\"][title=\"Submit\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[4]/button",
+      "elementTag": "button",
+      "elementHash": "e5da8d6705",
+      "type": "click"
+    },
+    {
+      "description": "Click the 'View' link for the first visible credit memo row (recorded View link element). This opens the credit memo detail page.",
+      "output": null,
+      "cssSelector": "tr > td > a[href=\"http://dockerized-magento.local/index.php/admin/sales_creditmemo/view/creditmemo_id/7/\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/tbody/tr/td[9]/a",
+      "elementTag": "a",
+      "elementHash": "6fe57738eb",
+      "type": "click"
+    },
+    {
+      "description": "After navigating to the credit memo view, extract the displayed invoice/credit memo details and totals for verification or storage.",
+      "output": "credit_memo_view",
+      "type": "extract_page_content",
+      "goal": "Capture the credit memo view details (order number, billing/shipping address, items refunded, totals, grand total) and return as structured text"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL to the Magento admin credit memos page. Example: \"http://dockerized-magento.local/index.php/admin/sales_creditmemo/\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "filter_increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Text to enter into the 'Credit Memo #' filter input (input[name='filter[increment_id]']). Leave empty to skip setting it (the step will still attempt to input the value).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_grand_total_from",
+      "type": "string",
+      "format": null,
+      "description": "Value to enter into the 'Refunded' range 'From' input (e.g. '300'). Matches inputs like input[name='filter[grand_total][from]'].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_grand_total_to",
+      "type": "string",
+      "format": null,
+      "description": "Value to enter into the 'Refunded' range 'To' input (e.g. '400'). Matches inputs like input[name='filter[grand_total][to]'].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Export format to choose from the Export select. Use 'CSV', 'Excel' or 'XML'. If empty, the step still selects the value (may no-op if not present).",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "mass_action_option",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the mass-action option to select (example recorded: 'PDF Credit Memos'). Provide the exact visible option text as shown in the Actions select.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "open_first_view",
+      "type": "bool",
+      "format": null,
+      "description": "If true, click the 'View' link for the first visible credit memo row after filtering. Default behaviour: the tool will always click the recorded View link element (first visible) \u2014 set true to perform it.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

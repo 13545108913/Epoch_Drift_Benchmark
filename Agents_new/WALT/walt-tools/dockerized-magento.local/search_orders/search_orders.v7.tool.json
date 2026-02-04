@@ -1,0 +1,305 @@
+{
+  "tool_analysis": "Step Analysis:\n- Recorded actions show a standard Magento 1 admin Sales > Orders grid. The automation navigates to the Orders URL, fills the filter row inputs (names used by Magento: increment_id, store_id, created_at[from/to], billing_name, shipping_name, base_grand_total*, grand_total* and status), clicks Search, waits for the grid refresh, then extracts row data (increment id, internal order_id from View link, status, totals, billing/shipping name, view link). Optionally the tool clicks an Export link by visible format.\n\nTask Definition:\n- Purpose: given filter criteria that map directly to Magento filter input names, return the visible order rows matching those filters and optionally initiate an export. The tool does not perform authentication (agent is assumed logged-in).\n\nAction Plan (step-by-step):\n1) Navigate to provided admin_orders_url. 2) Wait for grid & filter row to appear. 3) Populate each filter field (scope to tr.filter and column by header position). 4) Click the Search button inside the filter row and wait for refresh. 5) Extract visible rows and the per-row View link and numeric internal order_id. 6) Optionally click the Export link (CSV/Excel/XML) if requested and return discovered export hrefs. 7) Return structured output.\n\nVariable Identification (inputs):\n- admin_orders_url (required): base Orders page URL seen in the session. \n- increment_id, store_id, created_at_from, created_at_to, billing_name, shipping_name, base_grand_total_from, base_grand_total_to, grand_total_from, grand_total_to, status, page, limit, export_format (optional): all map directly to filter input names or toolbar controls.\n\nStep Optimization & Selector Choices:\n- All selectors are scoped to the Orders grid filter row (tr.filter) and to column positions deduced from the recorded session to avoid ambiguous global matches. Where possible the tool uses name attributes (e.g. input[name='increment_id'], select[name='store_id']) because these are stable across Magento installations.\n- For Export the tool prefers clicking the export anchor whose href contains 'export' and whose visible text contains the requested format; a direct-export URL fallback is provided in documentation if the click fails.\n- The tool avoids relying on JavaScript-only behaviors: it uses server-side anchors and form submits available in Magento admin grids. If JS is required by an environment, the caller should enable JS for the browser context or use the POST fallback (mass-action/export endpoints) with a form_key; instructions for that fallback are in the tool_analysis notes.\n\nConstraints & Notes:\n- The agent is assumed to already be logged in. No authentication steps included.\n- If the grid returns no records the tool will return an empty order_list and any observed grid state (total records). \n- The export click step is optional and will only have an effect if export_format is provided and a matching export anchor exists in the page.\n\nThis tool is deterministic, parameter-driven (no branching), and uses scoped selectors to minimize strict-mode selector collisions. If a caller needs mass-action submission or POST fallbacks, a separate tool or an extension to this tool should be used to perform those server-side POSTs while providing the session form_key.",
+  "name": "magento_find_orders",
+  "description": "Search the Magento 1 admin Sales > Orders grid using the grid filter inputs and return the visible order rows. Inputs map directly to the filter field names used by the Magento admin (increment_id, store_id, created_at[from]/[to], billing_name, shipping_name, grand total ranges, status). Optionally click an export link for CSV/Excel/XML after filtering. The agent is assumed to be already authenticated in the browser context.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento admin Orders grid (starting page).",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_orders_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the page and grid to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Locate grid anchor and ensure filter row exists (used to scope later interactions).",
+      "output": "grid_anchor",
+      "type": "extract_page_content",
+      "goal": "Confirm the Orders grid filter row (tr.filter) is present and identify the grid table anchor before interacting."
+    },
+    {
+      "description": "Set the Order # filter (input[name='increment_id'] / real_order_id) scoped to the filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[2]//input[@name='increment_id' or @name='real_order_id']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{increment_id}"
+    },
+    {
+      "description": "Set the Purchased From (Store) filter (select[name='store_id']) scoped to the filter row. Accepts visible text or option value.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[3]//select[contains(@name,'store') or contains(@id,'store')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{store_id}"
+    },
+    {
+      "description": "Set Purchased On 'From' date (created_at[from]) scoped to the filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[4]//input[contains(@name,'created_at') and contains(@name,'from')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_at_from}"
+    },
+    {
+      "description": "Set Purchased On 'To' date (created_at[to]) scoped to the filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[4]//input[contains(@name,'created_at') and contains(@name,'to')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_at_to}"
+    },
+    {
+      "description": "Set Bill to Name filter (input[name='billing_name']) scoped to the filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[5]//input[contains(@name,'billing') and contains(@name,'name')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{billing_name}"
+    },
+    {
+      "description": "Set Ship to Name filter (input[name='shipping_name']) scoped to the filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[6]//input[contains(@name,'shipping') and contains(@name,'name')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{shipping_name}"
+    },
+    {
+      "description": "Set G.T. (Base) From amount (base_grand_total[from]) scoped to the filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[7]//input[contains(@name,'base_grand_total') and contains(@name,'from')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{base_grand_total_from}"
+    },
+    {
+      "description": "Set G.T. (Base) To amount (base_grand_total[to]) scoped to the filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[7]//input[contains(@name,'base_grand_total') and contains(@name,'to')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{base_grand_total_to}"
+    },
+    {
+      "description": "Set G.T. (Purchased) From amount (grand_total[from]) scoped to the filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[8]//input[contains(@name,'grand_total') and contains(@name,'from')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{grand_total_from}"
+    },
+    {
+      "description": "Set G.T. (Purchased) To amount (grand_total[to]) scoped to the filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[8]//input[contains(@name,'grand_total') and contains(@name,'to')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{grand_total_to}"
+    },
+    {
+      "description": "Set Status filter (select[name='status']) scoped to the filter row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[contains(@class,'filter')]/th[9]//select[contains(@name,'status')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Click the Search control inside the filter row to apply the filters and refresh the grid.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//tr[contains(@class,'filter')]//button[normalize-space() = 'Search' or contains(@title,'Search') or //input[@type='submit' and (@value='Search' or @title='Search')]])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Read the grid body and collect one object per visible row with the key fields and the per-row View link (href contains '/sales_order/view/order_id/').",
+      "output": "order_list",
+      "type": "extract_page_content",
+      "goal": "Extract visible order rows (increment_id, internal entity id, status, purchased_on, billing_name, shipping_name, grand_total, view_link) from the orders grid and return as structured output"
+    },
+    {
+      "description": "Optional: click the export link matching {export_format} (CSV/Excel/XML) if provided. This clicks the first matching export link near the toolbar.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//a[contains(translate(., 'abcdefghijklmnopqrstuvwxyz','ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{export_format}') and contains(@href,'export')])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for any export navigation or download to start (if export was triggered).",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Return the extracted order_list and any detected export link hrefs / grid state (total records, pages).",
+      "output": "final_result",
+      "type": "extract_page_content",
+      "goal": "Confirm filter results and return 'order_list' and any export link hrefs discovered"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_orders_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the Magento admin orders page (example: \"http://dockerized-magento.local/index.php/admin/sales_order/\"). The tool will navigate here first.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Order increment number to filter by. Matches input[name='increment_id'] or input[name='real_order_id'] in the Orders grid filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "store_id",
+      "type": "string",
+      "format": null,
+      "description": "Store view identifier to filter by. Use the select option value (numeric store id) or visible text (e.g., \"English\" or \"French\"). Matches select[name='store_id'] in the filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_from",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Purchased On \"From\" date (format: MM/DD/YYYY). Targets input[name='created_at[from]'] in the filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_to",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Purchased On \"To\" date (format: MM/DD/YYYY). Targets input[name='created_at[to]'] in the filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "billing_name",
+      "type": "string",
+      "format": null,
+      "description": "Billing name filter. Targets input[name='billing_name'] in the filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "shipping_name",
+      "type": "string",
+      "format": null,
+      "description": "Shipping name filter. Targets input[name='shipping_name'] in the filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "base_grand_total_from",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Base) \"From\" amount. Targets input[name='base_grand_total[from]'] in the filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "base_grand_total_to",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Base) \"To\" amount. Targets input[name='base_grand_total[to]'] in the filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grand_total_from",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Purchased) \"From\" amount. Targets input[name='grand_total[from]'] in the filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grand_total_to",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Purchased) \"To\" amount. Targets input[name='grand_total[to]'] in the filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Order status to filter by. Use visible text (e.g. 'Pending', 'Canceled') or option value. Matches select[name='status'] in the filter row.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "page",
+      "type": "string",
+      "format": null,
+      "description": "Page number for pagination (1-based). The tool will leave paging to the default if omitted.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "limit",
+      "type": "string",
+      "format": null,
+      "description": "Number of rows per page (common options: 20,30,50,100,200). Matches select[name='limit'] in the toolbar.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Optional - if provided the tool will attempt to click the export link matching this format after applying filters. Use one of: 'CSV','Excel','XML'.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    }
+  ]
+}

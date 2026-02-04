@@ -1,0 +1,142 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigates to a Magento admin order view and interacts with the Add Order Comments block: fills Comment textarea, toggles Notify/Visible checkboxes, tries to change Status and clicks Submit Comment. The recorded run succeeded adding comments and toggling checkboxes, but failed to reliably set Status because the captured page snapshot lacked raw <select>/<option> markup and the hidden form_key value needed for some programmatic paths.\n\nTask Definition:\n- Create a reusable tool that, for a given admin_base_url and order_id, will: open the order page, fill an order history comment, optionally change the order status (by option value or visible text), set the Notify Customer and Visible on Frontend checkboxes as requested, submit the comment, and return verification data (form metadata and recent comment entries).\n\nAction Plan:\n1) Navigate to the order view URL constructed from admin_base_url and order_id.\n2) Wait for the page to load.\n3) Extract the Add Order Comments form metadata: form id, input[name='form_key'] (CSRF), and full list of status option texts + values (so status changes can be exact).\n4) Fill the Comment textarea with the provided comment.\n5) Set the Status select to the requested status_value (preferred) or status_text (fallback).\n6) Ensure the two checkboxes reflect the requested booleans (agent step to handle variable attribute names across installs).\n7) Click Submit Comment.\n8) Wait and re-extract the page to confirm the new comment entry and top-level order status.\n\nVariable Identification (inputs):\n- admin_base_url (string): base admin URL to construct navigation URL (required).\n- order_id (string): order identifier used in the URL (required).\n- comment (string): text to add (required).\n- status_value (string): exact option value used by the Status select (optional). Prefer this when known.\n- status_text (string): visible option text fallback (optional). Use when option value is unknown.\n- notify_customer (bool): whether to check 'Notify Customer by Email' (optional). If omitted, no change.\n- visible_on_front (bool): whether to check 'Visible on Frontend' (optional). If omitted, no change.\n- wait_seconds (number): optional wait time tuning between navigation/submit and extraction.\n\nStep Optimization:\n- Navigation is direct to the order URL to avoid unnecessary clicks.\n- Element targeting uses heading/label-relative XPath selectors which are robust across Magento admin customizations (example: //h3[normalize-space(.)='Add Order Comments']/following::select[1] for the status select, and analogous XPaths for textarea and submit button).\n- Where precise attribute names are typical (select[name='status'], textarea[name='comment']), they are provided as alternatives in the extraction step; however the steps themselves use label/heading-relative XPaths to be single-element deterministic locators.\n- We included an agentic step to set the checkboxes because input name/id conventions differ between installs (send_email, is_customer_notified, notify, etc.). This keeps interaction reliable without brittle selectors.\n\nNotes on limitations and required runtime data:\n- Changing status programmatically with 100% reliability requires knowing the select option value (the 'value' attribute). The tool attempts to extract option values in the 'form_data' extraction step. If the caller cannot provide status_value, provide status_text; the tool will try to match visible text.\n- Many Magento admin templates use a hidden input[name='form_key'] CSRF token; the extraction step reads it if present. If the environment returns only a text-rendered snapshot (without raw HTML), IDS and option values may not be available; in that case the tool will still attempt visible-text selection but full reliability requires DOM access.\n\nEssential-only steps:\n- The tool includes only steps necessary to accomplish the core task (navigate, read form metadata, fill comment, set status, set checkboxes, submit, verify). No unrelated filtering/sorting or extra navigation is included.\n\nSelectors and deterministic choices:\n- Status select: primary XPath //h3[normalize-space(.)='Add Order Comments']/following::select[1] (fallback select[name='status']).\n- Comment textarea: //h3[normalize-space(.)='Add Order Comments']/following::textarea[1] (fallback textarea[name='comment']).\n- Notify checkbox: label-based XPath //label[contains(normalize-space(.),'Notify Customer')]/input[@type='checkbox'].\n- Visible on Frontend: //label[normalize-space(.)='Visible on Frontend']/input[@type='checkbox'].\n- Submit button: //h3[normalize-space(.)='Add Order Comments']/following::button[normalize-space(.)='Submit Comment' or @title='Submit Comment'][1].\n\nThis tool is deterministic and parameter-driven, and it avoids fragile index-based element addressing. It also includes an agentic step specifically to handle varying checkbox attribute names across different Magento admin installations.",
+  "name": "magento_admin_add_order_comment",
+  "description": "Add an order history comment to a Magento 1.x admin order page and optionally change the order status and notify the customer. The tool navigates to the admin order view for a given order_id, fills the Comment textarea, optionally sets the Status (by option value or visible text), ensures the Notify and Visible checkboxes match the requested values, clicks Submit Comment, and returns verification data (form info and resulting comments history). Designed to use robust XPath/CSS selectors scoped to the 'Add Order Comments' block and to read the form's CSRF token when available.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento admin Order View page for the specified order_id.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_base_url}/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Allow page to load and admin JS to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Read form metadata and status options so the tool can set status reliably. Uses heading/label-relative selectors to find the correct comment form.",
+      "output": "form_data",
+      "type": "extract_page_content",
+      "goal": "Locate the 'Add Order Comments' form and extract form id (if present), input[name='form_key'] value (CSRF token), and current status select option list (text and value) from the DOM."
+    },
+    {
+      "description": "Enter the provided comment text into the 'Comment' textarea inside the Add Order Comments block.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//h3[normalize-space(.)='Add Order Comments']/following::textarea[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{comment}"
+    },
+    {
+      "description": "If status_value or status_text is provided, attempt to set the Status select. The function will try selectedValue first (exact option value) then selectedText (visible text) as a fallback. If both are empty, this step attempts no-op selection but is deterministic in execution.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//h3[normalize-space(.)='Add Order Comments']/following::select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{status_text}",
+      "selectedValue": "{status_value}"
+    },
+    {
+      "description": "Use DOM reads and clicks to set the two checkboxes to the requested states. Agentic step is used because checkbox attribute naming varies by install (send_email / is_customer_notified / notify).",
+      "output": "checkbox_result",
+      "type": "agent",
+      "task": "Ensure Notify Customer and Visible on Frontend checkboxes reflect the requested booleans {notify_customer} and {visible_on_front}. Find the checkboxes inside the Add Order Comments area using label- or heading-relative selectors, read their current checked state, and click only those that need toggling. If a parameter is omitted (null), leave that checkbox unchanged.",
+      "max_steps": 6
+    },
+    {
+      "description": "Click the 'Submit Comment' button inside the Add Order Comments block to submit the form (prefers button with visible text or title 'Submit Comment').",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//h3[normalize-space(.)='Add Order Comments']/following::button[normalize-space(.)='Submit Comment' or @title='Submit Comment'][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the server response and the Comments History to update.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Return structured data suitable for test verification: current order status, list of recent comment entries with timestamp, status, customer_notified flag, and comment text.",
+      "output": "verification",
+      "type": "extract_page_content",
+      "goal": "Read the order header (current status) and the top entries of Comments History to verify a new comment was created and to capture the status/notification state recorded with it."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base admin URL for the Magento instance, e.g. 'http://dockerized-magento.local' (no trailing slash). Tool will navigate to /index.php/admin/sales_order/view/order_id/{order_id}/.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric order_id used in the admin order view URL (for example '204').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment",
+      "type": "string",
+      "format": null,
+      "description": "Text of the order history comment to add. Will be entered into the 'Comment' textarea.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "status_value",
+      "type": "string",
+      "format": null,
+      "description": "Exact option value attribute for the Status select (e.g. 'processing'). If provided the tool will attempt to set the select to this value. If unknown, provide status_text instead.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status_text",
+      "type": "string",
+      "format": null,
+      "description": "Visible option text for the Status select (e.g. 'Processing'). Used as a fallback if status_value is not available.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "notify_customer",
+      "type": "bool",
+      "format": null,
+      "description": "Whether to check 'Notify Customer by Email' (true) or leave it unchecked (false). If omitted the tool will not change the checkbox state.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visible_on_front",
+      "type": "bool",
+      "format": null,
+      "description": "Whether to check 'Visible on Frontend' (true) or leave it unchecked (false). If omitted the tool will not change the checkbox state.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait after navigation and after submit (default behavior: short waits). Provide a number if you need longer waits for slow instances.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

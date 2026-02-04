@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from typing import Any, Optional, Type
+import re
 
 from langchain_core.messages import (
 	AIMessage,
@@ -17,31 +18,52 @@ logger = logging.getLogger(__name__)
 
 
 def extract_json_from_model_output(content: str) -> dict:
-	"""Extract JSON from model output, handling both plain JSON and code-block-wrapped JSON."""
-	try:
-		# If content is wrapped in code blocks, extract just the JSON part
-		if '```' in content:
-			# Find the JSON content between code blocks
-			content = content.split('```')[1]
-			# Remove language identifier if present (e.g., 'json\n')
-			if '\n' in content:
-				content = content.split('\n', 1)[1]
-		try:
-			return json.loads(content)
-		except json.JSONDecodeError as e:
-			# try and parse the largest dictionary
-			content = content.split('{')[1].split('}')[0]
-			return json.loads(content)
-	except json.JSONDecodeError as e:
-		logger.warning(f'Failed to parse model output: {content} {str(e)}')
-		raise ValueError('Could not parse response.')
+    """
+    更加健壮的 JSON 提取函数。
+    支持从代码块中提取，或者从混合文本中搜索最外层的 {} 结构。
+    """
+    try:
+        # 1. 尝试直接处理代码块 (Markdown 格式)
+        if '```' in content:
+            # split 后取中间部分，通常索引 1 是代码块内容
+            # 兼容可能有多个代码块的情况，这里取第一个非空的块
+            parts = content.split('```')
+            for part in parts:
+                if '{' in part:
+                    content = part
+                    break
+            
+            # 去除可能的语言标识 (如 ```json)
+            if content.strip().startswith('json'):
+                content = content.strip()[4:]
+
+        # 尝试直接解析
+        return json.loads(content)
+
+    except json.JSONDecodeError:
+        # 2. 如果直接解析失败，尝试寻找字符串中第一个 '{' 和最后一个 '}'
+        try:
+            start_index = content.find('{')
+            end_index = content.rfind('}')
+
+            if start_index != -1 and end_index != -1 and end_index > start_index:
+                # 提取完整的大括号闭包内容
+                json_str = content[start_index : end_index + 1]
+                return json.loads(json_str)
+            else:
+                logger.error(f"No JSON braces found in content: {content[:100]}...")
+                raise ValueError('No JSON object found in response.')
+                
+        except json.JSONDecodeError as e:
+            logger.warning(f'Failed to parse extracted JSON: {content} {str(e)}')
+            raise ValueError('Could not parse response.')
 
 
 def convert_input_messages(input_messages: list[BaseMessage], model_name: Optional[str]) -> list[BaseMessage]:
 	"""Convert input messages to a format that is compatible with the planner model"""
 	if model_name is None:
 		return input_messages
-	if model_name == 'deepseek-reasoner' or model_name.startswith('deepseek-r1'):
+	if model_name == 'deepseek-reasoner' or model_name.startswith('deepseek-r1') or model_name.startswith('claude'):
 		input_messages = _convert_messages_for_non_function_calling_models(input_messages)
 		input_messages = _merge_successive_messages(input_messages, HumanMessage)
 		input_messages = _merge_successive_messages(input_messages, AIMessage)

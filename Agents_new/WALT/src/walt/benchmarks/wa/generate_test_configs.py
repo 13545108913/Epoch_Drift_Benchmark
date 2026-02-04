@@ -26,7 +26,7 @@ def main() -> None:
     print(f"WORDPRESS: {WORDPRESS}")
     
     
-    with open("test_configs/gitlab_tasks_final_v16.json", "r") as f:
+    with open("test_configs/wordpress_tasks_final.json", "r") as f:
         raw = f.read()
         
     # Replace URL placeholders with environment variables

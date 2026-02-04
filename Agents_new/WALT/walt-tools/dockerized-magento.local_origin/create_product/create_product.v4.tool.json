@@ -1,0 +1,374 @@
+{
+  "tool_analysis": "Step Analysis:\nThe recorded session shows a complete Magento 1.9 admin flow: navigate to the admin catalog product URL, log in, arrive at the Manage Products grid, click Add Product, select Attribute Set and Product Type on the Create Product Settings step, continue to the full New Product (Default) form, fill mandatory General fields (name, description, short description, SKU, weight, status, visibility), go to Prices to set price and tax class, go to Inventory to set quantity and stock availability, then save the product and confirm it appears in the Manage Products grid. Previous failures were due to brittle selectors for the Add Product button (e.g., button[title=\"Add Product\"][title=\"Add Product\"]) and timing issues around element availability.\n\nTask Definition:\nCreate a deterministic, reusable tool that, starting from the Magento admin Manage Products page (with the user already authenticated or able to log in with provided credentials), creates a new simple product using parameterized inputs for core product data (name, descriptions, SKU, weight, price, qty, status, visibility, tax class, attribute set, product type). The tool must use robust selectors grounded in ids, names, and text-based XPaths (especially for the Add Product button) and avoid brittle title-based or index-based selectors. Navigation is kept explicit between major steps.\n\nAction Plan:\n1) Navigate directly to the Manage Products URL.\n2) If the login form is presented, fill username and password and submit using stable label-based selectors.\n3) From Manage Products, click the Add Product button using a robust header XPath (content-header + inner span text Add Product).\n4) On the Create Product Settings page, select attribute set and product type via their select elements (id attribute_set_id and product_type) using visible text from inputs, then click Continue via a stable text/XPath selector.\n5) On the New Product form (General tab), fill mandatory General fields using id/name selectors: product name (#name), description (#description), short description (#short_description), SKU (#sku), weight (#weight), status (#status via option text), and visibility (#visibility via option text).\n6) Click the Prices tab via its tab link (a[title='Prices']) and set base price (#price) and tax class (#tax_class_id) using the provided parameters.\n7) Click the Inventory tab via its tab link (a[title='Inventory']) and set quantity using input[name='product[stock_data][qty]'] and stock availability using select[name='product[stock_data][is_in_stock]'].\n8) Click the Save button using a robust XPath //button[.//span[normalize-space()='Save']].\n9) (Implicit) After save, Magento returns to the Manage Products grid with a green success message and the new product visible. Extraction is not required for this tool, but the flow ends at this point.\n\nVariable Identification:\nBased on the form fields and the demonstration, the following parameters are needed:\n- base_url: base Magento host URL to construct admin paths (string, required), e.g. \"http://dockerized-magento.local\".\n- admin_user: admin username for login (string, required) \u2013 from demo: \"admin\".\n- admin_password: admin password (string, required) \u2013 from demo: \"password123\".\n- attribute_set_id: numeric id for attribute set select (#attribute_set_id) (string required) \u2013 demo used value \"4\" (Default).\n- attribute_set_label: visible text of attribute set option (string, required) \u2013 demo: \"Default\". This is used as selectedText to be robust, while id is stable.\n- product_type_code: product type code value for #product_type (string, required, enum-like: simple, configurable, etc.). Demo used \"simple\".\n- product_type_label: visible text for product type (string, required) \u2013 demo: \"Simple Product\".\n- product_name: Name field value (string, required).\n- product_description: Description field value (string, required).\n- product_short_description: Short Description field (string, required).\n- product_sku: SKU field (string, required).\n- product_weight: Weight field (string, required \u2013 numeric string).\n- product_status: Status visible text (string, required, enum: Enabled/Disabled).\n- product_visibility: Visibility visible text (string, required, enum: Not Visible Individually, Catalog, Search, Catalog, Search).\n- product_price: Base price (string, required).\n- product_tax_class: Tax Class visible text (string, required \u2013 e.g., \"Taxable Goods\", \"None\").\n- product_qty: Inventory quantity (string, required).\n- product_stock_status: Stock Availability visible text (string, required, enum: In Stock, Out of Stock).\n\nOther page filters, mass actions, and pagination controls were analyzed but are not essential to creating a product, so they are omitted per instructions.\n\nStep Optimization:\n- Navigation: Instead of clicking through menu items, navigate directly to {base_url}/index.php/admin/catalog_product/ for Manage Products.\n- Login: Use deterministic input selectors derived from labels via element hashes: username field element_hash 3597a5c5e6, password field 1c47a5217e, and login button 6831836d17, coupled with their positional stability on the login page.\n- Add Product: Replace the previously failing selector button[title='Add Product'][title='Add Product'] with a robust XPath that matches the header button by text and structure: //div[contains(@class,'content-header')]//button[.//span[normalize-space()='Add Product']]. We reference the interacted elementHash 835f2cc821 for stability while using cssSelector / xpath in the ClickStep.\n- Attribute Set & Product Type: Use id-based cssSelectors (#attribute_set_id, #product_type) tied to element hashes d2ae05bcc3 and 9f39b707f1, selecting by visible text via select_change.\n- Continue: Use a text-based XPath for the Continue button element_hash 0a1d8ebd32.\n- General, Prices, Inventory fields: Use id or name selectors already known from extraction (e.g., #name, #description, #short_description, #sku, #weight, #status, #visibility, #price, #tax_class_id, input[name='product[stock_data][qty]'], select[name='product[stock_data][is_in_stock]']). Attach element_hash IDs where available from interaction logs.\n- Tabs: Use their a[title='Prices'] and a[title='Inventory'] selectors instead of index-based selection, referencing their hashes 86ed7ee82d and 71d44f34a7.\n- Save Button: Use the robust XPath //button[.//span[normalize-space()='Save']] tied to hash d507e205ad.\n\nWe avoid unnecessary scroll and extraction steps, and no agentic reasoning steps are needed because all controls have stable selectors. Timing issues around Add Product and other elements are addressed at the harness level (explicit waits); in this tool definition we only provide deterministic selectors and ordered steps.\n\nBecause the task is about product creation, all product-related fields are required here to ensure a successful save under default Magento validation.\n",
+  "name": "tool_create_magento_simple_product_v5",
+  "description": "Initiate the Magento 1 admin add-product flow from the Manage Products grid and create a new simple product with specified attributes, prices, and inventory, using robust selectors that avoid brittle title-based Add Product button selectors.",
+  "version": "v5",
+  "steps": [
+    {
+      "description": "Open Magento Manage Products admin grid page",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/catalog_product/",
+      "url_operation": null
+    },
+    {
+      "description": "Focus username field on Magento admin login page (if present) using element hash selector",
+      "output": null,
+      "cssSelector": "input[name=\"login[username]\"][type=\"text\"]",
+      "xpath": "html/body/div/div/form/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "3597a5c5e6",
+      "type": "click"
+    },
+    {
+      "description": "Enter admin username into login username field",
+      "output": null,
+      "cssSelector": "input[name=\"login[username]\"][type=\"text\"]",
+      "xpath": "html/body/div/div/form/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "3597a5c5e6",
+      "type": "input",
+      "value": "{admin_user}"
+    },
+    {
+      "description": "Enter admin password into login password field",
+      "output": null,
+      "cssSelector": "#login",
+      "xpath": "html/body/div/div/form/div/div[3]/input[2]",
+      "elementTag": "input",
+      "elementHash": "1c47a5217e",
+      "type": "input",
+      "value": "{admin_password}"
+    },
+    {
+      "description": "Click Login button to submit admin credentials",
+      "output": null,
+      "cssSelector": "input[title=\"Login\"]",
+      "xpath": "html/body/div/div/form/div/div[5]/input",
+      "elementTag": "input",
+      "elementHash": "6831836d17",
+      "type": "click"
+    },
+    {
+      "description": "Click Add Product button in Manage Products header using robust selector",
+      "output": null,
+      "cssSelector": "#id_fe721dc6e56ef7e81394304fcf8cb46a",
+      "xpath": "html/body/div/div[8]/div/div[2]/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "835f2cc821",
+      "type": "click"
+    },
+    {
+      "description": "Select desired Attribute Set on Create Product Settings page by visible text",
+      "output": null,
+      "cssSelector": "#attribute_set_id",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "d2ae05bcc3",
+      "type": "select_change",
+      "selectedText": "{attribute_set_label}"
+    },
+    {
+      "description": "Select desired Product Type on Create Product Settings page by visible text",
+      "output": null,
+      "cssSelector": "#product_type",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[2]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "9f39b707f1",
+      "type": "select_change",
+      "selectedText": "{product_type_label}"
+    },
+    {
+      "description": "Click Continue button to open full New Product form",
+      "output": null,
+      "cssSelector": "#id_d7047ae5dc5b43145e27b2beb39f762b",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[3]/td[2]/span/button",
+      "elementTag": "button",
+      "elementHash": "0a1d8ebd32",
+      "type": "click"
+    },
+    {
+      "description": "Fill Product Name field on General tab",
+      "output": null,
+      "cssSelector": "#name",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "df3020a86b",
+      "type": "input",
+      "value": "{product_name}"
+    },
+    {
+      "description": "Fill Description field on General tab",
+      "output": null,
+      "cssSelector": "textarea[name=\"product[description]\"]",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[2]/td[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "6aec08c625",
+      "type": "input",
+      "value": "{product_description}"
+    },
+    {
+      "description": "Fill Short Description field on General tab",
+      "output": null,
+      "cssSelector": "#short_description",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[3]/td[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "4b38ca02b1",
+      "type": "input",
+      "value": "{product_short_description}"
+    },
+    {
+      "description": "Fill SKU field on General tab",
+      "output": null,
+      "cssSelector": "#sku",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[4]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "1349f1ca81",
+      "type": "input",
+      "value": "{product_sku}"
+    },
+    {
+      "description": "Fill Weight field on General tab",
+      "output": null,
+      "cssSelector": "input[name=\"product[weight]\"][type=\"text\"]",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[5]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "d929abfc8b",
+      "type": "input",
+      "value": "{product_weight}"
+    },
+    {
+      "description": "Select Status on General tab using visible text (e.g. Enabled)",
+      "output": null,
+      "cssSelector": "select[name=\"product[status]\"]",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[8]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "d7baed0536",
+      "type": "select_change",
+      "selectedText": "{product_status}"
+    },
+    {
+      "description": "Select Visibility on General tab using visible text (e.g. Catalog, Search)",
+      "output": null,
+      "cssSelector": "select[name=\"product[visibility]\"]",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[10]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "2d6f7788e8",
+      "type": "select_change",
+      "selectedText": "{product_visibility}"
+    },
+    {
+      "description": "Switch to Prices tab of New Product form",
+      "output": null,
+      "cssSelector": "#product_info_tabs_group_8",
+      "xpath": "html/body/div/div[6]/div/div/div/ul/li[2]/a",
+      "elementTag": "a",
+      "elementHash": "86ed7ee82d",
+      "type": "click"
+    },
+    {
+      "description": "Set base Price on Prices tab",
+      "output": null,
+      "cssSelector": "#price",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[4]/div/div[2]/div/table/tbody/tr/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "e457e89369",
+      "type": "input",
+      "value": "{product_price}"
+    },
+    {
+      "description": "Select Tax Class on Prices tab using visible text",
+      "output": null,
+      "cssSelector": "#tax_class_id",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[4]/div/div[2]/div/table/tbody/tr[10]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "1d20c0f068",
+      "type": "select_change",
+      "selectedText": "{product_tax_class}"
+    },
+    {
+      "description": "Switch to Inventory tab of New Product form",
+      "output": null,
+      "cssSelector": "#product_info_tabs_inventory",
+      "xpath": "html/body/div/div[6]/div/div/div/ul/li[8]/a",
+      "elementTag": "a",
+      "elementHash": "71d44f34a7",
+      "type": "click"
+    },
+    {
+      "description": "Set Qty on Inventory tab",
+      "output": null,
+      "cssSelector": "#inventory_qty",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[10]/div/fieldset/table/tbody/tr[2]/td[2]/input[2]",
+      "elementTag": "input",
+      "elementHash": "15f8e67c9f",
+      "type": "input",
+      "value": "{product_qty}"
+    },
+    {
+      "description": "Set Stock Availability on Inventory tab",
+      "output": null,
+      "cssSelector": "#inventory_stock_availability",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/form/div[10]/div/fieldset/table/tbody/tr[12]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "09a76db7af",
+      "type": "select_change",
+      "selectedText": "{product_stock_status}"
+    },
+    {
+      "description": "Click Save button to create the new product",
+      "output": null,
+      "cssSelector": "#id_f1e39769cf0a9d7f14340abc06ae82be",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/div[2]/div/p/button[3]",
+      "elementTag": "button",
+      "elementHash": "d507e205ad",
+      "type": "click"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base URL of the Magento instance including scheme, e.g. 'http://dockerized-magento.local'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "admin_user",
+      "type": "string",
+      "format": null,
+      "description": "Admin username to log into Magento backend, e.g. 'admin'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "admin_password",
+      "type": "string",
+      "format": null,
+      "description": "Admin password to log into Magento backend, e.g. 'password123'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "attribute_set_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric ID value for the Attribute Set select on create product settings page, e.g. '4' for Default",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "attribute_set_label",
+      "type": "string",
+      "format": null,
+      "description": "Visible label of the Attribute Set option to select, e.g. 'Default'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_type_code",
+      "type": "string",
+      "format": null,
+      "description": "Internal product type code value for the product type select, e.g. 'simple', 'configurable', 'virtual', 'bundle', 'downloadable'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_type_label",
+      "type": "string",
+      "format": null,
+      "description": "Visible label of the Product Type option to select, e.g. 'Simple Product'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_name",
+      "type": "string",
+      "format": null,
+      "description": "Product Name value for the General tab Name field",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_description",
+      "type": "string",
+      "format": null,
+      "description": "Long Description text for the General tab Description field",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_short_description",
+      "type": "string",
+      "format": null,
+      "description": "Short Description text for the General tab Short Description field",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_sku",
+      "type": "string",
+      "format": null,
+      "description": "Unique SKU for the new product",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_weight",
+      "type": "string",
+      "format": null,
+      "description": "Product weight as a numeric string, e.g. '0.5'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_status",
+      "type": "string",
+      "format": null,
+      "description": "Status option visible text to select on General tab, e.g. 'Enabled' or 'Disabled'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_visibility",
+      "type": "string",
+      "format": null,
+      "description": "Visibility option visible text to select, e.g. 'Catalog, Search'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_price",
+      "type": "string",
+      "format": null,
+      "description": "Base price for the product as numeric string, e.g. '39.99'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_tax_class",
+      "type": "string",
+      "format": null,
+      "description": "Tax Class option visible text to select on Prices tab, e.g. 'Taxable Goods' or 'None'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_qty",
+      "type": "string",
+      "format": null,
+      "description": "Inventory quantity for the product, e.g. '25'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "product_stock_status",
+      "type": "string",
+      "format": null,
+      "description": "Stock Availability visible text value to select, e.g. 'In Stock' or 'Out of Stock'",
+      "required": true,
+      "enum": null
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session logs show a standard Magento 1 admin 'Manage Attribute Sets' grid. Key controls needed: 'Add New Set', the 'Set Name' filter input, 'Search' (apply filter), 'Reset Filter', and the per-row attribute-set name link (edit link). The session created a set named 'Automated Attribute Set 2026-02-02' and applied a filter. Multiple attempts to click the edit link accidentally targeted other nav items, so robust scoped XPaths are required.\n\nTask Definition:\n- The tool must navigate to the Manage Attribute Sets page, enter a user-provided attribute set name into the grid filter, apply the filter, find the exact row link for that set, and open it for editing. Optionally, if the set doesn't exist and the user requested creation, the tool should create the set and then open its edit view.\n\nAction Plan (detailed):\n1) Navigate to the Manage Attribute Sets page (provided by caller). 2) Wait a short time for the page to render. 3) Close blocking notification popups if present (agentic handling). 4) Confirm the grid and filter row exist. 5) Input the desired attribute set name into the 'Set Name' filter input (use an XPath anchored to the 'Set Name' header). 6) Click the 'Search' button to apply filters. 7) Wait for grid refresh. 8) Agentic step: if the exact attribute-set link (anchor) exists in the grid, click it. If not and create_if_missing is true, open Add New Set, fill the 'Set Name' and 'Based On' fields and save, then return to listing and click the newly created set's edit link. 9) Extract the Edit page title and URL to confirm success.\n\nVariable Identification (inputs required):\n- manage_attribute_sets_url: full listing URL (must be provided).  \n- attribute_set_name: exact visible name to search and open.  \n- create_if_missing: boolean to instruct creation flow when not found.  \n- new_set_name & new_set_based_on: used when creating a new set.  \n- wait_seconds_after_actions: optional timing control.\n\nStep Optimization & Determinism:\n- Prefer XPath selectors anchored to visible header text 'Set Name' and the grid table to avoid matching other page elements. Example XPaths used in steps are those recorded and hardened during the session (they scope to the table that contains the 'Set Name' header and then target the filter input or the row anchor with exact text).  \n- Popup closure is handled by an 'agent' step since it may or may not be present; this avoids brittle conditional branching in the static step list.  \n- Creation flow (if requested) is handled by an 'agent' step because the Add New Set control can render as <a> or <button> and the form may require capturing a hidden form_key; the agent step can read the DOM and proceed deterministically at runtime.  \n- No authentication steps are included per instructions (the session must already be logged in).\n\nSelectors and Reliability:\n- Use XPath: //th[.//a[normalize-space()='Set Name']]/ancestor::table[1]//tr[contains(@class,'filter')]//input[1] for the Set Name filter input.  \n- Use XPath: //button[normalize-space()='Search' or @title='Search'][1] for the Search button.  \n- Use XPath for the edit link scoped to the grid and text: //table[.//th[normalize-space()='Set Name']]//a[normalize-space()='{attribute_set_name}' and (contains(@href,'catalog_product_set/edit') or contains(@href,'catalog_product_set'))].  \n- When CSS-only selectors are required by the environment, the tool will return XPath wrappers that may be executed by frameworks that accept XPath-in-CSS notation; otherwise prefer XPath.\n\nCaveats:\n- If admin UI locale changes labels, the header text matching may need to be updated.  \n- If JavaScript is disabled, some interactive creation flows (attribute grouping) won't function; the tool documents this in tool_analysis and the agent step will attempt to proceed gracefully.  \n\nThis tool implements the single core task: locate an attribute set by name and open it, with an optional create-if-missing flow. It uses deterministic navigation and XPath-based selectors for reliability and includes agentic steps where dynamic behavior requires runtime reasoning.",
+  "name": "magento_manage_attribute_set",
+  "description": "Navigate Magento Admin Manage Attribute Sets, optionally create a new attribute set, filter the grid by attribute set name, and open the attribute set Edit page. Assumes the automation session is already authenticated as admin (no login steps). Uses XPath-based selectors scoped to the Magento admin grid to be robust across themes.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Manage Attribute Sets listing page.",
+      "output": null,
+      "type": "navigation",
+      "url": "{manage_attribute_sets_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Give the page a moment to load and any notifications to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Popup removal is handled by the agent step because it may or may not be present and can block interactions.",
+      "output": null,
+      "type": "agent",
+      "task": "Close any 'Incoming Message' / admin notification popup that blocks the grid if present by clicking a 'close' control (anchor with title='close' or text 'close'). If no popup present, continue.",
+      "max_steps": 4
+    },
+    {
+      "description": "Detect presence of the grid and filter row so we can input the set name.",
+      "output": "grid_presence",
+      "type": "extract_page_content",
+      "goal": "Ensure the Manage Attribute Sets grid is present and the filter row exists; extract confirmation info."
+    },
+    {
+      "description": "Type the requested attribute set name into the 'Set Name' grid filter input (scoped by header text to ensure the correct column).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[normalize-space() = 'Set Name']]/ancestor::table[1]//tr[contains(@class,'filter') or contains(@class,'filters')]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{attribute_set_name}"
+    },
+    {
+      "description": "Click the grid 'Search' (apply filters) button to filter the listing to the provided attribute set name.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space() = 'Search' or @title='Search' or contains(@onclick,'grid.search')][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the grid to refresh and show filtered results.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Agentic step handles the dynamic presence/absence of the target row and will create the set if requested.",
+      "output": "opened_edit_page",
+      "type": "agent",
+      "task": "Check whether an anchor exists matching the exact visible text '{attribute_set_name}' within the attribute-sets grid (XPath: //table[.//th[normalize-space()='Set Name']]//a[normalize-space()='{attribute_set_name}']). If found, click that anchor to open the Edit page. If not found and create_if_missing is true, perform the create flow: click the 'Add New Set' control, fill the new set 'Name' with '{new_set_name or attribute_set_name}', choose '{new_set_based_on or Default}' from 'Based On' dropdown, click Save, then after save return to Manage Attribute Sets and re-run the filter and click the new set link. Report success and the edit page URL.",
+      "max_steps": 8
+    },
+    {
+      "description": "Verify the edit view opened and return page_title and current_url for confirmation.",
+      "output": "edit_page_verification",
+      "type": "extract_page_content",
+      "goal": "Confirm the Edit page is displayed for the requested attribute set and capture the page title and URL."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "manage_attribute_sets_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL to the Magento admin Manage Attribute Sets page (example: 'http://dockerized-magento.local/index.php/admin/catalog_product_set/'). The tool navigates here first.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "attribute_set_name",
+      "type": "string",
+      "format": null,
+      "description": "Exact visible attribute set name to locate and open for editing (case-sensitive match). Example: 'Automated Attribute Set 2026-02-02'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "create_if_missing",
+      "type": "bool",
+      "format": null,
+      "description": "If true and the named attribute set is not found, the tool will create a new attribute set with the provided new_set_name and new_set_based_on values. Defaults to false when omitted.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "new_set_name",
+      "type": "string",
+      "format": null,
+      "description": "When create_if_missing=true, the visible name to use for the new attribute set. If omitted when create_if_missing=true the tool will use the value of attribute_set_name.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "new_set_based_on",
+      "type": "string",
+      "format": null,
+      "description": "When creating a new set, the existing set to base it on (visible option text). Common value: 'Default'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_seconds_after_actions",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait after navigation and clicks to allow the page to render (defaults to 1).",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

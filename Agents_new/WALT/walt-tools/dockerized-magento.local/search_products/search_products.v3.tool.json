@@ -1,0 +1,325 @@
+{
+  "tool_analysis": "Step Analysis: The recorded browser session navigates the Magento admin Manage Products page, identifies header-anchored selectors for filters and actions, fills filters (ID range, Name, SKU, Type, Attribute Set, Price, Qty, Visibility, Status, Website), clicks Search, and opens a product Edit page (either by product ID or by first visible row). Task Definition: Provide a reusable automation tool that takes explicit filter values and navigation targets and deterministically finds and opens a product's Edit page in Magento 1.x admin. Action Plan: 1) Navigate to the Manage Products URL. 2) Verify grid presence. 3) Fill per-column filters using header-text-anchored XPaths. 4) Select dropdown options for Type/Attribute Set/Visibility/Status/Websites. 5) Click Search and wait briefly. 6) Extract first-result metadata. 7) Use an agentic step to reliably click the Edit link for a specified product id or the Nth visible row. Variable Identification: Inputs required: manage_products_url (required), id_from, id_to, name, sku, type, attribute_set, price_from, price_to, qty_from, qty_to, visibility, status, website (all optional), open_product_id (optional) or first_result_row_index (optional), mass_action & mass_action_status (optional - not used by default). Step Optimization: I anchored filter selectors to header text (e.g. //th[a[normalize-space(.)='SKU']]//input) to avoid brittle id/class guesses; used partial href-patterns for Edit/Add Product when needed; replaced multi-click UI work with direct element targeting where possible. I avoided unconditional mass-action or Add Product navigation to keep the tool focused on the primary task (find + open). Dynamic behaviors (row selection, variable IDs, localized labels) are handled via an agent step to ensure the correct Edit link is clicked without fragile index assumptions. This tool assumes the caller provides the admin Manage Products URL and that the session is already authenticated (no login steps included).",
+  "name": "magento_admin_find_and_open_product",
+  "description": "Navigate to Magento admin Manage Products, apply column filters (ID range, Name, SKU, Type, Attribute Set, Price range, Qty range, Visibility, Status, Website), run Search, optionally apply a mass-action, and open a product's Edit page. Uses header-text-anchored XPaths and href patterns to produce stable selectors that resolve to a single element on a standard Magento 1.x admin grid.",
+  "version": "2026-02-01",
+  "steps": [
+    {
+      "description": "Navigate directly to the Manage Products grid URL specified by the caller.",
+      "output": null,
+      "type": "navigation",
+      "url": "{manage_products_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Verify grid presence by extracting header texts and ensuring the table with class containing 'grid' or the header 'Manage Products' exists.",
+      "output": "grid_check",
+      "type": "extract_page_content",
+      "goal": "Confirm the Manage Products grid loaded and locate the grid table to scope subsequent selectors."
+    },
+    {
+      "description": "Enter ID 'From' value into the ID-from filter cell. If {id_from} is empty the input will be left blank (caller may pass empty string).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='ID']]//input[contains(@name,'from') or contains(@placeholder,'From') or contains(@id,'from')][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{id_from}"
+    },
+    {
+      "description": "Enter ID 'To' value into the ID-to filter cell.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='ID']]//input[contains(@name,'to') or contains(@placeholder,'To') or contains(@id,'to')][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{id_to}"
+    },
+    {
+      "description": "Enter Name filter value (partial or full).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Name']]//input[@type='text' or contains(@name,'name')][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Enter SKU filter value (partial or full).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='SKU']]//input[@type='text' or contains(@name,'sku')][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Select product Type filter option by visible text (if {type} is empty, no visible option will be selected).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Type']]//select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{type}"
+    },
+    {
+      "description": "Select Attribute Set filter option by visible text.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Attrib. Set Name' or normalize-space(.)='Attrib. Set']]//select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{attribute_set}"
+    },
+    {
+      "description": "Enter Price From (first input in Price filter cell).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Price']]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{price_from}"
+    },
+    {
+      "description": "Enter Price To (second input in Price filter cell).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Price']]//input[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{price_to}"
+    },
+    {
+      "description": "Enter Qty From (first input in Qty filter cell).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Qty']]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{qty_from}"
+    },
+    {
+      "description": "Enter Qty To (second input in Qty filter cell).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Qty']]//input[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{qty_to}"
+    },
+    {
+      "description": "Select Visibility option by visible text.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Visibility']]//select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{visibility}"
+    },
+    {
+      "description": "Select Status option by visible text (Any/Enabled/Disabled).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Status']]//select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Select Website option by visible text.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Websites' or normalize-space(.)='Website']]//select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{website}"
+    },
+    {
+      "description": "Click the Search button to apply filters.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//button[normalize-space(.)='Search'] | //input[@type='button' and (@value='Search' or @title='Search')])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the grid to be refreshed after Search is clicked (adjust if slower environments).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract the first visible product row ID, Name and Edit link href to use for opening the product. This helps confirm a match was found.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Capture the first page of results and the first result's ID and Edit link href (if present)."
+    },
+    {
+      "description": "Agentic selection is used because rows and IDs are dynamic. This step ensures the correct Edit link is targeted even if table row ordering or attributes vary.",
+      "output": null,
+      "type": "agent",
+      "task": "Open the product Edit page: if {open_product_id} is provided, click the Edit link whose href contains '/id/{open_product_id}/'. Otherwise click the Edit link in the {first_result_row_index} visible row (default 1). After clicking, wait for navigation to the edit form page.",
+      "max_steps": 6
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "manage_products_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the Magento Manage Products grid (example: \"http://dockerized-magento.local/index.php/admin/catalog_product/\"). Use the admin frontName present on the page.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "id_from",
+      "type": "string",
+      "format": null,
+      "description": "Product ID 'From' filter (numeric string). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "id_to",
+      "type": "string",
+      "format": null,
+      "description": "Product ID 'To' filter (numeric string). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Product name filter (partial or full). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "format": null,
+      "description": "SKU filter (partial or full). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "format": null,
+      "description": "Product Type visible option text (e.g., \"Simple Product\"). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "attribute_set",
+      "type": "string",
+      "format": null,
+      "description": "Attribute Set visible option text (e.g., \"Default\"). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price_from",
+      "type": "string",
+      "format": null,
+      "description": "Price From filter (numeric). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price_to",
+      "type": "string",
+      "format": null,
+      "description": "Price To filter (numeric). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty_from",
+      "type": "string",
+      "format": null,
+      "description": "Qty From filter (numeric). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty_to",
+      "type": "string",
+      "format": null,
+      "description": "Qty To filter (numeric). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visibility",
+      "type": "string",
+      "format": null,
+      "description": "Visibility visible option text (e.g., \"Catalog, Search\"). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Status visible option text (e.g., \"Enabled\" or \"Disabled\"). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "website",
+      "type": "string",
+      "format": null,
+      "description": "Website visible option text (e.g., \"Main Website\"). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "mass_action",
+      "type": "string",
+      "format": null,
+      "description": "Optional mass-action to apply after search (e.g., \"Change status\", \"Delete\", \"Update Attributes\"). Leave empty to skip mass-action.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "mass_action_status",
+      "type": "string",
+      "format": null,
+      "description": "When mass_action is 'Change status', set this to 'Enabled' or 'Disabled'. Leave empty if not applicable.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "open_product_id",
+      "type": "string",
+      "format": null,
+      "description": "If provided, open the Edit page for the product with this ID (exact match). If empty the tool will open the first visible search result.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "first_result_row_index",
+      "type": "number",
+      "format": null,
+      "description": "1-based row index to open when open_product_id is not provided (defaults to 1). Use to target the N-th visible row.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

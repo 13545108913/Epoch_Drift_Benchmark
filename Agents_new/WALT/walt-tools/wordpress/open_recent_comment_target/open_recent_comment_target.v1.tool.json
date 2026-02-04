@@ -1,0 +1,75 @@
+{
+  "tool_analysis": "Step Analysis: The recorded browser session repeatedly analyzed pages to locate the 'Recent Comments' sidebar widget and identified a single comment entry that links to post id 8 comment id 14. The session used document-ordered anchor indices (e.g., 20, 21, 75, 76) and recorded element hashes for specific clicks (e.g., 'f21b1c5d03', '85abfde5e9', '831138803b'). The final action clicked the post/comment anchor and navigated to http://localhost:8000/?p=8#comment-14.\n\nTask Definition: Create a deterministic, re-usable tool that starts from a given page showing the Recent Comments widget and opens the post/comment anchor (permalink to a specific comment) to navigate to the referenced comment thread.\n\nAction Plan:\n1) Navigate to the provided start_url.\n2) Extract page anchors to find ones with href containing '#comment-'.\n3) Resolve the target anchor using either elementHash (preferred), explicit document link index, or fallback to the first '#comment-' anchor.\n4) Click the resolved anchor.\n5) Wait briefly for navigation and verify the URL or DOM includes the expected comment fragment.\n\nVariable Identification:\n- start_url (required): Where to begin; used for navigation.\n- comment_anchor_link_index (optional): numeric document-ordered link index of the comment anchor to click.\n- comment_anchor_element_hash (optional): stable elementHash recorded during session; prefer when available.\n\nStep Optimization: The tool prefers using the recorded elementHash when provided (more stable than numeric link index). If elementHash is not provided, clicking can be done by finding anchors with '#comment-' in their href, which is deterministic for WordPress sites. We avoid unnecessary UI steps like scrolling unless needed by the click action. We do not include login steps per instructions. If page navigation returns a server error, additional error-retry steps could be added but were omitted to keep the tool focused on the single task.\n\nInputs Schema: Provided above in input_schema.\n\nNotes on Recorded Values: Several specific link indexes (20, 21, 75, 76) and element hashes (f21b1c5d03, 85abfde5e9, 831138803b) were observed; these are optional inputs. The tool defaults to first '#comment-' anchor if no inputs are supplied.\n",
+  "name": "open_recent_comment_from_sidebar",
+  "description": "Navigate to a WordPress site's page and open the post anchor referenced by an entry in the 'Recent Comments' sidebar widget. The tool clicks the sidebar comment permalink (the post/comment anchor) to open the post page and jump to the specific comment fragment.\n\nAssumptions: The agent is already authenticated if necessary. Uses anchor link indexes (document-ordered numeric link index) or stable elementHash when available. If elementHash is provided it will be used; otherwise the tool will click based on link index. The tool will not attempt to log in.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the provided start page where the Recent Comments widget is present.",
+      "output": null,
+      "type": "navigation",
+      "url": "{start_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Extract all anchors in the page and identify those with href containing '#comment-'.",
+      "output": "recent_comments_links",
+      "type": "extract_page_content",
+      "goal": "Locate the Recent Comments widget and find the post/comment anchor hrefs (links containing '#comment-' fragments)."
+    },
+    {
+      "description": "Resolve which anchor to click using provided inputs or page-extracted anchors.",
+      "output": null,
+      "type": "agent",
+      "task": "Find the target anchor link to click. If 'comment_anchor_element_hash' is provided, select that element. Else if 'comment_anchor_link_index' is provided, select the anchor with that document link index. Otherwise pick the first anchor from 'recent_comments_links' whose href contains '#comment-'.",
+      "max_steps": 3
+    },
+    {
+      "description": "Click the resolved anchor element to open the post page and jump to the comment fragment.",
+      "output": "clicked_anchor",
+      "cssSelector": null,
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": "{comment_anchor_element_hash}",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the navigation to complete and the page to scroll to the comment fragment.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Verify the current URL or the DOM contains the target comment id (e.g., '#comment-14').",
+      "output": "confirmation",
+      "type": "extract_page_content",
+      "goal": "Confirm the URL contains the comment fragment or that the comment element is present on the page."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "start_url",
+      "type": "string",
+      "format": null,
+      "description": "The starting URL where the Recent Comments widget is visible (e.g., 'http://localhost:8000/?m=202512&paged=2'). Must include protocol.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment_anchor_link_index",
+      "type": "string",
+      "format": null,
+      "description": "The overall document link index (numeric string) of the Recent Comments post/comment anchor to click (e.g., '21'). If omitted, the tool will look for a link whose href contains '#comment-' and click the first match.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "comment_anchor_element_hash",
+      "type": "string",
+      "format": null,
+      "description": "Stable elementHash of the target anchor (if recorded), e.g., 'f21b1c5d03'. When present, this preferred selector will be used instead of link index lookup.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

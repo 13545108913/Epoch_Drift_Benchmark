@@ -1,0 +1,87 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigates to Magento Admin order view for an order_id, clicks the Reorder action in the top action toolbar, lands on the sales_order_create (New Order) page with pre-filled customer/items, and clicks Submit Order to create a new order. The UI uses modal popups (Gift Options, Configure Product) and two ajax loader images (ajax-loader.gif and ajax-loader-tr.gif + 'Please wait...') which can block interaction.\n\nTask Definition:\n- Build a deterministic tool that: 1) opens the admin order view for {order_id}, 2) clicks the Reorder control, 3) waits for the New Order page to load and for common blocking overlays to clear, 4) clicks Submit Order to finalize the new order, 5) verifies success by detecting the success message 'The order has been created.' or by capturing the resulting order view URL.\n\nAction Plan (ordered, essential steps only):\n1) Navigate to order view URL: {admin_base_url}/index.php/admin/sales_order/view/order_id/{order_id}/\n2) Wait briefly for page to stabilise (short fixed wait)\n3) Click the Reorder control using an XPath that matches text 'Reorder' (covers <button> and <a> implementations)\n4) Wait for navigation / page load (short fixed wait)\n5) Extract page content to verify the New Order page loaded and detect loader/modal elements (capture presence of ajax loaders and gift/config modals)\n6) Wait briefly for loaders/modals to clear (fixed wait + prior detection step reduces flakiness)\n7) Click scoped Submit Order control inside the order form using a form-scoped XPath that matches Submit text or input value\n8) Wait for the server processing overlay (longer fixed wait)\n9) Extract page content and verify the success message \"The order has been created.\" or capture the new order view URL/title to return as output.\n\nVariable Identification (tool inputs):\n- admin_base_url (string, required): admin scheme+host\n- order_id (string, required): order_id used in the admin URL\n\nStep Optimization:\n- Use direct navigation to the order view URL rather than trying to locate the admin menu. This is deterministic and faster.\n- Use visible-text XPaths for Reorder and Submit Order because Magento admin often renders these as <button>, <a> or <input>. The XPaths included cover these variants.\n- Instead of complex conditional polling for every overlay, the tool uses conservative fixed waits at key points and an extraction step to capture loader/modal evidence; this keeps the tool deterministic while still accounting for Ajax activity recorded in the session.\n- Do NOT include authentication; the recorded session was already logged in. If a login screen occurs the automation runner should handle it externally.\n\nNotes & Constraints:\n- The tool does not attempt to fill or edit gift/config modals \u2014 it will proceed by clicking Submit Order once the page stabilises. If a blocking modal is visible in an environment, the click may fail; the extraction steps help identify that and can be extended in future versions to explicitly close modals.\n- Fixed wait durations are used (short waits then a longer wait after submit) to avoid schema validation issues with numeric placeholders. These waits are conservative but small (2-5s) as the system observed quick transitions in the recorded session.\n",
+  "name": "magento_admin_reorder_create",
+  "description": "Create a new Magento 1 admin order by re-ordering an existing order (click Reorder on the order view, then Submit Order on the order-create page). Waits for common blocking overlays and verifies creation.",
+  "version": "2026-02-01",
+  "steps": [
+    {
+      "description": "Open the Magento admin Order View page for the specified order_id.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_base_url}/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Allow the Order View page to stabilise (wait for initial AJAX and page rendering).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Click the Reorder action in the top action toolbar (matches button or anchor with text 'Reorder').",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space(.)='Reorder'] | //a[normalize-space(.)='Reorder']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the New Order (sales_order_create) page to load after Reorder is activated.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Extract page content to confirm the New Order page is present and whether blocking modals/loaders exist.",
+      "output": "create_page_snapshot",
+      "type": "extract_page_content",
+      "goal": "Capture page content to verify sales_order_create loaded and to detect blocking overlays (look for 'Create New Order', 'Please wait...', ajax-loader images, 'Gift Options', 'Configure Product')."
+    },
+    {
+      "description": "Short wait to allow any transient overlays to disappear (covers quick AJAX toggles).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Click the Submit Order button scoped to the order form (matches button or input with 'Submit Order' inside the order form).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//form[contains(@action,'sales_order') or contains(@id,'order') or contains(@id,'order_form')]//button[normalize-space(.)='Submit Order'] | //form[contains(@action,'sales_order') or contains(@id,'order') or contains(@id,'order_form')]//input[@value='Submit Order']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for server processing and the typical 'Please wait...' overlay to appear and complete (allow time for order creation and redirect).",
+      "output": null,
+      "type": "wait",
+      "seconds": 5.0
+    },
+    {
+      "description": "Extract the final page content to confirm success and capture the new order id/title/URL for the caller.",
+      "output": "created_order_result",
+      "type": "extract_page_content",
+      "goal": "Verify that the order was created by detecting 'The order has been created.' message or by capturing the resulting order view title/URL. Output created order confirmation data."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base URL of the Magento admin (scheme + host), e.g. 'http://dockerized-magento.local'. Do NOT include a trailing slash.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "The numeric order_id used in admin URLs (example: '204' for /sales_order/view/order_id/204/). Use the internal order_id (not the displayed order increment id).",
+      "required": true,
+      "enum": null
+    }
+  ]
+}

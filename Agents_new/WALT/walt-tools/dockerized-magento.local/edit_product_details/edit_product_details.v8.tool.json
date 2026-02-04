@@ -1,0 +1,251 @@
+{
+  "tool_analysis": null,
+  "name": "magento_product_edit",
+  "description": "Edit a Magento 1 product in the admin product edit page. Navigates to the product edit URL (or uses current session URL), sets fields (name, sku, weight, price, status, visibility), updates inventory (manage_stock, qty, is_in_stock), assigns websites and categories, and performs toolbar actions (Save, Save and Continue, Delete, Duplicate). Uses stable name/id-based selectors with fallbacks suitable for Magento 1.9 admin. Requires an authenticated admin session. Handles JS-disabled environments by providing form POST fallback instructions.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the product edit page for the specified product id.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/catalog_product/edit/id/{product_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the page to load and any JS-initialized elements to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Confirm we are on the correct product edit page and read required hidden inputs (form_key, id).",
+      "output": "page_snapshot",
+      "type": "extract_page_content",
+      "goal": "Verify the product edit page loaded and capture presence of product form, tabs and form_key"
+    },
+    {
+      "description": "Because admin DOM rendering can differ, verify selectors at runtime and return exact element attributes/ids to use for subsequent deterministic interactions.",
+      "output": null,
+      "type": "agent",
+      "task": "Find and confirm selectors for the following fields on the live DOM: name (input[name='name'] or input[name='product[name]']), sku (input[name='sku' or product[sku]]), weight (input[name='weight']), price (input[name='price']), status (select[name*='status']), visibility (select[name*='visibility']), manage_stock (select or radio name='stock_data[manage_stock]'), qty (input[name='stock_data[qty]']), is_in_stock (select or radio name='stock_data[is_in_stock]'), website checkboxes (input[name='product[website_ids][]']), categories checkboxes (input[name='product[category_ids][]' or input[name='categories[]']) and toolbar buttons (buttons with id or title Save/Delete/Duplicate)",
+      "max_steps": 6
+    },
+    {
+      "description": "Set product Name (if provided).",
+      "output": null,
+      "cssSelector": "#name",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "df3020a86b",
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Set product SKU (if provided).",
+      "output": null,
+      "cssSelector": "#sku",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[4]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "1349f1ca81",
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Set product Weight (if provided).",
+      "output": null,
+      "cssSelector": "input[name=\"product[weight]\"][type=\"text\"]",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr[5]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "d929abfc8b",
+      "type": "input",
+      "value": "{weight}"
+    },
+    {
+      "description": "Navigate directly to the Prices tab URL when possible to set price quickly. If not available, the agent will click the Prices tab.",
+      "output": null,
+      "type": "navigation",
+      "url": null,
+      "url_operation": {
+        "base": "{current_url}",
+        "replace": {
+          "tab": "prices"
+        }
+      }
+    },
+    {
+      "description": "Price input may be inside the Prices tab and loaded dynamically; locate and set it.",
+      "output": null,
+      "type": "agent",
+      "task": "Locate Price input (input[name='price'] or input[name='product[price]']) and set to {price} if provided, otherwise skip. Max steps:4",
+      "max_steps": 4
+    },
+    {
+      "description": "Use name-based selectors (product[status], product[visibility]) with fallback to id or label proximity.",
+      "output": null,
+      "type": "agent",
+      "task": "Locate and set Status select to {status} and Visibility select to {visibility} using select_change action. Max steps:4",
+      "max_steps": 4
+    },
+    {
+      "description": "Inventory fields usually use name 'stock_data[...]' \u2014 prefer those selectors. If JS disabled, collect form_key and prepare POST fallback.",
+      "output": null,
+      "type": "agent",
+      "task": "Open Inventory tab if not visible and locate Manage Stock select/radios, Qty input and Stock Availability select/radios. Set manage_stock={manage_stock}, qty={qty}, is_in_stock={is_in_stock} as provided. Max steps:6",
+      "max_steps": 6
+    },
+    {
+      "description": "Check/uncheck provided website IDs. Verify labels match before toggling to avoid misassignment.",
+      "output": null,
+      "type": "agent",
+      "task": "Open Websites tab and set website checkboxes matching the provided website_ids (comma-separated). Use input[name='product[website_ids][]'][value='{id}'] for each id. Max steps:6",
+      "max_steps": 6
+    },
+    {
+      "description": "Prefer name+value selectors, fallback to label text matching when value not present.",
+      "output": null,
+      "type": "agent",
+      "task": "Open Categories tab (or direct categories URL) and toggle category checkboxes by value using input[name='product[category_ids][]'][value='{category_id}'] for each category id in {category_ids}. Max steps:8",
+      "max_steps": 8
+    },
+    {
+      "description": "Ensure uniqueness of the toolbar selector and handle JS confirmation safely.",
+      "output": null,
+      "type": "agent",
+      "task": "Verify toolbar buttons and perform the requested action {action} (save/save_and_continue/delete/duplicate/none). When performing Delete, parse the onclick for deleteConfirm(...) and either click and accept confirmation or navigate to the delete URL (ensure form_key present). Max steps:8",
+      "max_steps": 8
+    },
+    {
+      "description": "Confirm the product was saved/updated/deleted and return final state.",
+      "output": "result_snapshot",
+      "type": "extract_page_content",
+      "goal": "After action, extract admin success/failure notices and re-read inventory values to confirm changes persisted"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "product_id",
+      "type": "string",
+      "format": null,
+      "description": "Product ID to edit (e.g. '2796').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Product name to set (use admin store default or specific store view if needed).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "format": null,
+      "description": "Product SKU value.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "weight",
+      "type": "string",
+      "format": null,
+      "description": "Product weight (numeric string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price",
+      "type": "string",
+      "format": null,
+      "description": "Product price (numeric string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Status value: '1' = Enabled, '0' = Disabled. Magento stores status as 1/0.",
+      "required": false,
+      "enum": [
+        "1",
+        "0"
+      ]
+    },
+    {
+      "name": "visibility",
+      "type": "string",
+      "format": null,
+      "description": "Visibility value: 1=Not Visible Individually, 2=Catalog, 3=Search, 4=Catalog, Search.",
+      "required": false,
+      "enum": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ]
+    },
+    {
+      "name": "manage_stock",
+      "type": "string",
+      "format": null,
+      "description": "Manage stock: '1' = Yes, '0' = No, 'use_config' = Use Config Settings.",
+      "required": false,
+      "enum": [
+        "1",
+        "0",
+        "use_config"
+      ]
+    },
+    {
+      "name": "qty",
+      "type": "string",
+      "format": null,
+      "description": "Inventory quantity value (numeric string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_in_stock",
+      "type": "string",
+      "format": null,
+      "description": "Stock availability: '1' = In Stock, '0' = Out of Stock.",
+      "required": false,
+      "enum": [
+        "1",
+        "0"
+      ]
+    },
+    {
+      "name": "website_ids",
+      "type": "string",
+      "format": null,
+      "description": "Comma-separated website IDs to assign the product to (e.g. '1,2').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "category_ids",
+      "type": "string",
+      "format": null,
+      "description": "Comma-separated category IDs to check in the categories tree (e.g. '75,63').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "action",
+      "type": "string",
+      "format": null,
+      "description": "Toolbar action to perform after edits. 'none' does not perform toolbar action.",
+      "required": false,
+      "enum": [
+        "save",
+        "save_and_continue",
+        "delete",
+        "duplicate",
+        "none"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,318 @@
+{
+  "tool_analysis": "Step Analysis:\n- Recorded session navigated to Magento Admin 'Online Customers' grid, closed an incoming-message popup, analyzed the filter row and recorded robust header-anchored selectors for each filter control. The IP Address input was not visible in the static dump (page indicated JS disabled), so a runtime JS fallback was generated to compute the IP filter cell and element at runtime.\n\nTask Definition:\n- Create a reusable tool that opens the Online Customers admin grid, closes any popup blocking the filters, fills provided filter values (ID range, names, email, IP, session/last-activity ranges, type, last URL), clicks Search, and returns the filtered results. The tool must use stable selectors and include a runtime fallback for JS-rendered controls (notably the IP Address filter).\n\nAction Plan (ordered):\n1) Navigate to the Online Customers URL (parameterizable via base_url). 2) Wait briefly for DOM/popups. 3) Close incoming-message popup using recorded elementHash (deterministic). 4) Fill each filter control using header-anchored XPath expressions (computes column index by header text) so selectors remain stable even if column ids change. 5) For the IP Address filter use the same header-anchored XPath; also include runtime JS fallback in tool_analysis for environments where the input is only present after JS initialization. 6) Click the Search button (grid-scoped when possible). 7) Wait for grid reload and extract results.\n\nVariable Identification (inputs):\n- base_url (optional): start page. grid_id (optional): grid table id if known for scoping selectors. Filters: id_from, id_to, first_name, middle_name, last_name, email, ip_address, session_start_from, session_start_to, last_activity_from, last_activity_to, type (enum: Customer/Visitor), last_url. All filters are optional because the UI does not require them; the tool should send empty values if not set.\n\nStep Optimization:\n- Prefer header-anchored XPath that computes the column index by locating the header cell text (e.g. 'IP Address') and then selecting the corresponding filter cell in the filter row \u2014 this is robust to column order changes and avoids brittle auto-generated ids.\n- Use elementHash for the popup close step because it was recorded and is stable in the session; this avoids guessing a brittle CSS selector for the popup close control.\n- Use a short explicit wait after major UI actions to allow JS listeners to process events. A production implementation should replace static waits with explicit waits for AJAX loader disappearance or row updates.\n- Provide a runtime JS fallback (included in tool_analysis) to locate the IP filter by header text and return id/name/css/xpath at runtime; this is necessary because the IP control may be rendered only when JS is enabled.\n\nDeterministic behavior and essential steps only:\n- Every included step is required to accomplish the core task (navigate, reveal filters, populate fields, apply filters, extract results). No optional exploratory steps are present. Fields are parameterized and optional so the tool can be used for any subset of filters.\n\nSelector stability considerations (implementation notes for integrators):\n- Preferred selector order at runtime: id -> name -> CSS scoped to grid id -> header-anchored XPath. If grid id is supplied the tool's selectors can be adjusted to scope to #customerGrid for higher reliability.\n- If a test runner cannot evaluate complex XPath, use the provided runtime JS to compute and return a CSS/XPath string for the IP input and then use that stable selector in the automation.\n\nRuntime JS fallback summary:\n- The tool_analysis contains a ready-to-run JS function (_magentoLocateIpFilter / _magentoSetIpAndSearch) that finds the IP filter input by header text, returns id/name/css/xpath and can set an IP and click Search. Use this in contexts where the static XPath does not find the IP input because JS-rendered controls are not present in the static DOM.\n\nConclusion:\n- The produced tool uses header-anchored XPaths for determinism, an elementHash for the popup close action, and provides a runtime fallback for IP Address. It accepts all filters as parameters (all optional) and returns the grid results after applying filters. Replace static waits with explicit waits in production automation to increase robustness.",
+  "name": "magento_admin_online_customers_filter_tool",
+  "description": "Navigate to Magento Admin -> Customers -> Online Customers grid, close any incoming message popup, populate provided filter values (ID range, first/middle/last name, email, IP address, session start range, last activity range, Type select, last URL) and apply the filters by clicking Search. Provides header-anchored XPath selectors and a runtime JS fallback for locating the IP Address filter when JS-enhanced controls are required.",
+  "version": "2026-02-01-v1",
+  "steps": [
+    {
+      "description": "Navigate to the Online Customers grid. If base_url is empty the tool will navigate to 'http://dockerized-magento.local/index.php/admin/customer_online/'.",
+      "output": "page_loaded",
+      "type": "navigation",
+      "url": "{base_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the page to render (allow DOM and any popup to appear).",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Close the incoming message popup (recorded stable elementHash). If the popup is not present this step will be a no-op in most runners.",
+      "output": "popup_closed",
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Short wait after closing popup to ensure filter row is visible.",
+      "output": null,
+      "type": "wait",
+      "seconds": 0.5
+    },
+    {
+      "description": "Set ID 'From' filter. Empty value is allowed and will not change the control if empty.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'ID']/preceding-sibling::th) + 1]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{id_from}"
+    },
+    {
+      "description": "Set ID 'To' filter (second input in the ID filter cell).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'ID']/preceding-sibling::th) + 1]//input[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{id_to}"
+    },
+    {
+      "description": "Set First Name filter input (single text input).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'First Name']/preceding-sibling::th) + 1]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{first_name}"
+    },
+    {
+      "description": "Set Middle Name filter input (single text input).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'Middle Name']/preceding-sibling::th) + 1]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{middle_name}"
+    },
+    {
+      "description": "Set Last Name filter input (single text input).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'Last Name']/preceding-sibling::th) + 1]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_name}"
+    },
+    {
+      "description": "Set Email filter input (single text input).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'Email']/preceding-sibling::th) + 1]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{email}"
+    },
+    {
+      "description": "Set IP Address filter input. If the IP input is rendered only with JS this XPath will find it when present. If JS-rendered controls are not present, use the runtime JS fallback provided in tool_analysis.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'IP Address']/preceding-sibling::th) + 1]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{ip_address}"
+    },
+    {
+      "description": "Set Session Start 'From' input (first input in that filter cell).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'Session Start Time']/preceding-sibling::th) + 1]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{session_start_from}"
+    },
+    {
+      "description": "Set Session Start 'To' input (second input in that filter cell).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'Session Start Time']/preceding-sibling::th) + 1]//input[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{session_start_to}"
+    },
+    {
+      "description": "Set Last Activity 'From' input (first input in that filter cell).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'Last Activity']/preceding-sibling::th) + 1]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_activity_from}"
+    },
+    {
+      "description": "Set Last Activity 'To' input (second input in that filter cell).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'Last Activity']/preceding-sibling::th) + 1]//input[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_activity_to}"
+    },
+    {
+      "description": "Set Type select (Customer or Visitor) using visible option text. If {type} is empty the select will not change.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'Type']/preceding-sibling::th) + 1]//select",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{type}"
+    },
+    {
+      "description": "Set Last URL filter input.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/th[position() = count(//table[contains(@class,'grid')]//thead/tr[1]/th[normalize-space(.) = 'Last URL']/preceding-sibling::th) + 1]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_url}"
+    },
+    {
+      "description": "Short wait after populating filters to allow JS listeners to process input events.",
+      "output": null,
+      "type": "wait",
+      "seconds": 0.2
+    },
+    {
+      "description": "Click the Search button to apply filters. This XPath attempts to find the grid's Search button first, then any button labelled 'Search'.",
+      "output": "search_clicked",
+      "cssSelector": null,
+      "xpath": "(//table[contains(@class,'grid')]//button[@title='Search' or normalize-space()='Search' or contains(.,'Search')])[1] | (//button[@title='Search' or normalize-space()='Search' or contains(.,'Search')])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to reload after applying filters (short static wait; callers should use a more robust wait in production).",
+      "output": null,
+      "type": "wait",
+      "seconds": 0.6
+    },
+    {
+      "description": "Capture the resulting grid state after filters applied. If the grid is empty the output will indicate no records.",
+      "output": "filtered_results",
+      "type": "extract_page_content",
+      "goal": "Extract the grid rows (ID, First Name, Middle Name, Last Name, Email, IP Address, Session Start, Last Activity, Type, Last URL) from the Online Customers grid and return as structured output."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base admin URL for the Online Customers grid. Default: 'http://dockerized-magento.local/index.php/admin/customer_online/'",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grid_id",
+      "type": "string",
+      "format": null,
+      "description": "Optional id attribute of the admin grid table (e.g. 'customerGrid'). If provided, selectors will be scoped to this id which improves stability.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "id_from",
+      "type": "string",
+      "format": null,
+      "description": "Filter: ID 'From' value (numeric). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "id_to",
+      "type": "string",
+      "format": null,
+      "description": "Filter: ID 'To' value (numeric). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "first_name",
+      "type": "string",
+      "format": null,
+      "description": "Filter: First Name text. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "middle_name",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Middle Name text. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_name",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Last Name text. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Email address text. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "ip_address",
+      "type": "string",
+      "format": null,
+      "description": "Filter: IP address (e.g. '192.0.2.1'). Leave empty to skip. If the IP filter is rendered only when JS is enabled, the tool will attempt a runtime lookup.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "session_start_from",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Session Start Time 'From' (use the page's expected format). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "session_start_to",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Session Start Time 'To' (use the page's expected format). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_activity_from",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Last Activity 'From' (use the page's expected format). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_activity_to",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Last Activity 'To' (use the page's expected format). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Type dropdown visible values. Use 'Customer' or 'Visitor'. Leave empty to skip (no selection).",
+      "required": false,
+      "enum": [
+        "Customer",
+        "Visitor"
+      ]
+    },
+    {
+      "name": "last_url",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Last URL text (partial match). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

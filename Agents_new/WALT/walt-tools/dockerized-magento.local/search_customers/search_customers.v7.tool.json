@@ -1,0 +1,382 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session demonstrates a complete admin workflow on a Magento 1.x Customers grid: login (already assumed), navigate to Customers, apply column filters (name, email, group, website, date range), run Search, export CSV, perform mass-action on selected rows (Subscribe to Newsletter), open Add New Customer form, and open customer Edit pages. Stable selectors and element hashes were captured during the recorded run and are used as primary deterministic selectors with label-based/XPath fallbacks.\n\nTask Definition:\n- Build a reusable automation tool that: navigates to the Customers admin grid, applies user-specified filters, optionally exports results, optionally performs a mass-action on a specified customer id, and opens the customer's Edit page. Optionally create a new customer when requested. The tool focuses on performing these single-purpose operations deterministically and returning extracted page content for verification.\n\nAction Plan:\n1) Navigation to provided {admin_url} (grid entry point).\n2) Confirm grid loaded and capture snapshot.\n3) Apply each filter input (name, email, telephone, group, website, created_at from/to). Use recorded elementHash selectors where available; provide label/XPath fallbacks in descriptions.\n4) Click Search and wait for grid reload; extract filtered rows.\n5) Optionally set Export format and trigger Export download.\n6) If a {customer_id} is provided and mass_action != 'none', select the row checkbox by CSS input[value='{customer_id}'], choose mass-action option, set mass-action group (if assign_group), and click Submit. Wait and extract success/error messages.\n7) Navigate to the Edit page for {customer_id} (deterministic direct URL) and extract the edit page content (account fields and action buttons). This avoids brittle per-row link lookups.\n8) If create_new_customer is requested, run an agentic step to reliably fill and submit the New Customer form (covers dynamic modals and JS flows).\n\nVariable Identification (inputs required):\n- admin_url: base customers grid URL (required).\n- filter_name, filter_email, filter_telephone, filter_group_id, filter_website_id, filter_created_from, filter_created_to: grid filter parameters (optional).\n- export_format: optional export choice (CSV/XML/Excel).\n- mass_action and mass_action_group_id: optional mass-action instructions; mass_action expects enumerated action names and mass_action_group_id used only for assign_group.\n- customer_id: target customer id for selection/mass-action/edit navigation.\n- create_new_customer and new_customer_* fields: optional inputs for creating a new customer when requested.\n\nStep Optimization / Selector Strategy:\n- Prefer deterministic navigation and direct URL navigation for the Edit page rather than clicking row links. That avoids brittle grid-specific locators.\n- Use elementHash values recorded during the session as primary, deterministic selectors for inputs/buttons that were interacted with successfully: email input (elementHash '56a5f4823b'), name input ('958237192c'), group select ('547d16e240'), website select ('4a2f7e5061'), created_at inputs ('d62d76baab' and 'acb2625150'), Search button ('90708cd5ce'), export/select ('e2c204011f','5d9a22adb7'), mass-action select and submit ('b202e94e0d','c7b2a872ff'), and mass-action row checkbox (targeted by value selector for reusability). When elementHash is not appropriate for reusability (e.g. selecting arbitrary customer ids) prefer building CSS selectors with {customer_id}.\n- Combine UI interactions into single URL navigations when possible (Edit navigation uses direct URL). Keep field inputs explicit and deterministic rather than branching.\n\nNotes and Constraints:\n- The tool assumes the browser context is already authenticated as an admin user (recorded run authenticated). Do not perform login steps here.\n- Magento admin relies on JavaScript; the automation should wait for AJAX loaders and verify element visibility before performing destructive actions (mass delete). The tool includes brief waits but consumers should add more robust wait-for-conditions in real runs.\n- All destructive actions (e.g. delete) should be used with care; the tool provides them for completeness but the default mass_action is 'none'.\n\nThis tool is purposely single-purpose (search/filter/open/edit + optional export and mass-action) and deterministic. It uses recorded elementHashes for stability and label/XPath fallbacks for portability across similar Magento 1.x admin installs.",
+  "name": "magento_admin_customers_tool",
+  "description": "Automate searching, filtering, exporting, mass-actions and opening/editing customer records in Magento 1.x admin Customers grid. Uses recorded stable selectors and label-based fallbacks. Assumes an active authenticated admin session in the browser context.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Customers admin grid URL to begin (must be an authenticated session).",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Read the grid page to confirm it contains the customer table and capture any notices (e.g. 'Total records' or mass-action messages).",
+      "output": "initial_grid_snapshot",
+      "type": "extract_page_content",
+      "goal": "Confirm the Customers grid loaded and capture available controls and messages."
+    },
+    {
+      "description": "Set the Name filter input. (Recorded elementHash for name filter used as primary target; fallback: XPath //tr[contains(@class,'filter')]//th[normalize-space(.)='Name']//input).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_name",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/div/input",
+      "elementTag": "input",
+      "elementHash": "958237192c",
+      "type": "input",
+      "value": "{filter_name}"
+    },
+    {
+      "description": "Set the Email filter input. (Recorded elementHash for email filter; fallback CSS input[name='filter[email]']).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_email",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/input",
+      "elementTag": "input",
+      "elementHash": "56a5f4823b",
+      "type": "input",
+      "value": "{filter_email}"
+    },
+    {
+      "description": "Set the Telephone filter input (recorded checkbox/hash used earlier for a checkbox; this step uses the recorded telephone input element hash from the session. Fallback: input[name='filter[telephone]']).",
+      "output": null,
+      "cssSelector": "input[name=\"customer\"][type=\"checkbox\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/tbody/tr[18]/td/input",
+      "elementTag": "input",
+      "elementHash": "822a6e2ce4",
+      "type": "input",
+      "value": "{filter_telephone}"
+    },
+    {
+      "description": "Choose Customer Group from the Group filter. Uses recorded group-select elementHash; fallback: select[name='filter[group_id]'].",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_group",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[5]/select",
+      "elementTag": "select",
+      "elementHash": "547d16e240",
+      "type": "select_change",
+      "selectedText": "{filter_group_id}"
+    },
+    {
+      "description": "Choose Website from the Website filter. Uses recorded website-select elementHash; fallback: select[name='filter[website_id]'].",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_website_id",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[11]/select",
+      "elementTag": "select",
+      "elementHash": "4a2f7e5061",
+      "type": "select_change",
+      "selectedText": "{filter_website_id}"
+    },
+    {
+      "description": "Enter Customer Since (From) date into the filter's from field. Recorded elementHash used; fallback XPath //input[contains(@name,'created_at') and contains(@name,'from')].",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_customer_since1769986143.1127_from",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[10]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "d62d76baab",
+      "type": "input",
+      "value": "{filter_created_from}"
+    },
+    {
+      "description": "Enter Customer Since (To) date into the filter's to field. Recorded elementHash used; fallback XPath //input[contains(@name,'created_at') and contains(@name,'to')].",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_customer_since1769986143.1127_to",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[10]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "acb2625150",
+      "type": "input",
+      "value": "{filter_created_to}"
+    },
+    {
+      "description": "Click the Search button to apply grid filters and reload the customer grid. Uses recorded Search button elementHash as primary selector.",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for grid AJAX or page reload to complete (wait for loader to disappear in live runs).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract the visible row data and any success/error messages after filter/search.",
+      "output": "filtered_grid_results",
+      "type": "extract_page_content",
+      "goal": "Capture the filtered grid rows and top-level messages (e.g. 'Total of N record(s) were updated.')."
+    },
+    {
+      "description": "If an export format is provided, set the Export select to that format. Uses recorded export-select elementHash; fallback: select[name='export'].",
+      "output": null,
+      "cssSelector": "#customerGrid_export",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "e2c204011f",
+      "type": "select_change",
+      "selectedText": "{export_format}"
+    },
+    {
+      "description": "Click the Export control to trigger the export download (used after setting export format).",
+      "output": null,
+      "cssSelector": "button[title=\"Export\"][title=\"Export\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "5d9a22adb7",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for export/download to start (file download behavior depends on environment).",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Select the checkbox for the specified customer id in the grid (used for mass-action). This CSS selector uses the numeric id value and ensures the checkbox in the customer row is targeted. If your grid uses different name attributes, verify and adapt.",
+      "output": null,
+      "cssSelector": "input[type='checkbox'][value='{customer_id}']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Select the requested mass-action from the 'Actions' dropdown. Uses recorded mass-action select elementHash as primary selector; fallback: select[id*='massaction'].",
+      "output": null,
+      "cssSelector": "#customerGrid_massaction-select",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span/select",
+      "elementTag": "select",
+      "elementHash": "b202e94e0d",
+      "type": "select_change",
+      "selectedText": "{mass_action}"
+    },
+    {
+      "description": "If assigning a group as part of mass-action, select the target group from the mass-action group select. This targets the group-select placed near mass-action (fallback: select[name*='group']).",
+      "output": null,
+      "cssSelector": "ul > li > a[href=\"http://dockerized-magento.local/index.php/admin/customer/\"]",
+      "xpath": "html/body/div/div/div[3]/ul/li[4]/ul/li/a",
+      "elementTag": "a",
+      "elementHash": "209a7de5e9",
+      "type": "select_change",
+      "selectedText": "{mass_action_group_id}"
+    },
+    {
+      "description": "Click the mass-action Submit control to apply the chosen mass-action to the selected row(s). Uses recorded elementHash where available and a robust ID/title-based CSS fallback.",
+      "output": null,
+      "cssSelector": "#id_6dc2f3a45507030f2337b47e1ce3418b",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[4]/button",
+      "elementTag": "button",
+      "elementHash": "c7b2a872ff",
+      "type": "click"
+    },
+    {
+      "description": "Wait for mass-action to complete (page reload or ajax).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Read the messages container (e.g. #messages .success-msg) and selection count to confirm the mass-action result.",
+      "output": "post_massaction_status",
+      "type": "extract_page_content",
+      "goal": "Capture success/error messages and verify selection state after the mass-action."
+    },
+    {
+      "description": "Navigate directly to the Edit page for the provided {customer_id}. This is deterministic and avoids brittle row-locators; use only when a customer_id is supplied.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_url}edit/id/{customer_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Capture the edit page form structure and preferred selectors (id/name and label-based XPaths) for later automated edits.",
+      "output": "customer_edit_page",
+      "type": "extract_page_content",
+      "goal": "Extract account fields and top action buttons from the customer Edit page (Save, Save and Continue, Delete, Back)."
+    },
+    {
+      "description": "Some installs require extra JS/confirm flows to create a customer (addresses, modals). This agentic step will run up to 5 iterations to handle dynamic flows such as address dialogs or password options when creating a new customer.",
+      "output": null,
+      "type": "agent",
+      "task": "If create_new_customer == 'true', fill the New Customer form and submit using the new_customer_* inputs and then return to the Manage Customers grid.",
+      "max_steps": 5
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL to the Magento Customers admin grid (must end with '/admin/customer/' or equivalent). Example: 'http://dockerized-magento.local/index.php/admin/customer/'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "filter_name",
+      "type": "string",
+      "format": null,
+      "description": "Customer name to filter by. Maps to the grid filter input (typical form name 'filter[name]')",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_email",
+      "type": "string",
+      "format": null,
+      "description": "Customer email to filter by. Maps to the grid filter input (typical form name 'filter[email]')",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_telephone",
+      "type": "string",
+      "format": null,
+      "description": "Telephone number to filter by. Maps to the grid filter input (typical form name 'filter[telephone]')",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_group_id",
+      "type": "string",
+      "format": null,
+      "description": "Customer Group id (or visible text) to filter by. Maps to select name 'filter[group_id]'. You may pass group's visible text (e.g. 'Wholesale') or its numeric id depending on your environment.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_website_id",
+      "type": "string",
+      "format": null,
+      "description": "Website id (or visible text) to filter by. Maps to select name 'filter[website_id]'. You may pass visible text (e.g. 'Main Website') or numeric id.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_created_from",
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "description": "Customer 'Customer Since' start date (YYYY-MM-DD) to filter created_at from (maps to created_at[from] filter).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_created_to",
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "description": "Customer 'Customer Since' end date (YYYY-MM-DD) to filter created_at to (maps to created_at[to] filter).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Optional: Export format to use after filtering. Use 'CSV', 'XML' or 'Excel'. If omitted no export is performed.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "XML",
+        "Excel"
+      ]
+    },
+    {
+      "name": "mass_action",
+      "type": "string",
+      "format": null,
+      "description": "Optional mass action to run on the target customer. Use 'none' to skip mass-action.",
+      "required": false,
+      "enum": [
+        "none",
+        "subscribe_newsletter",
+        "unsubscribe_newsletter",
+        "delete",
+        "assign_group"
+      ]
+    },
+    {
+      "name": "mass_action_group_id",
+      "type": "string",
+      "format": null,
+      "description": "When mass_action is 'assign_group' provide the target group id or visible text (e.g. 'Wholesale').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "customer_id",
+      "type": "string",
+      "format": null,
+      "description": "Customer numeric id to select for mass-action and to open the Edit page. Example: '209'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "create_new_customer",
+      "type": "string",
+      "format": null,
+      "description": "If 'true', the tool will fill and submit the new-customer form using the new_customer_* fields. Use 'false' or omit to skip creation.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "new_customer_firstname",
+      "type": "string",
+      "format": null,
+      "description": "First name for the new customer (used if create_new_customer is 'true').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "new_customer_lastname",
+      "type": "string",
+      "format": null,
+      "description": "Last name for the new customer (used if create_new_customer is 'true').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "new_customer_email",
+      "type": "string",
+      "format": null,
+      "description": "Email for the new customer (used if create_new_customer is 'true').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "new_customer_group_id",
+      "type": "string",
+      "format": null,
+      "description": "Group id or visible text to set on new customer (used if create_new_customer is 'true').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "new_customer_website_id",
+      "type": "string",
+      "format": null,
+      "description": "Website id or visible text to set on new customer (used if create_new_customer is 'true').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "new_customer_password",
+      "type": "string",
+      "format": null,
+      "description": "Password for the new customer (used if create_new_customer is 'true'). If omitted some installs may require 'Send Auto-Generated Password' instead.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "open_edit_after_actions",
+      "type": "string",
+      "format": null,
+      "description": "If 'true' navigate to the customer Edit page for {customer_id} at the end of the run (if customer_id provided). Default: 'false'.",
+      "required": false,
+      "enum": [
+        "true",
+        "false"
+      ]
+    }
+  ]
+}

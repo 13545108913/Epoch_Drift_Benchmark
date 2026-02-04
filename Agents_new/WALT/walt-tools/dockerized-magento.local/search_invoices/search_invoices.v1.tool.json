@@ -1,0 +1,233 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session visits the Magento admin Invoices grid, uses header filters (Invoice #, Order #, Bill to Name, Amount range, Status), clicks Search, exports CSV, selects visible rows and applies the 'PDF Invoices' mass-action, and finally opens an invoice View page (invoice_id=42). Stable elementHashes from the recording are available for the key controls.\n\nTask Definition:\n- Create a deterministic, re-usable automation tool to: 1) apply header filters on the Magento invoices grid, 2) apply an export, 3) select visible rows and apply a mass-action, 4) extract the resulting rows, and 5) open a specific invoice view page.\n\nAction Plan (detailed):\n1) Navigate to the invoices grid URL.\n2) Populate the header filter inputs: invoice increment id, order increment id, bill-to name, amount from/to. 3) Set the Status select. 4) Click 'Search' and wait for the grid to update.\n3) Choose export format and click 'Export'.\n4) Click 'Select Visible' to mark visible rows, choose a mass-action option, and click 'Submit' to apply it.\n5) Extract the grid rows into structured output for the caller to inspect. 6) Navigate to the invoice view URL for a provided invoice_id.\n\nVariable Identification (inputs required):\n- increment_id: maps to header input for Invoice # (not required).\n- order_increment_id: maps to header input for Order # (not required).\n- billing_name: maps to Bill to Name header input (not required).\n- status: visible option name for the Status filter (Any/Pending/Paid/Canceled) (not required).\n- amount_from / amount_to: numeric strings for Amount range fields (not required).\n- export_format: visible export option (CSV/Excel XML/XML) (not required).\n- massaction_option: visible mass-action option (e.g., 'PDF Invoices') (not required).\n- invoice_id: numeric internal invoice id to open by direct URL (not required).\n\nStep Optimization:\n- Navigation optimization: Instead of clicking the per-row 'View' anchor, the tool navigates directly to the invoice view URL using the invoice_id parameter. This is deterministic and avoids fragile selectors for the view link in different table rows.\n- Deterministic interactions: Where the recording provided elementHash values for inputs/buttons/selects, the tool uses those hashes for stable interactions (these are included in steps). This avoids brittle path-based selectors.\n- Simplification: The tool always executes the same sequence of steps (apply filters, search, export, select visible, mass action, extract rows, open view). All inputs are optional; callers can pass empty strings for any filter/action they do not want to use. The tool will attempt each interaction in order using the recorded stable element references.\n\nNotes and limitations:\n- The original session noted that some UI functions rely on JavaScript. The recorded elementHashes were captured during an interactive demo with JS available; ensure JS is enabled in the automation environment.\n- Because the tool follows a fixed linear sequence (no runtime branching), callers should provide empty values for parameters they wish to ignore. Selecting an option by empty visible text may be a no-op or fail depending on the automation runtime; in typical use provide the explicit visible text for export and mass action when those actions are desired.\n\nSelector provenance: All interaction steps reference elementHash values recorded during the demo so the tool remains deterministic for the same admin UI instance. If the admin theme or DOM changes, replace the elementHash references with updated selectors or use the header-text XPaths suggested in the session notes.\n",
+  "name": "magento_admin_invoices_search_and_action",
+  "description": "Automates searching the Magento admin Invoices grid using header filters (invoice #, order #, bill-to, status, amount range), then performs export, mass-action (select visible + apply), and opens an invoice view page. Uses the exact elements interacted with during the recorded demo (stable elementHash identifiers) so steps are deterministic against the same UI.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Magento admin Invoices grid (starting page for all actions).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_invoice/",
+      "url_operation": null
+    },
+    {
+      "description": "Type the Invoice # filter into the Invoice # header input (may be empty to leave unset).",
+      "output": null,
+      "cssSelector": "#sales_invoice_grid_filter_increment_id",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "6d5a061d1b",
+      "type": "input",
+      "value": "{increment_id}"
+    },
+    {
+      "description": "Type the Order # filter into the Order # header input (may be empty to leave unset).",
+      "output": null,
+      "cssSelector": "#sales_invoice_grid_filter_order_increment_id",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/input",
+      "elementTag": "input",
+      "elementHash": "ca9ff6c19c",
+      "type": "input",
+      "value": "{order_increment_id}"
+    },
+    {
+      "description": "Type the Bill to Name filter into the Bill to Name header input (may be empty).",
+      "output": null,
+      "cssSelector": "#sales_invoice_grid_filter_billing_name",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[6]/div/input",
+      "elementTag": "input",
+      "elementHash": "f395d4b12d",
+      "type": "input",
+      "value": "{billing_name}"
+    },
+    {
+      "description": "Type the Amount 'From' (lower bound) into the Amount filter 'From' input (may be empty).",
+      "output": null,
+      "cssSelector": "#sales_invoice_grid_filter_grand_total_from",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "6eece115d1",
+      "type": "input",
+      "value": "{amount_from}"
+    },
+    {
+      "description": "Type the Amount 'To' (upper bound) into the Amount filter 'To' input (may be empty).",
+      "output": null,
+      "cssSelector": "#sales_invoice_grid_filter_grand_total_to",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "ab48eece81",
+      "type": "input",
+      "value": "{amount_to}"
+    },
+    {
+      "description": "Select the Status filter option by visible text in the Status header select (use 'Any' or leave blank to not change).",
+      "output": null,
+      "cssSelector": "#sales_invoice_grid_filter_state",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/select",
+      "elementTag": "select",
+      "elementHash": "04857b749b",
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Click the 'Search' button to apply header filters and refresh the grid results.",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the grid to refresh after applying filters (adjust if necessary for slower servers).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Choose an export format in the 'Export to' control (CSV/Excel XML/XML). If left empty, this step will attempt to select nothing (no-op).",
+      "output": null,
+      "cssSelector": "#sales_invoice_grid_export",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "e59543f7b4",
+      "type": "select_change",
+      "selectedText": "{export_format}"
+    },
+    {
+      "description": "Click the 'Export' button to download the selected export format (if export selection was present).",
+      "output": null,
+      "cssSelector": "#id_0f0bc8c55136acf3102555ed46cbc7d9",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "58f8c3e1ff",
+      "type": "click"
+    },
+    {
+      "description": "Click 'Select Visible' to check all rows currently visible on the page (prepares them for mass-action).",
+      "output": null,
+      "cssSelector": "tr > td > a[href=\"#\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td/a",
+      "elementTag": "a",
+      "elementHash": "0eefac88df",
+      "type": "click"
+    },
+    {
+      "description": "Select the mass-action option by visible text (e.g., 'PDF Invoices'). Leave empty to skip selecting a mass-action (step will still attempt selection).",
+      "output": null,
+      "cssSelector": "#sales_invoice_grid_massaction-select",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span/select",
+      "elementTag": "select",
+      "elementHash": "beeeaa3873",
+      "type": "select_change",
+      "selectedText": "{massaction_option}"
+    },
+    {
+      "description": "Click the mass-action 'Submit' button to apply the chosen mass action to the selected rows.",
+      "output": null,
+      "cssSelector": "button[title=\"Submit\"][title=\"Submit\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[4]/button",
+      "elementTag": "button",
+      "elementHash": "e5da8d6705",
+      "type": "click"
+    },
+    {
+      "description": "Extract the current invoice rows from the grid so the caller can inspect which invoices were found and their view URLs.",
+      "output": "invoice_rows",
+      "type": "extract_page_content",
+      "goal": "Capture the grid rows (invoice number, invoice_id, view_url, bill-to, status, amount) and return as 'invoice_rows'"
+    },
+    {
+      "description": "Open the invoice view page for the provided invoice_id (direct navigation is deterministic and avoids fragile row-specific clicks).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_invoice/view/invoice_id/{invoice_id}/",
+      "url_operation": null
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Invoice increment/number to filter (maps to the Invoice # header filter input)",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "order_increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Order increment/number to filter (maps to the Order # header filter input)",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "billing_name",
+      "type": "string",
+      "format": null,
+      "description": "Bill to Name filter (partial or full name)",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Invoice status filter (visible select options in the grid header). Use 'Any' or leave empty to not filter by status.",
+      "required": false,
+      "enum": [
+        "Any",
+        "Pending",
+        "Paid",
+        "Canceled"
+      ]
+    },
+    {
+      "name": "amount_from",
+      "type": "string",
+      "format": null,
+      "description": "Amount (grand_total) lower bound (numeric string). Maps to Amount 'From' filter input.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "amount_to",
+      "type": "string",
+      "format": null,
+      "description": "Amount (grand_total) upper bound (numeric string). Maps to Amount 'To' filter input.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Export format to choose from the 'Export to' control. Leave empty to skip export (the step still executes and will be a no-op if not available).",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel XML",
+        "XML"
+      ]
+    },
+    {
+      "name": "massaction_option",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the mass-action option to select (e.g., 'PDF Invoices'). Leave empty to skip mass-action (step will attempt selection regardless).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "invoice_id",
+      "type": "string",
+      "format": null,
+      "description": "Invoice internal id to open in the detail view (numeric id from the grid's view links). If provided, the tool will navigate directly to the invoice view URL.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

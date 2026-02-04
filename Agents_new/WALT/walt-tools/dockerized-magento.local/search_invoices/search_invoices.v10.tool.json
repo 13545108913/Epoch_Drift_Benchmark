@@ -1,0 +1,387 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session performed: navigate to the Magento invoices grid, close an inline admin notice, fill grid filter inputs (invoice, order, bill-to, status, date/amount ranges), click Search, trigger Export, select a row, choose a mass-action and submit it, then open the invoice 'View' link. Stable selectors observed: input[name='filter[increment_id]'], input[name='filter[order_increment_id]'], input[name='filter[billing_name]'], select[name='filter[state]'], input[name=\"filter[grand_total][from]\"], input[name=\"filter[grand_total][to]\"], a[href*='/sales_invoice/view/'].\n\nTask Definition:\n- Build a reusable, parameterized tool that: navigates to the Magento admin invoices grid (given a base_url), applies user-provided filters, optionally exports results to a chosen format, optionally selects a row and applies a mass-action, and optionally opens the invoice view. The tool uses stable, attribute-based selectors and conservative waits to tolerate Magento's AJAX loading mask and an inline notice overlay.\n\nAction Plan:\n1) Navigate to the invoices grid at {base_url}/index.php/admin/sales_invoice/.\n2) Close inline admin notice if present and wait for #loading-mask to be hidden (agent step) to avoid blocked interactions.\n3) Deterministically set all filter inputs by writing to the form fields using their form names (use XPath selectors matching the Magento 'filter[...]' names). Empty strings are acceptable inputs when the caller does not need to filter by that field.\n4) Select the status dropdown option by visible text.\n5) Click the grid Search button to apply filters and wait for refresh.\n6) Optionally set the Export dropdown and trigger Export (select+click), then wait to allow the browser to start downloading.\n7) Optionally select a row checkbox by 1-based index, select a visible mass-action option by its visible text and click the mass-action Submit button, then wait.\n8) Optionally open the invoice View link either by matching a visible invoice number or by row index, and wait for the view to load.\n9) Extract the visible invoice row details after actions complete and return them under invoice_row_details for verification.\n\nVariable Identification (inputs required / optional):\n- base_url (required): starting site root used for navigation.\n- filter[...] form names (optional): filter[increment_id], filter[order_increment_id], filter[billing_name], filter[state], filter[created_at][from/to], filter[order_created_at][from/to], filter[grand_total][from/to]. These map directly to the Magento grid form names.\n- perform_export, export_format: control exporting behavior (optional). export_format options are CSV/Excel/XML.\n- select_row_index, mass_action, apply_mass_action: choose which row to select and which mass-action to apply (optional). select_row_index is 1-based.\n- view_invoice_number or view_row_index: how to open a specific invoice view (optional). Using the invoice number is the most robust across pages.\n\nStep Optimization / Selector Choices:\n- Prefer attribute-based XPath for filter fields: e.g. //input[@name='filter[increment_id]'] so the tool targets the form key used by Magento rather than brittle visual cues.\n- For amount fields account for variations grand_total vs base_grand_total by using an XPath OR expression, minimizing environment-specific failures.\n- Close the inline notice (a[title='close']) before interacting; this was required in the recorded session and is a low-risk action.\n- Replace expensive UI-only sequences (like multiple clicks to open exports) with the Export select + Export click pattern which is present on Magento 1 grids; this avoids reading deeply-nested dynamic JS menus.\n- Use row-based XPath for per-row actions: //table[contains(@id,'sales_invoice')]/tbody/tr[{row_index}]... so callers can target the correct visible row regardless of pagination.\n\nDeterminism and Limitations:\n- The tool is sequential and deterministic; it writes values to all recognized filter fields (caller-provided values or empty strings). It does not branch at runtime on element presence \u2014 the recorded session showed these elements exist on a Magento 1.9 grid.\n- If the target Magento instance uses different form names or custom grid modifications (different column order or IDs), callers must supply selectors or adjust the tool.\n- The tool assumes the client executing it has an authenticated admin session already; no login step is included.\n\nSecurity / Robustness Notes:\n- The tool uses visible-text selection for dropdowns and mass-action options; these match the recorded visible labels (e.g., 'Paid', 'PDF Invoices'). If your environment uses different text or translation, pass the visible text used in your admin UI.\n- Export is triggered via the page Export control (select+Export). Downloads occur in the browser; automation harness should handle file retrieval if needed.\n\nThis tool encodes the recorded, tested selectors and the precise interaction order used in the session, with conservative waits and an agent step for closing overlays to improve reliability across similar Magento 1 admin deployments.",
+  "name": "magento_admin_invoices_tool_v1",
+  "description": "Automate locating invoices in Magento admin (sales_invoice grid), apply filters, export results, perform a mass-action and open a View link. Uses stable form and grid selectors observed during a recorded session against Magento 1.9.x. Assumes the session is already authenticated (no login).",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento admin Invoices (sales_invoice) grid page.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/sales_invoice/",
+      "url_operation": null
+    },
+    {
+      "description": "Safely close the inline admin notification (e.g. 'Latest Message' / 'Incoming Message') if present and ensure the AJAX loading mask is not blocking interactions.",
+      "output": "overlay_handling",
+      "type": "agent",
+      "task": "If there is a visible admin notice with a close link, click it. Then wait for any #loading-mask to be hidden before proceeding. Use document.querySelector('a[title=\"close\"]') to find the notice close link and document.getElementById('loading-mask') to detect the loading overlay. If the close link is not present, continue.",
+      "max_steps": 4
+    },
+    {
+      "description": "Give the page one second to finish any short AJAX setup after closing notices.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set Invoice # filter (filter[increment_id]). Leave as empty string to keep blank.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='filter[increment_id]']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[increment_id]}"
+    },
+    {
+      "description": "Set Order # filter (filter[order_increment_id]).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='filter[order_increment_id]']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[order_increment_id]}"
+    },
+    {
+      "description": "Set Bill-to Name filter (filter[billing_name]).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='filter[billing_name]']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[billing_name]}"
+    },
+    {
+      "description": "Select the visible status option in the status dropdown (filter[state]). Use visible text e.g. 'Paid'. If left blank/Any, selection may remain unchanged.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//select[@name='filter[state]']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{filter[state]}"
+    },
+    {
+      "description": "Set Invoice Date FROM (filter[created_at][from]).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='filter[created_at][from]']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[created_at][from]}"
+    },
+    {
+      "description": "Set Invoice Date TO (filter[created_at][to]).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='filter[created_at][to]']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[created_at][to]}"
+    },
+    {
+      "description": "Set Order Date FROM (filter[order_created_at][from]).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='filter[order_created_at][from]']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[order_created_at][from]}"
+    },
+    {
+      "description": "Set Order Date TO (filter[order_created_at][to]).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='filter[order_created_at][to]']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[order_created_at][to]}"
+    },
+    {
+      "description": "Set Amount FROM (tries grand_total first, falls back to base_grand_total by using an XPath OR expression).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='filter[grand_total][from]' or @name='filter[base_grand_total][from]']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[grand_total][from]}"
+    },
+    {
+      "description": "Set Amount TO (tries grand_total first, falls back to base_grand_total).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='filter[grand_total][to]' or @name='filter[base_grand_total][to]']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{filter[grand_total][to]}"
+    },
+    {
+      "description": "Click the grid 'Search' button to apply the filters.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[@title='Search' or normalize-space()='Search']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters (allow the loading mask to appear/disappear).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "When perform_export is true, select the requested export format in the Export drop-down (CSV / Excel / XML). If export_format is empty the select action will attempt to select nothing.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//div[contains(@class,'export')]//select | //select[contains(@id,'export') or contains(@name,'export')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{export_format}"
+    },
+    {
+      "description": "Trigger Export by clicking the Export button or direct export link (the XPath covers both the Export button and typical export links).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//div[contains(@class,'export')]//button[normalize-space()='Export'] | //a[contains(@href,'exportCsv') or contains(@href,'exportExcel') or contains(@href,'exportXml')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Brief wait to allow an export request to be initiated (downloads are handled by the browser).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Select the checkbox in the first column of the specified row (1-based index). If select_row_index is not provided this XPath will be invalid; provide a row index to select a row for mass actions.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@id,'sales_invoice')]/tbody/tr[{select_row_index}]/td[1]//input[@type='checkbox']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Select the desired mass-action option by visible text (for example 'PDF Invoices').",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//select[contains(@id,'massaction') or contains(@name,'massaction') or contains(@class,'massaction-select')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{mass_action}"
+    },
+    {
+      "description": "Click the mass-action 'Submit' button to apply the selected mass-action to the selected rows.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//div[contains(@class,'massaction') or contains(@class,'actions')]//button[normalize-space()='Submit' or @title='Submit'] | //button[normalize-space()='Submit']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the mass-action to be processed (server may return a file or change page state).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract the visible invoice row data so the caller can verify filtered results and the view link href for the selected invoice.",
+      "output": "invoice_row_details",
+      "type": "extract_page_content",
+      "goal": "Capture the first visible invoice row details (invoice number, view link href) after actions complete"
+    },
+    {
+      "description": "Open the 'View' link for the row containing the given view_invoice_number (if provided).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[td[normalize-space()='{view_invoice_number}']]//a[normalize-space()='View']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Open the 'View' link for the specified 1-based row index (fallback when view_invoice_number is not provided).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//table[contains(@id,'sales_invoice')]/tbody/tr[{view_row_index}]/td[last()]//a[normalize-space()='View']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the invoice view page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base site URL (scheme + host + optional base path). Example: 'http://dockerized-magento.local'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "filter[increment_id]",
+      "type": "string",
+      "format": null,
+      "description": "Invoice number to filter by (form field name: filter[increment_id]). Use exact invoice number like '100000040'. Leave empty to not filter by invoice number.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[order_increment_id]",
+      "type": "string",
+      "format": null,
+      "description": "Order number to filter by (form field name: filter[order_increment_id]).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[billing_name]",
+      "type": "string",
+      "format": null,
+      "description": "Bill-to name to filter by (form field name: filter[billing_name]).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[state]",
+      "type": "string",
+      "format": null,
+      "description": "Invoice status visible text to select in status dropdown (form field name: filter[state]). Use 'Any' or leave empty to not change the status filter.",
+      "required": false,
+      "enum": [
+        "Any",
+        "Pending",
+        "Paid",
+        "Canceled"
+      ]
+    },
+    {
+      "name": "filter[created_at][from]",
+      "type": "string",
+      "format": null,
+      "description": "Invoice Date FROM value (string). Format depends on site locale; entering an empty string leaves the field blank.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[created_at][to]",
+      "type": "string",
+      "format": null,
+      "description": "Invoice Date TO value (string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[order_created_at][from]",
+      "type": "string",
+      "format": null,
+      "description": "Order Date FROM value (string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[order_created_at][to]",
+      "type": "string",
+      "format": null,
+      "description": "Order Date TO value (string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[grand_total][from]",
+      "type": "string",
+      "format": null,
+      "description": "Amount FROM value for the Amount (grand_total) filter. Use numeric string like '0' or leave empty.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter[grand_total][to]",
+      "type": "string",
+      "format": null,
+      "description": "Amount TO value for the Amount (grand_total) filter. Use numeric string like '1000' or leave empty.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "perform_export",
+      "type": "bool",
+      "format": null,
+      "description": "If true the tool will trigger the Export control after applying filters. Defaults to false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "When perform_export is true, selects this export format from the Export dropdown. Valid values: 'CSV', 'Excel', 'XML'.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "select_row_index",
+      "type": "number",
+      "format": null,
+      "description": "1-based index of the row to select for mass-action (first data row = 1). If omitted no row is selected.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "mass_action",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the mass-action option to apply (example: 'PDF Invoices' or the visible label of the option). If omitted no mass-action will be selected/applied.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "apply_mass_action",
+      "type": "bool",
+      "format": null,
+      "description": "If true the tool will click the mass-action submit button after selecting the mass-action option. Defaults to false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "view_invoice_number",
+      "type": "string",
+      "format": null,
+      "description": "If provided the tool will open the 'View' link for the row containing this invoice number (visible Invoice #). Example: '100000040'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "view_row_index",
+      "type": "number",
+      "format": null,
+      "description": "1-based row index of the invoice row to open the 'View' link for. Use when view_invoice_number is not provided.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

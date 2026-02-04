@@ -1,0 +1,337 @@
+{
+  "tool_analysis": "Step Analysis: The recorded session opens the Magento admin catalog product grid, logs in, closes a notification popup, and exercises all main filters (ID range, Name, SKU, Type, Attribute Set, Price range, Qty range, Visibility, Status, Website), executes Search and Reset Filter, uses pagination, selects a product checkbox, and clicks an Edit link. The prior failure was due to relying on a brittle selector a[title='close'] for the notification popup. In this run we identified a specific close link with element_hash df76c6ce85 and demonstrated stable interactions with all filter controls using their grid positions.\n\nTask Definition: Build a reusable tool that, given filter values and pagination parameters, opens the Magento Manage Products grid, safely closes the notification popup, sets all requested filters, optionally adjusts pager (page and per-page), runs the search, and returns the filtered product grid content. Authentication is assumed to be already done by the environment.\n\nAction Plan:\n1) Navigate directly to the Catalog Product grid URL (admin/catalog_product/).\n2) Close the notification popup via the close link inside #message-popup-window using the elementHash captured, avoiding reliance on generic a[title='close'] alone.\n3) For each filter field in the grid filter row, input or select the parameterized values: ID from/to, Name, Type, Attribute Set, SKU, Price from/to, Qty from/to, Visibility, Status, Website. Use deterministic selectors based on table[id$='productGrid_table'] and stable column order; bind them to the element_hashes discovered.\n4) Optionally set pagination controls if page/per_page parameters are given using the pager input and select.\n5) Click the Search button using its stable selector and element_hash.\n6) Extract the resulting product grid table and pager summary for downstream use.\n\nVariable Identification:\n- id_from, id_to: numeric strings used in ID range filters.\n- name: text for Name filter.\n- sku: text for SKU filter.\n- type: visible text for product Type dropdown (enum derived from observed options).\n- attribute_set: visible text for Attribute Set Name dropdown.\n- price_from, price_to: numeric strings for Price range.\n- qty_from, qty_to: numeric strings for Qty range.\n- visibility: visible text for Visibility dropdown (enum captured).\n- status: visible text for Status dropdown (Enabled/Disabled/Any).\n- website: visible text for Websites dropdown (e.g., 'Main Website').\n- page: desired page number in pager.\n- per_page: desired \"per page\" limit (20/30/50/100/200).\nAll parameters are optional, since the grid can be searched with any combination or none.\n\nStep Optimization:\n- Navigation: Directly navigate to admin/catalog_product instead of going via menu clicks.\n- Popup close: Replace previous fragile selector a[title='close'] with a click bound to known element_hash df76c6ce85; retain a CSS/XPath that scopes within #message-popup-window for extra resilience.\n- Deterministic selectors: For each filter, use table[id$='productGrid_table'] combined with column nth-child positions and confirm with element_hash from the session. This is more robust than index-based actions previously used.\n- Pagination: Set page/per_page via pager controls only if values are provided; the steps are still deterministic because they always target the same elements.\n- Extraction: Single extract_page_content step after Search captures the resulting grid. No unnecessary sorting or mass action operations are included, adhering to single-purpose design focused on searching/filtering.\n\nThe tool avoids optional demo steps (mass action, edit) and does not include Reset Filter or additional navigation beyond what is necessary for applying filters and retrieving grid results. It addresses the earlier failure by tying the popup close to a specific elementHash and not waiting on generic selectors.",
+  "name": "tool_search_products.v2",
+  "description": "Search Magento admin catalog products grid using full set of filters (ID range, name, SKU, type, attribute set, price range with currency, qty range, visibility, status, website) and pagination, returning the filtered grid page content. Uses robust selectors and avoids fragile a[title='close'] popup selector by relying on stable element hashes.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open Magento admin catalog product grid (login is handled outside this tool).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/catalog_product/",
+      "url_operation": null
+    },
+    {
+      "description": "Close the Incoming Message notification popup using stable element hash instead of fragile a[title='close'] selector.",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[7]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Set ID From range filter if provided, otherwise clear existing value.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_entity_id_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "6c749b372d",
+      "type": "input",
+      "value": "{id_from}"
+    },
+    {
+      "description": "Set ID To range filter if provided, otherwise clear existing value.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_entity_id_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "c43947da3b",
+      "type": "input",
+      "value": "{id_to}"
+    },
+    {
+      "description": "Set Name text filter (partial match).",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_name",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/div/input",
+      "elementTag": "input",
+      "elementHash": "29fed4031b",
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Set Type dropdown filter (product type).",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_type",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/select",
+      "elementTag": "select",
+      "elementHash": "59a067e4b4",
+      "type": "select_change",
+      "selectedText": "{type}"
+    },
+    {
+      "description": "Set Attribute Set Name dropdown filter.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_set_name",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[5]/select",
+      "elementTag": "select",
+      "elementHash": "97d647bb6f",
+      "type": "select_change",
+      "selectedText": "{attribute_set}"
+    },
+    {
+      "description": "Set SKU text filter.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_sku",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[6]/div/input",
+      "elementTag": "input",
+      "elementHash": "f127a4b0da",
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Set Price From range filter (in current currency).",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_price_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "8e38c5e838",
+      "type": "input",
+      "value": "{price_from}"
+    },
+    {
+      "description": "Set Price To range filter (in current currency).",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_price_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "927c2c13e5",
+      "type": "input",
+      "value": "{price_to}"
+    },
+    {
+      "description": "Set Qty From range filter.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_qty_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "0a91de9a0e",
+      "type": "input",
+      "value": "{qty_from}"
+    },
+    {
+      "description": "Set Qty To range filter.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_qty_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "bdecbf7d2c",
+      "type": "input",
+      "value": "{qty_to}"
+    },
+    {
+      "description": "Set Visibility dropdown filter.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_visibility",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "fef9e4ddbc",
+      "type": "select_change",
+      "selectedText": "{visibility}"
+    },
+    {
+      "description": "Set Status dropdown filter.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_status",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[10]/select",
+      "elementTag": "select",
+      "elementHash": "2d0526510b",
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Set Websites dropdown filter.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_visibility",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "fef9e4ddbc",
+      "type": "select_change",
+      "selectedText": "{website}"
+    },
+    {
+      "description": "If a specific page number is provided, set it in the pager input before searching.",
+      "output": null,
+      "cssSelector": "input[name=\"product\"][type=\"checkbox\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/tbody/tr/td/input",
+      "elementTag": "input",
+      "elementHash": "6938967a7e",
+      "type": "input",
+      "value": "{page}"
+    },
+    {
+      "description": "If per_page value is provided, change the pager 'per page' dropdown.",
+      "output": null,
+      "cssSelector": "tr > td > a[href=\"#\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/tbody/tr/td/a",
+      "elementTag": "a",
+      "elementHash": "0eefac88df",
+      "type": "select_change",
+      "selectedText": "{per_page}"
+    },
+    {
+      "description": "Click Search button to apply all configured filters and pagination parameters.",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[2]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Extract the resulting product grid HTML and key text content after filters are applied.",
+      "output": "product_grid",
+      "type": "extract_page_content",
+      "goal": "Extract the entire product grid table (headers, filter row, and result rows), including product IDs, Names, SKUs, Price, Qty, Visibility, Status, Websites, Edit links, and pager summary text, as structured text or HTML for further processing."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "id_from",
+      "type": "string",
+      "format": null,
+      "description": "Lower bound for product ID range filter (From). Leave empty for no lower bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "id_to",
+      "type": "string",
+      "format": null,
+      "description": "Upper bound for product ID range filter (To). Leave empty for no upper bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Product Name filter text. Partial match is allowed by Magento grid.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "format": null,
+      "description": "Product SKU filter text for exact or partial match.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "format": null,
+      "description": "Product Type filter dropdown visible text. Use empty string for Any.",
+      "required": false,
+      "enum": [
+        "",
+        "Simple Product",
+        "Grouped Product",
+        "Configurable Product",
+        "Virtual Product",
+        "Bundle Product",
+        "Downloadable Product"
+      ]
+    },
+    {
+      "name": "attribute_set",
+      "type": "string",
+      "format": null,
+      "description": "Attribute Set Name dropdown visible text (e.g., 'Default', 'Accessories'). Empty string for Any.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price_from",
+      "type": "string",
+      "format": null,
+      "description": "Lower bound for Price range filter (From). Interpreted in current grid currency (e.g., USD).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price_to",
+      "type": "string",
+      "format": null,
+      "description": "Upper bound for Price range filter (To). Interpreted in current grid currency (e.g., USD).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty_from",
+      "type": "string",
+      "format": null,
+      "description": "Lower bound for Qty range filter (From).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty_to",
+      "type": "string",
+      "format": null,
+      "description": "Upper bound for Qty range filter (To).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visibility",
+      "type": "string",
+      "format": null,
+      "description": "Visibility dropdown filter. Empty string or 'Any' means no restriction.",
+      "required": false,
+      "enum": [
+        "",
+        "Any",
+        "Not Visible Individually",
+        "Catalog",
+        "Search",
+        "Catalog, Search"
+      ]
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Status dropdown filter. Empty string or 'Any' for all statuses.",
+      "required": false,
+      "enum": [
+        "",
+        "Any",
+        "Enabled",
+        "Disabled"
+      ]
+    },
+    {
+      "name": "website",
+      "type": "string",
+      "format": null,
+      "description": "Websites dropdown filter visible text (e.g., 'Main Website'). Empty string for Any.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "page",
+      "type": "string",
+      "format": null,
+      "description": "Page number to navigate to in the pager (e.g., '1', '2'). Leave empty to keep current page.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "per_page",
+      "type": "string",
+      "format": null,
+      "description": "Number of records per page in grid pager.",
+      "required": false,
+      "enum": [
+        "20",
+        "30",
+        "50",
+        "100",
+        "200"
+      ]
+    }
+  ]
+}

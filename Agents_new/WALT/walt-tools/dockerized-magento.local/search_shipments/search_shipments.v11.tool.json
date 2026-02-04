@@ -1,0 +1,280 @@
+{
+  "tool_analysis": "Step Analysis:\n- This recorded session logs the complete interaction to find shipments in Magento admin grid: navigate to shipments page, close modal, fill filters (Shipment #, Order #, Ship to Name, Total Qty range), click Search, optionally export results, select a row checkbox, choose a mass-action (PDF Packingslips or Print Shipping Labels) and Submit, then open the shipment View record.\n\nTask Definition:\n- A single-purpose, parameterized tool to locate shipments using the key filters, optionally export results, run a mass action against a specified row, and open the shipment View page. Assumes the admin session is already authenticated.\n\nAction Plan (detailed to-do list):\n1) Navigate to {admin_url}.\n2) Analyze page and close blocking modal if present.\n3) Fill Shipment #, Order #, Ship to Name, Total Qty From/To inputs using recorded stable selectors.\n4) Click Search and wait for grid refresh; extract filtered results.\n5) If export_type provided: select export_type and click Export; capture any post-export indicators.\n6) Select the row checkbox for {row_index} and choose the specified massaction option; click Submit; capture post-action indicators.\n7) Open the shipment View link for {row_index} and extract key shipment details.\n\nVariable Identification (inputs required):\n- admin_url (required): exact shipments page URL. Used to navigate directly.\n- shipment_number (optional): text for Shipment # filter (maps to the Shipment # input).\n- order_number (optional): text for Order # filter.\n- ship_to_name (optional): text for Ship to Name filter.\n- total_qty_from (optional) and total_qty_to (optional): numeric range filters for Total Qty.\n- export_type (optional enum): 'CSV', 'Excel', or 'XML' to pick export format.\n- massaction (optional enum): 'PDF Packingslips' or 'Print Shipping Labels' for bulk actions.\n- row_index (optional number): 1-based row index to select and open. Recommended when deterministic targeting is required.\n\nStep Optimization & Determinism:\n- Where stable element hashes were captured during the session, the tool uses those elementHash values for clicks/inputs (modal close, specific filter inputs, Search button, export/massaction controls). That ensures deterministic targeting of the same elements used during recording.\n- For row-specific actions (checkbox click and View link open) the tool uses a parameterized cssSelector that accepts a {row_index}. This avoids hard-coding specific element hashes for rows and supports automation across different pages/rows.\n- Extract_page_content steps are included before and after critical actions (filtering, export, mass action, and view) to verify state changes and surface download/message indicators.\n- The tool avoids conditional branching; optional inputs can be left empty. Callers should supply values for actions they intend to run (e.g., export_type, massaction, row_index) to ensure deterministic behavior.\n\nNotes about limitations discovered in recording:\n- The recorded session showed a 'JavaScript seems to be disabled' banner which prevented client-side triggered downloads from being observed. For reliable export/mass-action downloads, enable JavaScript in the automation runtime or perform server-side requests to the export/mass-action endpoints using the form parameters (including form_key) if required.\n- Authentication is out-of-scope; the tool assumes the browser session is already authenticated as admin.\n\nSelectors & Robustness:\n- Where possible the tool uses the recorded elementHash values for UI controls (these were captured during the session and resolve to exactly one element in the recorded environment).\n- For grid row targeting the tool uses CSS with {row_index}; callers must provide a valid 1-based row_index to avoid ambiguous selection.\n\nThis tool is minimal and deterministic: it performs only the exact actions required by the original task (apply filters, export, mass action, open view) and nothing extra.",
+  "name": "magento_admin_shipments_tool",
+  "description": "Automates locating shipments in Magento Admin shipments grid, applying filters, exporting results, performing a mass action, and opening a shipment View. Uses the recorded stable element hashes and robust CSS/XPath templates where appropriate. Assumes an already-authenticated admin session (no login steps).",
+  "version": "2026-02-01-1",
+  "steps": [
+    {
+      "description": "Navigate to the Magento admin shipments grid page (requires an already-authenticated admin session).",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Read the page to confirm shipments grid and controls are present before interacting.",
+      "output": "initial_page",
+      "type": "extract_page_content",
+      "goal": "Capture initial page structure, detect any blocking modal (e.g., 'Incoming Message') and confirm grid presence"
+    },
+    {
+      "description": "Close the 'Incoming Message' modal if present (recorded element_hash for modal close anchor).",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the modal to dismiss and DOM to stabilize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Fill the Shipment # filter input (positional / recorded selector). Provide empty string to leave unchanged.",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_filter_increment_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "a16414da11",
+      "type": "input",
+      "value": "{shipment_number}"
+    },
+    {
+      "description": "Fill the Order # filter input (positional / recorded selector). Provide empty string to leave unchanged.",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_filter_order_increment_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/input",
+      "elementTag": "input",
+      "elementHash": "28b46dc009",
+      "type": "input",
+      "value": "{order_number}"
+    },
+    {
+      "description": "Fill the Ship to Name filter input (positional / recorded selector). Provide empty string to leave unchanged.",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_filter_shipping_name",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[6]/div/input",
+      "elementTag": "input",
+      "elementHash": "6ae9a2d6cc",
+      "type": "input",
+      "value": "{ship_to_name}"
+    },
+    {
+      "description": "Fill the Total Qty 'From' filter input (positional / recorded selector). Provide empty string to leave unchanged.",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_filter_total_qty_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "0bab1b22e0",
+      "type": "input",
+      "value": "{total_qty_from}"
+    },
+    {
+      "description": "Fill the Total Qty 'To' filter input (positional / recorded selector). Provide empty string to leave unchanged.",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_filter_total_qty_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "c1e188c737",
+      "type": "input",
+      "value": "{total_qty_to}"
+    },
+    {
+      "description": "Click the Search button in the grid header to apply filters (recorded selector).",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Confirm filters applied and capture resulting row(s).",
+      "output": "filtered_grid",
+      "type": "extract_page_content",
+      "goal": "Capture filtered grid results (verify number of records and example row data)"
+    },
+    {
+      "description": "Select export format from the 'Export to' dropdown (recorded selector). Provide empty/omit to skip selection.",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_export",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "b9908203f9",
+      "type": "select_change",
+      "selectedText": "{export_type}"
+    },
+    {
+      "description": "Click the Export button (recorded selector) to initiate export in the chosen format.",
+      "output": null,
+      "cssSelector": "#id_26f2b9bee118b6bcc0ac3deb1dc197b0",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "addae47297",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for any download or server response triggered by Export.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Record any success/error messages or evidence of a download.",
+      "output": "post_export_state",
+      "type": "extract_page_content",
+      "goal": "Capture page state after export (check for messages or download triggers)"
+    },
+    {
+      "description": "Click the row checkbox for the specified row_index to select the shipment for mass action. Use a 1-based {row_index}. If {row_index} is not provided this selector will be invalid \u2014 callers should provide a row_index for deterministic selection.",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_table tbody tr:nth-child({row_index}) td:nth-child(1) input[type='checkbox']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Select the mass-action option (e.g., 'PDF Packingslips') from the Actions dropdown (recorded selector). Provide empty/omit to skip mass action.",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_massaction-select",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span/select",
+      "elementTag": "select",
+      "elementHash": "f61b130718",
+      "type": "select_change",
+      "selectedText": "{massaction}"
+    },
+    {
+      "description": "Click the mass-action Submit button (recorded selector) to execute the selected mass action.",
+      "output": null,
+      "cssSelector": "button[title=\"Submit\"][title=\"Submit\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[4]/button",
+      "elementTag": "button",
+      "elementHash": "e5da8d6705",
+      "type": "click"
+    },
+    {
+      "description": "Wait for mass-action processing to complete and for any download or message to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Record any success/error messages or evidence of a download from the mass action.",
+      "output": "post_massaction_state",
+      "type": "extract_page_content",
+      "goal": "Capture page state after mass action (check for messages or download triggers)"
+    },
+    {
+      "description": "Open the shipment View link for the specified {row_index}. Uses href pattern 'sales_shipment/view' to target the View anchor in the desired row.",
+      "output": null,
+      "cssSelector": "table#sales_shipment_grid_table tbody tr:nth-child({row_index}) td:last-child a[href*='sales_shipment/view']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the shipment View page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Record key shipment details from the View page for verification/reporting.",
+      "output": "shipment_view",
+      "type": "extract_page_content",
+      "goal": "Capture the opened shipment View page (header info, addresses, items shipped)"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL to the Magento admin shipments page (e.g. 'http://dockerized-magento.local/index.php/admin/sales_shipment/'). Must be an authenticated admin session when used.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "shipment_number",
+      "type": "string",
+      "format": null,
+      "description": "Shipment # filter text (matches the 'Shipment #' column). Leave empty to skip or match all.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "order_number",
+      "type": "string",
+      "format": null,
+      "description": "Order # filter text (matches the 'Order #' column). Leave empty to skip or match all.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "ship_to_name",
+      "type": "string",
+      "format": null,
+      "description": "Ship to Name filter text (matches the 'Ship to Name' column). Leave empty to skip or match all.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "total_qty_from",
+      "type": "string",
+      "format": null,
+      "description": "Total Qty 'From' filter value (numeric). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "total_qty_to",
+      "type": "string",
+      "format": null,
+      "description": "Total Qty 'To' filter value (numeric). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_type",
+      "type": "string",
+      "format": null,
+      "description": "Export format to choose from the 'Export to' control. If omitted no export selection is made.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "massaction",
+      "type": "string",
+      "format": null,
+      "description": "Mass-action option visible in the 'Actions' dropdown. If omitted no mass action is selected/submitted.",
+      "required": false,
+      "enum": [
+        "PDF Packingslips",
+        "Print Shipping Labels"
+      ]
+    },
+    {
+      "name": "row_index",
+      "type": "number",
+      "format": null,
+      "description": "1-based row index in the grid to select for mass actions and to open the View link. If omitted the first matching View link or checkbox may be used by the runtime (but runtime must supply a row index for deterministic targeting).",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

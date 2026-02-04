@@ -1,0 +1,127 @@
+{
+  "tool_analysis": "1. Step Analysis:\nThe recorded steps show a full interaction flow in Magento 1.9 admin:\n- Navigate directly to the Sales Orders grid URL.\n- Encounter the admin login page, fill in username and password, and submit the Login form.\n- Land on the Orders / Sales grid page containing filters, sorting, bulk actions, and export controls.\n- Focus on the filters row and export controls, especially the Status filter dropdown, Search button, Export-to format dropdown, and Export button.\n- Apply a Status = Complete filter via the Status dropdown (elementHash 301a5525e7), click the Search button (elementHash 92991c1102) to apply filters, then choose the export format \"Excel XML\" via the Export to dropdown (elementHash 0e5d7d55cb) and click the Export button (elementHash e39e2f67d4).\n- This triggers download of the filtered orders grid as an Excel XML file.\n\n2. Task Definition:\nThe tool's purpose is to automate exporting the current (optionally status-filtered) Magento Sales > Orders grid into a machine-readable file (CSV, Excel XML, or XML). It should:\n- Ensure the admin session is established by logging in if necessary.\n- Navigate to the Orders grid.\n- Optionally apply a status filter (e.g., Complete, Pending, etc.) and run Search.\n- Select the desired export format from the Export to dropdown.\n- Click Export to initiate file download.\n\n3. Action Plan:\nA. Navigation & Login\n- Step 1: Navigate directly to the Orders grid URL `/index.php/admin/sales_order/`.\n- Step 2: If redirected to login, input the admin username into the username field.\n- Step 3: Input the admin password into the password field.\n- Step 4: Click the Login button to authenticate.\n- Step 5: Navigate (or stay) on the Orders grid page (URL remains `/index.php/admin/sales_order/`).\n\nB. Filter by Status (optional)\n- Step 6: If a status filter value is provided, select that status option in the Status filter dropdown (elementHash `301a5525e7`).\n- Step 7: Click the Search button (elementHash `92991c1102`) to apply filters.\n\nC. Choose Export Format and Export\n- Step 8: Select the desired export format (CSV, Excel XML, or XML) in the Export to dropdown (elementHash `0e5d7d55cb`).\n- Step 9: Click the Export button (elementHash `e39e2f67d4`) to trigger the export/download of the grid in the chosen format under the current filter context.\n\nNote: The instructions explicitly call out exporting the *current filtered set*, so we keep filters focused on status only, as demonstrated, instead of all possible filters.\n\n4. Variable Identification:\nFrom the interactions and page semantics, key variable inputs should be:\n- `admin_username` (string, required): login username used on the admin login page (actual value used: `admin`).\n- `admin_password` (string, required): login password used on the admin login page (actual value used: `password123`).\n- `status_filter` (string, optional): textual visible label of the order Status to filter on (e.g., `Complete`, `Pending`, `Processing`). In the demo, `Complete` was chosen through select index 155 / elementHash 301a5525e7.\n- `export_format` (string, required, enum): one of the Export to dropdown visible labels. The UI and extraction show options `CSV`, `Excel`, and `XML`, but the actually selected label inside the UI is `Excel XML` (the value exported was an Excel URL). We treat allowed visible labels as the user input set: `CSV`, `Excel XML`, `XML`.\n\nNo URL-level parameters for export need to be directly manipulated; the export link is generated when selecting an option. The export URL that appeared for Excel XML in the run shows that it encodes filter state and uses `ajax=true&isAjax=true`, but we do not need to build this manually since the UI interaction is reliable and uses stable element hashes.\n\n5. Step Optimization:\n- Navigation optimization: We can directly navigate to the Orders grid URL. Magento will redirect to login if not authenticated; after login, it redirects back to the last requested admin URL automatically. Therefore, we need only a single initial navigation to `/index.php/admin/sales_order/` and do not need extra menu clicks like `Sales > Orders`.\n- Deterministic interactions: For login fields we only have indexes/hashes from one screenshot (`3597a5c5e6` for username, `1c47a5217e` for password, `6831836d17` for Login). These are reasonably stable within this demo and are the only recorded field interactions, so we will use these `elementHash` values.\n- On the Orders grid, we have clear `elementHash` values for:\n  - Status filter select: `301a5525e7` (index 155)\n  - Search button: `92991c1102` (index 129)\n  - Export format select: `0e5d7d55cb` (index 126)\n  - Export button: `e39e2f67d4` (index 127)\n  These will be used as deterministic interaction targets.\n- URL manipulation (Pass 2) is not ideal here: the export URL is dynamically assembled with encoded filters (`filter=Y3Jl...`) and AJAX flags; reconstructing this manually is brittle and unnecessary since we already have robust UI selectors. So we keep UI-driven steps.\n- Unnecessary actions: We exclude exploratory steps like clicking the Orders top menu item, interacting with other filters (Order #, totals, etc.), sorting, pagination, bulk actions, RSS, or notification popups, as they are not essential to the core export task.\n\nGiven the above, the final tool will:\n- Accept credentials, status_filter, and export_format.\n- Navigate, log in, optionally apply status filter, then choose export format and click Export using the known element hashes.\n\nBecause this is a deterministic automation, no `agent`-type steps are required.\n",
+  "name": "magento_admin_export_orders_grid",
+  "description": "Exports the current Magento admin Sales > Orders grid (optionally filtered by order status) to a chosen machine-readable format (CSV, Excel XML, or XML). The tool logs into Magento admin if needed, opens the Orders grid, applies a status filter, selects the export format, and clicks Export to trigger the download for the filtered result set.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Magento admin Sales > Orders grid URL. If not authenticated, Magento will redirect to the admin login page.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_order/",
+      "url_operation": null
+    },
+    {
+      "description": "Enter the admin username into the 'User Name' field on the Magento admin login page.",
+      "output": null,
+      "cssSelector": "input[name=\"login[username]\"][type=\"text\"]",
+      "xpath": "html/body/div/div/form/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "3597a5c5e6",
+      "type": "input",
+      "value": "{admin_username}"
+    },
+    {
+      "description": "Enter the admin password into the 'Password' field on the Magento admin login page.",
+      "output": null,
+      "cssSelector": "#login",
+      "xpath": "html/body/div/div/form/div/div[3]/input[2]",
+      "elementTag": "input",
+      "elementHash": "1c47a5217e",
+      "type": "input",
+      "value": "{admin_password}"
+    },
+    {
+      "description": "Click the 'Login' button to authenticate into the Magento admin panel.",
+      "output": null,
+      "cssSelector": "input[title=\"Login\"]",
+      "xpath": "html/body/div/div/form/div/div[5]/input",
+      "elementTag": "input",
+      "elementHash": "6831836d17",
+      "type": "click"
+    },
+    {
+      "description": "Navigate (or return) to the Sales > Orders grid page after successful login to ensure the orders grid is in view.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_order/",
+      "url_operation": null
+    },
+    {
+      "description": "Select the desired order Status value in the Status filter dropdown to filter the orders grid. Skipped logically by caller if status_filter is empty or not provided.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_status",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "301a5525e7",
+      "type": "select_change",
+      "selectedText": "{status_filter}"
+    },
+    {
+      "description": "Click the 'Search' button to apply the current filter criteria (including Status) to the orders grid.",
+      "output": null,
+      "cssSelector": "#id_e1404737cb6fb935b7f97a0fdaa5999c",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "92991c1102",
+      "type": "click"
+    },
+    {
+      "description": "Choose the desired export format (CSV, Excel XML, or XML) from the 'Export to' dropdown control.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_export",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "0e5d7d55cb",
+      "type": "select_change",
+      "selectedText": "{export_format}"
+    },
+    {
+      "description": "Click the 'Export' button to trigger download of the current (filtered) orders grid in the selected export format.",
+      "output": null,
+      "cssSelector": "#id_82e616761991030352e6069074271d25",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "e39e2f67d4",
+      "type": "click"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_username",
+      "type": "string",
+      "format": null,
+      "description": "Magento admin username to use on the login page (User Name field). Example: 'admin'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "admin_password",
+      "type": "string",
+      "format": null,
+      "description": "Magento admin password to use on the login page (Password field). Example: 'password123'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "status_filter",
+      "type": "string",
+      "format": null,
+      "description": "Visible label of the order Status value to filter by in the Orders grid Status dropdown (elementHash 301a5525e7), e.g., 'Complete', 'Pending', 'Processing'. If omitted or empty, no status filter is changed/applied before export.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Visible label of the export format to select in the 'Export to' dropdown (elementHash 0e5d7d55cb). Supported values as seen in UI: 'CSV', 'Excel XML', 'XML'.",
+      "required": true,
+      "enum": [
+        "CSV",
+        "Excel XML",
+        "XML"
+      ]
+    }
+  ]
+}

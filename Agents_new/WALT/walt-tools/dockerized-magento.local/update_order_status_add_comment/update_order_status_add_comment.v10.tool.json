@@ -1,0 +1,123 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session loads the Magento admin order view for a specific order_id, fills the 'Comment' textarea, optionally selects a new order status, toggles 'Notify Customer by Email' and 'Visible on Frontend' checkboxes, then clicks the 'Submit Comment' control. The session included successful login before reaching the order page. Stable element identifiers recorded: textarea (elementHash 'fcc90341f4'), status select (elementHash 'a29f177603'), two checkboxes (elementHashes '6ff6db733b' and '394ae2565e'), and submit button (elementHash 'e9ca39f8c2').\n\nTask Definition:\n- Create a reusable, parameterized automation tool that: navigates to the admin order view for a given order_id, inserts a provided comment, optionally updates the order status to a provided visible text value, optionally ensures the two checkboxes are set as requested, submits the comment, and returns verification information from the Comments History.\n\nAction Plan (detailed to-do list):\n1) Navigate to the order URL: {base_url}/index.php/admin/sales_order/view/order_id/{order_id}/ (use default if base_url omitted).\n2) Wait briefly for admin UI to finish loading.\n3) Fill the 'Comment' textarea with {comment} using the recorded textarea elementHash (fallback: label-relative XPath //label[normalize-space(.)='Comment']/following::textarea[1]).\n4) If status parameter provided: locate the 'Status' select (recorded elementHash or label-relative XPath //label[normalize-space(.)='Status']/following::select[1]) and select option by visible text {status}.\n5) For notify_customer and visible_on_frontend: ensure each checkbox is in the requested state. Because checkboxes may already be checked, the tool will detect current checked state and click only if a change is required (agentic subtask uses label-relative XPath with elementHash fallback to perform the check and conditional click). This avoids unwanted toggles.\n6) Click the recorded Submit Comment button (elementHash 'e9ca39f8c2', fallback to button[text()='Submit Comment'] or title) to submit the comment.\n7) Wait a short time for the server response and page refresh of Comments History.\n8) Extract verification details from the Comments History: the most recent history entry timestamp, status text (if present), and the top comment snippet. Return those in the step output.\n\nVariable Identification (inputs required):\n- order_id (string, required): numeric id appearing in URL path.\n- comment (string, required): comment text to add.\n- status (string, optional): visible option text for status update (e.g. 'Complete').\n- notify_customer (bool, optional): set Notify checkbox to true if provided true.\n- visible_on_frontend (bool, optional): set Visible checkbox to true if provided true.\n- base_url (string, optional): admin site base URL; default 'http://dockerized-magento.local' documented in description.\n\nStep Optimization / Selector strategy:\n- Use recorded elementHash values for the primary interactions (textarea, select, submit) to increase determinism in the same environment. For portability across environments, provide robust label-relative XPath fallbacks as recorded in the session: e.g. //label[normalize-space(.)='Status']/following::select[1] and //label[normalize-space(.)='Comment']/following::textarea[1].\n- For checkboxes, do not blindly click; detect .checked state first and click only if a difference is required. Because clicks are stateful toggles, this avoids accidental unchecking.\n- Avoid unnecessary page navigation or additional filtering steps; go directly to the order view URL for the given order_id.\n- Add short waits before/after submissions to allow the admin UI (which may load JS) to update reliably.\n\nNotes / Constraints:\n- Tool assumes the automation context is already authenticated (session cookie present). The recorded session included a login step but authentication is not implemented in this tool per instructions.\n- The agentic steps (small autonomous tasks) are used only to inspect checkbox states and decide whether to click; main form interactions remain deterministic using recorded elementHashes where possible.\n- This tool intentionally scopes selectors to the 'Add Order Comments' block, using recorded elementHashes as primary selectors and label-relative XPaths as robust fallbacks for different Magento admin themes.\n",
+  "name": "magento_add_order_comment",
+  "description": "Add an order history comment to a Magento admin order view, optionally update order status, and optionally notify the customer / make the comment visible on frontend. Uses stable label-relative selectors and recorded element hashes when available.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the admin order view page for the provided order_id. If {base_url} is empty the caller should substitute 'http://dockerized-magento.local'.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Short wait for the admin UI to load dynamic components.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Type the provided comment into the Comment textarea (primary selector uses recorded elementHash). Fallback selector: //label[normalize-space(.)='Comment']/following::textarea[1].",
+      "output": "comment_filled",
+      "cssSelector": "#history_comment",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/span[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "fcc90341f4",
+      "type": "input",
+      "value": "{comment}"
+    },
+    {
+      "description": "Agentic step to safely perform the optional status change (skip if {status} empty). Uses recorded elementHash fallback to label-relative XPath.",
+      "output": "status_update_result",
+      "type": "agent",
+      "task": "If {status} is provided and non-empty, select the option with visible text {status} from the Status dropdown. Prefer the recorded elementHash 'a29f177603' to find the <select>. If that elementHash is not present, locate with XPath //label[normalize-space(.)='Status']/following::select[1]. After selecting, verify the selected option's visible text matches {status}.",
+      "max_steps": 6
+    },
+    {
+      "description": "Set the Notify Customer checkbox to the requested state without toggling it if already correct.",
+      "output": "notify_checkbox_result",
+      "type": "agent",
+      "task": "If notify_customer is true, ensure the 'Notify Customer by Email' checkbox is checked. Locate the checkbox by recorded elementHash '6ff6db733b' if available; otherwise use XPath //label[contains(normalize-space(.),'Notify Customer')]/following::input[@type='checkbox'][1] or //input[@type='checkbox' and contains(@name,'notify')]. Determine current checked state and click only if it is not already checked. If notify_customer is false or not provided, do nothing.",
+      "max_steps": 6
+    },
+    {
+      "description": "Set the Visible on Frontend checkbox to the requested state without toggling it if already correct.",
+      "output": "visible_checkbox_result",
+      "type": "agent",
+      "task": "If visible_on_frontend is true, ensure the 'Visible on Frontend' checkbox is checked. Locate the checkbox by recorded elementHash '394ae2565e' if available; otherwise use XPath //label[contains(normalize-space(.),'Visible on Frontend')]/following::input[@type='checkbox'][1] or //input[@type='checkbox' and contains(@name,'visible')]. Determine current checked state and click only if it is not already checked. If visible_on_frontend is false or not provided, do nothing.",
+      "max_steps": 6
+    },
+    {
+      "description": "Click the Submit Comment button to submit the form. Primary selector uses recorded elementHash; fallback is //button[normalize-space(.)='Submit Comment' or @title='Submit Comment'].",
+      "output": "submit_click_result",
+      "cssSelector": "#id_e32082e69ad3abcaf03a8ae2aab45c1d",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/div[3]/button",
+      "elementTag": "button",
+      "elementHash": "e9ca39f8c2",
+      "type": "click"
+    },
+    {
+      "description": "Wait for server response and Comments History update.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Scrape the Comments History area to confirm the new comment/status appears in the most-recent entry.",
+      "output": "result",
+      "type": "extract_page_content",
+      "goal": "Verify the comment was added and capture the top Comments History entry (timestamp, status text if shown, and snippet of the comment). Output fields: latest_history_timestamp, latest_history_status, latest_history_comment_snippet."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric order_id path segment from the admin order view URL (e.g. '204'). This is appended to /index.php/admin/sales_order/view/order_id/{order_id}/",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment",
+      "type": "string",
+      "format": null,
+      "description": "Text to add to the order's Comments History. This will be placed in the 'Comment' textarea.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the status option to select from the 'Status' dropdown (e.g. 'Complete'). If omitted the status selection step will be skipped.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "notify_customer",
+      "type": "bool",
+      "format": null,
+      "description": "If true, ensure the 'Notify Customer by Email' checkbox is checked. If false or omitted the checkbox will be left as-is.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visible_on_frontend",
+      "type": "bool",
+      "format": null,
+      "description": "If true, ensure the 'Visible on Frontend' checkbox is checked. If false or omitted the checkbox will be left as-is.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Admin base URL (no trailing slash). Example: 'http://dockerized-magento.local'. If omitted the tool will navigate to 'http://dockerized-magento.local' by default.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

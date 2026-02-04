@@ -1,0 +1,207 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session logs a complete admin workflow: login (done outside the tool), navigate to an order view (order_id=204), open the Create Credit Memo flow (New Credit Memo), set per-item 'Qty to Refund' values, set shipping/refund adjustments and comments, click 'Update Qty's' to recalc totals, and click 'Refund Offline' to submit the credit memo. Multiple submit attempts in the recording failed due to the server-side validation 'Credit memo\\'s total must be positive.' The recording shows the admin UI is Magento 1.9.x and that some required hidden tokens (form_key) were not visible in textual snapshots; JS-driven recalculation may be required.\n\nTask Definition:\n- Purpose: Provide a deterministic, reusable tool that creates a credit memo (offline refund) for a specified Magento admin order by navigating to the credit memo page, configuring per-item refund quantities and amounts, recalculating totals and submitting the refund. The tool should capture final success or validation errors.\n\nAction Plan (to-do list):\n1) Navigate directly to the order credit memo page using base admin URL and order_id (avoid menu clicks).\n2) Set per-item Qty to Refund per provided mapping (dynamic: needs agentic mapping because item input names include server-side item ids).\n3) Set shipping refund and adjustment inputs if provided, and fill the comment textarea.\n4) Set checkboxes for sending email and choose offline refund mode.\n5) Click 'Update Qty\\'s' and wait for recalculation/AJAX to finish.\n6) Extract Refund Totals -> Grand Total and presence/value of form_key; if Grand Total <= 0, abort with a clear error message explaining the cause.\n7) If positive, click 'Refund Offline' (submit) and capture post-submit messages or created credit memo link.\n\nVariable Identification (inputs needed):\n- base_admin_url (required): base admin URL; necessary for robust direct navigation.\n- order_id (required): internal order id used in admin URLs.\n- items_qty (optional JSON string): mapping of order_item_id -> qty to refund; dynamic so agent step will map to actual input names.\n- adjustment_positive (optional): positive adjustment amount to add to refund to force positive grand total.\n- adjustment_negative (optional): negative adjustment (fee) to subtract.\n- refund_shipping (optional): shipping refund amount if shipping should be refunded.\n- comment_text (optional): admin credit memo comments.\n- send_email (optional bool): email copy to customer.\n- do_offline (optional bool): choose offline refund mode (defaults to true in tool flow).\n- return_to_stock_items (optional JSON array): list of item ids to mark return-to-stock.\n\nStep Optimization / Selector decisions:\n- Navigation: replaced UI menu clicks with direct URL navigation to the order view and direct credit memo creation URL. This is deterministic and faster.\n- Per-item qty inputs: dynamic naming (creditmemo[items][<id>][qty]) prevents reliable static selectors. Use an agent step to parse {items_qty} JSON and locate inputs by name patterns (starts-with 'creditmemo' and contains 'qty' / 'items') and set values.\n- Shipping / adjustments / comment: recorded elementHash values (from the session) are used as deterministic fallbacks. If elements differ on another install, the agent steps include queries to find inputs by name patterns.\n- Update Qty's and Refund Offline actions: use XPath by visible text (normalize-space) for robustness and include recorded elementHash as fallback. XPath by visible text is resilient across admin frontName changes and localization if not translated; if multi-language installs exist, agentic selection is possible.\n- CSRF/form_key: the recording did not expose a form_key value in textual snapshots. Tool extracts the hidden input[name='form_key'] from the live DOM before a programmatic submit; if absent, the tool warns and proceeds only for offline/manual click in the browser. The extract_page_content step reports the form_key value so any programmatic POST can include it.\n\nEssential-only steps included: navigation to credit memo page, set inputs (dynamic via agent), set adjustments, update totals, verify grand total and form_key, submit Refund Offline, capture results. Non-essential exploratory clicks were removed.\n\nExecution notes & caveats:\n- The admin user must be already authenticated in the running browser session; this tool does not perform login.\n- If JavaScript is disabled in the environment, client-side recalculation may not occur causing Grand Total to remain 0. The tool waits after Update Qty's and reads the grand total; if it is not positive the tool stops and returns an actionable message.\n- Per-item input names and IDs are environment-specific; agent steps must inspect the DOM to locate them. The tool uses recorded elementHash values as fallbacks when possible but relies on robust name patterns as primary lookup.\n- The tool will not attempt to guess payment gateway interaction for online refunds; it defaults to 'Refund Offline' when do_offline is true. If an online refund is required, set do_offline=false, but be aware payment-gateway behavior is external to Magento and may fail in test/demo modes.\n\nThis tool focuses only on the single task: create a credit memo (refund) for a given order. It avoids unrelated navigation or filtering steps.",
+  "name": "magento_admin_create_creditmemo_v1",
+  "description": "Create a parameterized, re-executable tool that opens a Magento 1.x admin order view and creates a credit memo (refund) for a specified order. The tool navigates to the order's credit memo page, sets per-item refund quantities and refund adjustments/shipping/comment options, recalculates totals, and submits an offline refund. It includes deterministic selectors where recorded and an agent step for dynamic per-item inputs.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento admin Order View page for the specified order_id (direct navigation - faster and avoids menu hover).",
+      "output": "order_view_page",
+      "type": "navigation",
+      "url": "{base_admin_url}/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Open the New Credit Memo page for the order (direct URL). Use this instead of clicking the top action button to make the flow deterministic.",
+      "output": "creditmemo_new_page",
+      "type": "navigation",
+      "url": "{base_admin_url}/sales_order_creditmemo/new/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Dynamic: map JSON item ids to form inputs and set per-item Qty to Refund and return-to-stock flags as requested.",
+      "output": "items_updated",
+      "type": "agent",
+      "task": "Locate per-item 'Qty to Refund' input elements inside the credit memo form and set quantities according to the JSON mapping {items_qty}. Mapping is a JSON string: parse it and for each pair (order_item_id -> qty) set the corresponding input with name like creditmemo[items][{order_item_id}][qty] (or nearest matching input). If {items_qty} is empty/omitted, do not change per-item qtys. Also, for each order_item_id in {return_to_stock_items} (JSON array) set the 'Return to Stock' checkbox if present. After setting inputs, do not submit; return a list of item inputs updated and their DOM selectors. Max steps: 8.",
+      "max_steps": 8
+    },
+    {
+      "description": "Set the Refund Shipping / Shipping Refund amount if provided. Uses the recorded input element for the shipping/adjustment area as a deterministic target. (If {refund_shipping} is empty, skip this step programmatically.)",
+      "output": "shipping_refund_set",
+      "cssSelector": "#adjustment_positive",
+      "xpath": "html/body/div/div[6]/div/form/div[12]/div[6]/div[2]/table/tbody/tr[4]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "f0880af96b",
+      "type": "input",
+      "value": "{refund_shipping}"
+    },
+    {
+      "description": "Set Adjustment Fee (negative adjustment) if provided. Uses a recorded input element as target. Skip if omitted.",
+      "output": "adjustment_fee_set",
+      "cssSelector": "#adjustment_negative",
+      "xpath": "html/body/div/div[6]/div/form/div[12]/div[6]/div[2]/table/tbody/tr[6]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "973c1afd37",
+      "type": "input",
+      "value": "{adjustment_negative}"
+    },
+    {
+      "description": "Set Adjustment Refund (positive adjustment) if provided. NOTE: some installs use different inputs for positive/negative - this elementHash is the best recorded match; if your site differs, the agent step will need to find input[name*='adjustment_positive'].",
+      "output": "adjustment_positive_set",
+      "cssSelector": "#adjustment_positive",
+      "xpath": "html/body/div/div[6]/div/form/div[12]/div[6]/div[2]/table/tbody/tr[4]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "f0880af96b",
+      "type": "input",
+      "value": "{adjustment_positive}"
+    },
+    {
+      "description": "Fill the Credit Memo Comments textarea with {comment_text} (if provided). Uses the recorded textarea element.",
+      "output": "comment_set",
+      "cssSelector": "#creditmemo_comment_text",
+      "xpath": "html/body/div/div[6]/div/form/div[12]/div[5]/fieldset/textarea",
+      "elementTag": "textarea",
+      "elementHash": "58ddf1cf2f",
+      "type": "input",
+      "value": "{comment_text}"
+    },
+    {
+      "description": "Set comment/email/offline checkboxes which are dynamic in name across installations.",
+      "output": "checkboxes_set",
+      "type": "agent",
+      "task": "If {send_email} is true, find and check the 'Email Copy of Credit Memo' checkbox (commonly input[name='send_email'] or input[name*='send']). If {do_offline} is true, ensure the offline/refund option checkbox (commonly input[name='do_offline' or 'refund_offline']) is set appropriately. Return which checkboxes were toggled and their selectors. Max steps: 5.",
+      "max_steps": 5
+    },
+    {
+      "description": "Click 'Update Qty's' to force the admin UI to recalculate per-line and grand totals after changes. Use recorded elementHash as deterministic fallback. Wait for totals to update (use next wait step).",
+      "output": null,
+      "cssSelector": "button[title=\"Update Qty's\"][title=\"Update Qty's\"]",
+      "xpath": "html/body/div/div[6]/div/form/div[12]/div/div/table/tfoot/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "3996551a0e",
+      "type": "click"
+    },
+    {
+      "description": "Wait for client-side recalculation/AJAX to finish and totals to refresh.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Verify grand total is positive and capture form_key if present. This step must return grand_total (numeric), validation_messages array, and form_key value (string or null).",
+      "output": "pre_submit_snapshot",
+      "type": "extract_page_content",
+      "goal": "Read the Refund Totals -> Grand Total value and capture any validation messages (e.g. \"Credit memo's total must be positive.\") and whether input[name='form_key'] exists and its value."
+    },
+    {
+      "description": "Decision/validation step to prevent known server-side rejection.",
+      "output": null,
+      "type": "agent",
+      "task": "If pre_submit_snapshot.grand_total_value <= 0 then fail with actionable message: 'Grand total is not positive. Adjust items_qty or adjustment_positive/refund_shipping to produce a positive total.' Else proceed to click the Refund action. This agent step should not run more than 2 steps and must stop if grand_total is non-positive.",
+      "max_steps": 2
+    },
+    {
+      "description": "Click the 'Refund Offline' action. Use the XPath by button text and fall back to recorded elementHash if available. This is the final submit action. (If site uses a different label, try input[@value='Refund Offline'].)",
+      "output": "refund_submit_click",
+      "cssSelector": "button[title=\"Refund Offline\"][title=\"Refund Offline\"]",
+      "xpath": "html/body/div/div[6]/div/form/div[12]/div[6]/div[2]/div/button",
+      "elementTag": "button",
+      "elementHash": "a21829205a",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the server response and page navigation after submit.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Confirm whether credit memo creation succeeded and return the created credit memo URL or error messages.",
+      "output": "post_submit_result",
+      "type": "extract_page_content",
+      "goal": "Capture post-submit messages, look for success message or errors, and extract created credit memo id or link if present. Output 'result' containing success (true/false), messages array, and creditmemo_link or id if available."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Base admin URL including index.php and admin frontName, e.g. \"http://dockerized-magento.local/index.php/admin\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Internal order id used in admin URLs (example: \"204\"). Use internal id, not increment id.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "items_qty",
+      "type": "string",
+      "format": null,
+      "description": "JSON string mapping order_item_id to qty to refund, e.g. '{\"123\":1,\"124\":0}'. If omitted, the tool will not change per-item quantities and will rely on adjustments to produce a positive total.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "adjustment_positive",
+      "type": "string",
+      "format": null,
+      "description": "Positive adjustment amount to add to refund (decimal string), e.g. \"25.00\". Use to force a positive credit memo total.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "adjustment_negative",
+      "type": "string",
+      "format": null,
+      "description": "Negative adjustment (fee) to subtract from refund (decimal string), e.g. \"0.00\".",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "refund_shipping",
+      "type": "string",
+      "format": null,
+      "description": "Shipping refund amount to include (decimal string), e.g. \"25.00\".",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "comment_text",
+      "type": "string",
+      "format": null,
+      "description": "Admin comment to add to the credit memo (text area).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "send_email",
+      "type": "bool",
+      "format": null,
+      "description": "Whether to email a copy of the credit memo to the customer (true/false).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "do_offline",
+      "type": "bool",
+      "format": null,
+      "description": "Whether to perform an offline refund (true) or attempt an online refund (false). Defaults to true for this tool (Refund Offline).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "return_to_stock_items",
+      "type": "string",
+      "format": null,
+      "description": "JSON string array of order_item_ids to mark 'Return to Stock' (e.g. '[\"123\",\"125\"]'). If omitted, return-to-stock flags are not changed.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

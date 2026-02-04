@@ -1,0 +1,174 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigated to an order view and used the 'Credit Memo' action to open the New Credit Memo form. The agent set item quantities, updated the form, set shipping/adjustments, added a comment, toggled email copy, and submitted 'Refund Offline'. The final page showed a success banner and returned to the Order View.\n\nTask Definition:\n- Provide a reusable automation tool that, given an order_id and a set of items (order_item ids and quantities) plus optional shipping/adjustments/comment and send_email choice, will create an offline credit memo for that order.\n\nAction Plan (to-do list):\n1. Navigate directly to the New Credit Memo URL for the given order_id (deterministic, faster).\n2. Verify the New Credit Memo page loaded.\n3. Set each specified item qty-to-refund using robust XPath patterns and click 'Update Qty\\'s'.\n4. Confirm totals recalculated.\n5. Set shipping refund and adjustments if provided.\n6. Enter admin comment if provided.\n7. Toggle the Email Copy checkbox if requested.\n8. Click 'Refund Offline' to submit.\n9. Verify success by reading the resulting page for confirmation text or navigation back to Order View.\n\nVariable Identification (inputs):\n- order_id (required): used in the new credit memo URL.\n- items_json (required): JSON array of {item_id, qty} entries - needed to set item qty inputs which are tied to order item ids in input name attributes.\n- shipping_refund (optional): shipping refund amount.\n- adjustment_positive (optional): positive adjustment amount.\n- adjustment_negative (optional): negative adjustment amount.\n- comment_text (optional): admin comment to append.\n- send_email (optional bool): whether to check the 'Email Copy' checkbox.\n\nStep Optimization:\n- Replace click-through from order view -> credit memo with direct navigation to /sales_order_creditmemo/new/order_id/{order_id}/ to make the flow deterministic.\n- Use attribute-based selectors where possible (input[name^='creditmemo[items]'] and input[name='creditmemo[shipping_amount]']). For item qtys we rely on using order_item ids in the name attribute (creditmemo[items][<item_id>][qty]) which is the most stable mapping in Magento 1.\n- Use an agentic loop step to iterate items because the number and IDs vary per order; this keeps the main steps deterministic while allowing dynamic per-item interactions.\n- Add small waits and extraction steps to verify that updates and submission succeeded and to capture failure evidence.\n\nNotes and Constraints:\n- The admin session and permissions are assumed (automation will not perform login). If the site redirects to login, the automation must handle authentication separately.\n- Magento admin themes or custom modules can change names/ids; fallbacks use label-proximity XPath selectors for resilience.\n- The tool focuses only on creating an offline credit memo for one order and does not perform broader navigation or filtering that isn't necessary.\n\n",
+  "name": "magento_create_credit_memo",
+  "description": "Create a credit memo (offline refund) for a specified Magento order by setting item quantities, optional shipping/adjustments, adding a comment, optionally emailing the customer, and submitting the credit memo. Uses direct navigation to the creditmemo/new page and robust selectors (XPath/name) with an agent step to iterate item entries.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the New Credit Memo page directly for the specified order_id (faster and deterministic).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_order_creditmemo/new/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Confirm we're on the credit memo creation page for the order before making edits.",
+      "output": "page_loaded",
+      "type": "extract_page_content",
+      "goal": "Verify the New Credit Memo page loaded and contains 'New Credit Memo' and the order reference."
+    },
+    {
+      "description": "Set item quantities to refund for the specified order items, then click 'Update Qty's' to refresh totals.",
+      "output": "items_updated",
+      "type": "agent",
+      "task": "Iterate items from the provided JSON in {items_json}. For each object {item_id, qty}: locate the quantity input for that order item using robust XPath patterns (try in order: //input[contains(@name,'creditmemo[items][{item_id}]') and contains(@name,'qty')], //input[contains(@name,'[{item_id}]') and contains(@name,'qty')], //input[contains(@name,'creditmemo') and contains(@name,'qty') and contains(.,'{item_id}')], //tr[.//text()[contains(.,'{item_id}')]]//input[contains(@name,'qty')]) and set its value to '{qty}'. After updating all qty inputs, click the 'Update Qty\\'s' button using XPath //button[contains(normalize-space(.),'Update Qty')]|//input[@type='button' and contains(@value,'Update Qty')]. Stop after one attempt per item and log any missing item ids. Maximum iterations: 1 pass over the list.",
+      "max_steps": 6
+    },
+    {
+      "description": "Wait briefly for the page to recalc totals after Update Qty's.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Read back Qty to Refund fields and Refund Totals to ensure values are set before proceeding.",
+      "output": "qtys_confirmed",
+      "type": "extract_page_content",
+      "goal": "Confirm the Qty to Refund inputs were updated and page recalculated refund totals."
+    },
+    {
+      "description": "Set the Shipping Refund amount if {shipping_refund} is provided (skip if empty).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='creditmemo[shipping_amount]' or @id='creditmemo_shipping_amount' or contains(@name,'shipping_amount')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{shipping_refund}"
+    },
+    {
+      "description": "Set positive adjustment (Adjustment Refund) if {adjustment_positive} is provided (skip if empty).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='creditmemo[adjustment_positive]' or contains(@name,'adjustment_positive') or @id='creditmemo_adjustment_positive']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{adjustment_positive}"
+    },
+    {
+      "description": "Set negative adjustment (Adjustment Fee) if {adjustment_negative} is provided (skip if empty).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@name='creditmemo[adjustment_negative]' or contains(@name,'adjustment_negative') or @id='creditmemo_adjustment_negative']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{adjustment_negative}"
+    },
+    {
+      "description": "Enter the admin comment into the Credit Memo Comments textarea if {comment_text} is provided.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//textarea[@name='comment_text' or contains(@name,'comment') or @id='comment_text' or //fieldset[.//h4[contains(normalize-space(.),'Credit Memo Comments')]]//textarea]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{comment_text}"
+    },
+    {
+      "description": "Toggle the 'Email Copy of Credit Memo' checkbox if {send_email} is explicitly provided (agent should click only if {send_email}==true and the checkbox is unchecked, or if {send_email}==false and the checkbox is checked).",
+      "output": "email_toggled",
+      "cssSelector": null,
+      "xpath": "//input[@type='checkbox' and (@name='send_email' or contains(@name,'comment_customer_notify') or @id='send_email')] | //label[contains(normalize-space(.),'Email Copy of Credit Memo')]/preceding::input[@type='checkbox'][1] | //label[contains(normalize-space(.),'Email Copy of Credit Memo')]/following::input[@type='checkbox'][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the UI to reflect any changes before submitting.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Click the Refund Offline button to submit the credit memo (final action).",
+      "output": "refund_submitted",
+      "cssSelector": null,
+      "xpath": "//button[normalize-space(.)='Refund Offline'] | //input[@type='submit' and normalize-space(@value)='Refund Offline'] | //button[contains(normalize-space(.),'Refund') and contains(@onclick,'submitCreditmemo')]|//button[contains(@title,'Refund Offline')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the submission to process and the admin UI to navigate.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Return success evidence (banner text or order view URL) or the page content for failure analysis.",
+      "output": "result_confirmation",
+      "type": "extract_page_content",
+      "goal": "Confirm creation of the credit memo by looking for a success message 'The credit memo has been created.' or by confirming navigation back to the Order View for the same order."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Magento internal order_id used in admin URLs (example: '204'). This is NOT the visible order increment id (000000299).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "items_json",
+      "type": "string",
+      "format": null,
+      "description": "JSON array (string) of objects describing items to refund. Each object must contain 'item_id' (order_item_id used in creditmemo form) and 'qty' (integer). Example: '[{\"item_id\":\"627\",\"qty\":1},{\"item_id\":\"628\",\"qty\":1}]'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "shipping_refund",
+      "type": "string",
+      "format": null,
+      "description": "Shipping refund amount to set (decimal as string, e.g. '0' or '25.00'). Leave empty to not change the shipping refund field.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "adjustment_positive",
+      "type": "string",
+      "format": null,
+      "description": "Positive adjustment amount (Adjustment Refund). Use string numeric format, e.g. '0' or '5.00'. Leave empty if not required.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "adjustment_negative",
+      "type": "string",
+      "format": null,
+      "description": "Negative adjustment amount (Adjustment Fee). Use string numeric format, e.g. '0' or '3.00'. Leave empty if not required.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "comment_text",
+      "type": "string",
+      "format": null,
+      "description": "Admin comment to append to the credit memo. Example: 'Partial refund for 2 items per customer request (order 000000299)'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "send_email",
+      "type": "bool",
+      "format": null,
+      "description": "If true, toggle the 'Email Copy of Credit Memo' checkbox to send the credit memo to the customer. Default behavior (when omitted) is to leave the current checkbox state unchanged.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

@@ -1,0 +1,300 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigated the Magento 1 Admin Orders grid, discovered and exercised the primary controls: per-column filters (Order #, Purchased From/Store, Purchased On date range, Bill/Ship names, G.T. ranges, Status), Search and Reset, Export, Select Visible/Unselect, Mass Actions dropdown and Submit, and per-row View links. It opened an order detail page and extracted detailed order selectors.\n\nTask Definition:\n- Build a reusable automation tool that accepts common Orders-grid filter criteria and returns matching order rows. The tool must also support exporting the filtered result set, selecting visible rows, running a mass action, and optionally opening an order view to extract full order details.\n\nAction Plan:\n1. Navigate to the Orders grid (base URL provided). 2. Populate column filters (order number, billing/shipping names, store, purchased-on date range, grand total range, status). 3. Set page size (per_page) and click Search to apply filters. 4. Extract visible order rows into structured output. 5. Optionally export the filtered set. 6. Optionally select visible rows and execute a mass action. 7. Optionally open an Order View by internal order_id and extract detailed fields.\n\nVariable Identification (inputs required):\n- order_number, bill_to_name, ship_to_name, store_view, purchased_on_from, purchased_on_to, grand_total_base_from, grand_total_base_to, status, per_page, export_format, select_visible (bool), mass_action, open_order_id. These come directly from the recorded filters and controls (field placeholders and select lists). None are required by the page itself; the tool treats them as optional filter criteria.\n\nStep Optimization:\n- Where deterministic element hashes were captured in the session, those are used in input/select/click steps (elementHash entries). This increases reliability on Magento admin grids.\n- Where date and numeric-range inputs did not have recorded elementHash values, the tool uses limited agentic steps (agent) to locate and set those fields. This keeps the majority of the flow deterministic while handling a few dynamic controls.\n- Export and Order View navigation are implemented as direct interactions/URL navigation (export via dropdown+button, order view via direct URL) to avoid brittle UI-only sequences.\n\nNotes & Constraints:\n- The session showed a 'JavaScript disabled' warning; mass actions, select-visible behavior, and AJAX refresh require JS running in the browser. Automation should ensure JS-enabled execution environment or handle degraded behavior.\n- The tool assumes the caller is already authenticated to admin; no login steps are included (per instructions).\n- The tool intentionally does not include conditional branching; it will attempt the configured actions in sequence using the provided input values. Empty values will result in inputs being set to empty (which is acceptable for optional filters).",
+  "name": "magento_admin_orders_search",
+  "description": "Navigate Magento 1 admin Orders grid and return orders matching provided filters. Supports filtering by order number, store view, date range, bill/ship name, grand total ranges, status, export, select-visible, mass-action submission, and opening an order view. Uses recorded stable element hashes where available.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Orders grid (starting page for all subsequent actions).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_order/",
+      "url_operation": null
+    },
+    {
+      "description": "Enter the provided order number into the 'Order #' column filter input.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_real_order_id",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "230585ef85",
+      "type": "input",
+      "value": "{order_number}"
+    },
+    {
+      "description": "Enter the billing name into the 'Bill to Name' column filter input.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_billing_name",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[5]/div/input",
+      "elementTag": "input",
+      "elementHash": "8770abde75",
+      "type": "input",
+      "value": "{bill_to_name}"
+    },
+    {
+      "description": "The 'Ship to Name' filter input didn't have a stable elementHash captured; this agent step finds and sets it.",
+      "output": null,
+      "type": "agent",
+      "task": "Locate the 'Ship to Name' column filter input in the Orders grid and enter the value '{ship_to_name}'",
+      "max_steps": 4
+    },
+    {
+      "description": "Select the visible store view option in the 'Purchased From (Store)' filter dropdown using the visible text.",
+      "output": null,
+      "cssSelector": "select[name=\"store_id\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/select",
+      "elementTag": "select",
+      "elementHash": "2e752431bb",
+      "type": "select_change",
+      "selectedText": "{store_view}"
+    },
+    {
+      "description": "Date range inputs did not have a recorded stable elementHash; this agent step finds both date inputs and sets them.",
+      "output": null,
+      "type": "agent",
+      "task": "Set the 'Purchased On' date range filters: enter '{purchased_on_from}' into the 'From' field and '{purchased_on_to}' into the 'To' field on the Orders grid.",
+      "max_steps": 4
+    },
+    {
+      "description": "Numeric range inputs for grand total did not have stable elementHash recorded; this agent step finds and sets them.",
+      "output": null,
+      "type": "agent",
+      "task": "Set the 'G.T. (Base)' numeric range filters: enter '{grand_total_base_from}' into the 'From' field and '{grand_total_base_to}' into the 'To' field on the Orders grid.",
+      "max_steps": 4
+    },
+    {
+      "description": "Choose the order status from the Status filter (visible text). For multiple values provide comma-separated visible labels; the automation agent will attempt to select all provided entries.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_status",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "301a5525e7",
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Set the 'View per page' dropdown to control page size. Provide one of the allowed values (20/30/50/100/200).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_export",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "0e5d7d55cb",
+      "type": "select_change",
+      "selectedText": "{per_page}"
+    },
+    {
+      "description": "Click the Search button to apply filters and refresh the grid.",
+      "output": null,
+      "cssSelector": "#id_cd66749c9f3d27df944cc493473f0e82",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "6e5c42d684",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh (allow AJAX/loader time).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture the filtered grid results as structured data so the caller receives matching orders.",
+      "output": "order_results",
+      "type": "extract_page_content",
+      "goal": "Extract all currently visible order rows and their key fields (order_number, order_id, purchased_on, bill_to_name, ship_to_name, grand_total_base, grand_total_purchased, status, view_url)."
+    },
+    {
+      "description": "If an export_format is provided, choose it in the 'Export to' dropdown so the Export button will produce the desired format.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_export",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "0e5d7d55cb",
+      "type": "select_change",
+      "selectedText": "{export_format}"
+    },
+    {
+      "description": "Click the Export button to trigger the selected export format (CSV/Excel/XML).",
+      "output": null,
+      "cssSelector": "#id_217c463c2f58c0340f48126034904e0f",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "bdd988f268",
+      "type": "click"
+    },
+    {
+      "description": "Click 'Select Visible' link to select all rows visible on the current page (used prior to mass actions).",
+      "output": null,
+      "cssSelector": "tr > td > a[href=\"#\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td/a",
+      "elementTag": "a",
+      "elementHash": "0eefac88df",
+      "type": "click"
+    },
+    {
+      "description": "Choose the requested mass action from the Actions dropdown (e.g., 'Print Invoices', 'Cancel').",
+      "output": null,
+      "cssSelector": "#sales_order_grid_massaction-select",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span/select",
+      "elementTag": "select",
+      "elementHash": "e47b96fe25",
+      "type": "select_change",
+      "selectedText": "{mass_action}"
+    },
+    {
+      "description": "Click the mass-action Submit button to execute the selected bulk action on the selected rows.",
+      "output": null,
+      "cssSelector": "button[title=\"Submit\"][title=\"Submit\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[4]/button",
+      "elementTag": "button",
+      "elementHash": "e5da8d6705",
+      "type": "click"
+    },
+    {
+      "description": "Wait for mass action to complete (AJAX/redirects).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Return status messages and updated grid snapshot after mass action execution.",
+      "output": "post_mass_action_state",
+      "type": "extract_page_content",
+      "goal": "Capture the grid state after performing any mass action (selected count, notices, and visible rows)."
+    },
+    {
+      "description": "If open_order_id is provided, navigate to the Order View page for that internal order id.",
+      "output": null,
+      "type": "navigation",
+      "url": null,
+      "url_operation": {
+        "base": "http://dockerized-magento.local/index.php/admin/sales_order/view/order_id/{open_order_id}/",
+        "replace": {}
+      }
+    },
+    {
+      "description": "Capture a structured order detail record for the opened order view.",
+      "output": "order_detail",
+      "type": "extract_page_content",
+      "goal": "Extract order-level details (order number, date, status, billing/shipping address, items, totals) from the Order View page."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "order_number",
+      "type": "string",
+      "format": null,
+      "description": "Order number as shown in admin grid (e.g., '000000299'). Matches the 'Order #' column text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "bill_to_name",
+      "type": "string",
+      "format": null,
+      "description": "Billing name to filter by (text input in the 'Bill to Name' column filter).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "ship_to_name",
+      "type": "string",
+      "format": null,
+      "description": "Shipping name to filter by (text input in the 'Ship to Name' column filter).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "store_view",
+      "type": "string",
+      "format": null,
+      "description": "Purchased From (Store) visible option to select (example: 'English' or 'Main Website / Madison Island / English'). Use exact visible text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "purchased_on_from",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Start date for 'Purchased On' filter (format MM/DD/YYYY). Leave empty to not set lower bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "purchased_on_to",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "End date for 'Purchased On' filter (format MM/DD/YYYY). Leave empty to not set upper bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grand_total_base_from",
+      "type": "string",
+      "format": null,
+      "description": "Lower bound for 'G.T. (Base)' filter. Use numeric value (example: '100.00').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grand_total_base_to",
+      "type": "string",
+      "format": null,
+      "description": "Upper bound for 'G.T. (Base)' filter. Use numeric value (example: '300.00').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Visible status option to select (examples: 'Complete', 'Pending', 'Processing'). For multiple statuses provide comma-separated values with exact visible labels.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "per_page",
+      "type": "string",
+      "format": null,
+      "description": "Rows per page to set in the grid. Allowed values: '20','30','50','100','200'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Export format to use for the grid export control. If empty no export is performed.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "select_visible",
+      "type": "bool",
+      "format": null,
+      "description": "If true the tool will click 'Select Visible' to select all visible rows before performing any mass action. Default false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "mass_action",
+      "type": "string",
+      "format": null,
+      "description": "Mass action to apply from the Actions dropdown (examples: 'Print Invoices', 'Cancel', 'Hold'). If empty no mass action is executed.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "open_order_id",
+      "type": "string",
+      "format": null,
+      "description": "Internal numeric order_id to open the Order View after filtering (e.g. '204'). If provided the tool will navigate to the order view URL.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

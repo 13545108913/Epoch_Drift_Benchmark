@@ -1,0 +1,273 @@
+{
+  "tool_analysis": "Step analysis: The recorded browser session shows a standard Magento 1.9 Manage Customers grid and the New/Edit customer workflows. The core demonstration actions recorded were: open Manage Customers, close the incoming message popup, input multiple column filters (ID from/to, Name, Email, Group, Website, Telephone, Customer Since range), apply Search, export CSV, select/submit a mass-action, and click the per-row Edit link to open and edit telephone. Purpose: create a reusable automation tool that applies user-provided filters to the Magento admin customers grid, opens the first matching customer's Edit page, and optionally updates the telephone field then saves. Action plan: 1) Navigate to customers list; 2) close popup (deterministic elementHash recorded); 3) set each filter input/select using recorded elementHashes or robust XPath fallbacks; 4) click Search; 5) extract the grid results; 6) open the first Edit link (XPath using href contains); 7) confirm Edit page; 8) optional edit+save executed by an agent step (conditional update to telephone); 9) capture final status messages. Variable identification: The tool accepts all typical filters as inputs (entity_id_from, entity_id_to, name, email, telephone, group, website, country, customer_since_from, customer_since_to) plus instructions to open the first result and an optional new_telephone for update. Step optimization: Used direct navigation to the customers URL to avoid extra clicks. Where stable element hashes were recorded in the session (popup close, filter inputs, group/website selects, telephone input), they are referenced to make UI interactions deterministic. XPath fallbacks are included for Search, Edit link and date fields because these elements may vary between admin themes. The save/edit action is conditional (depends on new_telephone) so it's implemented as an agent step to keep the main sequence deterministic while allowing a safe conditional behavior. Important: the session is expected to be already authenticated to the admin; the tool does not handle login. The tool will always open the Edit page for the first matching result if open_first_result_edit=true. If no results are found the Edit click will fail; callers should inspect 'search_results' to confirm matches before relying on the edit step. Selectors were chosen to prefer id/name/href equality where available and label-relative XPaths otherwise. Testing note: verify selectors against the live DOM for unique matches before running in parallel test runs.",
+  "name": "magento_find_and_edit_customer",
+  "description": "Search the Magento Admin Customers grid using provided filters, open the first matching customer's Edit page, and optionally update the customer's telephone. Uses recorded stable selectors and falls back to XPath when necessary. Assumes the automation session is already authenticated to the Magento admin.",
+  "version": "2026-02-01",
+  "steps": [
+    {
+      "description": "Open the Manage Customers admin grid.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/customer/",
+      "url_operation": null
+    },
+    {
+      "description": "Allow the page to load and any popups to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Close the incoming message popup if present (uses recorded elementHash; selector fallback uses the popup close link title).",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Fill 'ID From' filter input. Leave empty if not provided.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_entity_id_from",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "99d940d9fc",
+      "type": "input",
+      "value": "{entity_id_from}"
+    },
+    {
+      "description": "Fill 'ID To' filter input. Leave empty if not provided.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_entity_id_to",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "c069a1390d",
+      "type": "input",
+      "value": "{entity_id_to}"
+    },
+    {
+      "description": "Fill the Name filter input with the provided {name} value (optional).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_name",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/div/input",
+      "elementTag": "input",
+      "elementHash": "958237192c",
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Fill the Email filter input with the provided {email} value (optional).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_email",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/input",
+      "elementTag": "input",
+      "elementHash": "56a5f4823b",
+      "type": "input",
+      "value": "{email}"
+    },
+    {
+      "description": "Select the Customer Group filter (visible text). If empty, the select remains unchanged.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_group",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[5]/select",
+      "elementTag": "select",
+      "elementHash": "547d16e240",
+      "type": "select_change",
+      "selectedText": "{group}"
+    },
+    {
+      "description": "Select the Website filter (visible text). If empty, the select remains unchanged.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_website_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[11]/select",
+      "elementTag": "select",
+      "elementHash": "4a2f7e5061",
+      "type": "select_change",
+      "selectedText": "{website}"
+    },
+    {
+      "description": "Fill the Telephone filter input (optional).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_Telephone",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[6]/div/input",
+      "elementTag": "input",
+      "elementHash": "3cf635d2df",
+      "type": "input",
+      "value": "{telephone}"
+    },
+    {
+      "description": "Fill the 'Customer Since - From' date input when provided (XPath locates the 'From' field in the Customer Since column).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Customer Since']]//input[contains(@name,'from') or contains(@id,'from')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{customer_since_from}"
+    },
+    {
+      "description": "Fill the 'Customer Since - To' date input when provided (XPath locates the 'To' field in the Customer Since column).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[a[normalize-space(.)='Customer Since']]//input[contains(@name,'to') or contains(@id,'to')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{customer_since_to}"
+    },
+    {
+      "description": "Click the Search / Apply Filters button to run the grid search.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space(.)='Search' or @title='Search' or contains(@onclick,'doFilter')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract the first page of results from the grid to confirm matched records.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Capture the top table rows (ID, Name, Email, Group, Telephone, Website) into 'search_results' so caller can inspect matches."
+    },
+    {
+      "description": "Open the Edit page for the first matching customer (click the per-row 'Edit' link). This XPath targets the first Edit link found in the grid.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//a[contains(@href,'/admin/customer/edit/id/') and normalize-space(.)='Edit'])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the Edit page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Capture basic customer info to verify we are on the right Edit page before applying changes.",
+      "output": "edit_page_summary",
+      "type": "extract_page_content",
+      "goal": "Confirm the Edit page opened and capture current customer id, name and telephone into 'edit_page_summary'."
+    },
+    {
+      "description": "This agent step performs the conditional edit-and-save because updating is optional and depends on the provided {new_telephone} parameter.",
+      "output": "edit_result",
+      "type": "agent",
+      "task": "If {new_telephone} is non-empty: locate the Telephone input inside the Addresses area using XPath (//label[contains(normalize-space(.),'Telephone')]/following::input[1]) and set its value to {new_telephone}, then click the primary Save Customer button using XPath (//button[normalize-space(.)='Save Customer' or @title='Save Customer'])[1]. After clicking Save, wait up to 10s for a success message or the page to refresh. If {new_telephone} is empty, skip editing and return.",
+      "max_steps": 6
+    },
+    {
+      "description": "Return final confirmation that the customer was updated (or that no update was requested).",
+      "output": "final_status",
+      "type": "extract_page_content",
+      "goal": "After save (or skip), capture success/failure messages and the updated customer telephone into 'final_status'."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "entity_id_from",
+      "type": "string",
+      "format": null,
+      "description": "Filter: customer ID (From). Numeric string; leave empty to not set lower bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "entity_id_to",
+      "type": "string",
+      "format": null,
+      "description": "Filter: customer ID (To). Numeric string; leave empty to not set upper bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Customer Name (visible name). Partial or full name; optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Customer email address (partial or full). Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "telephone",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Telephone (text). Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "group",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Customer Group visible text (e.g., 'General', 'Wholesale'). Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "website",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Website visible text (e.g., 'Main Website', 'Admin'). Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "country",
+      "type": "string",
+      "format": null,
+      "description": "Filter: Country visible text (e.g., 'United States'). Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "customer_since_from",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Filter: 'Customer Since' date lower bound in MM/DD/YYYY format. Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "customer_since_to",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Filter: 'Customer Since' date upper bound in MM/DD/YYYY format. Optional.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "open_first_result_edit",
+      "type": "bool",
+      "format": null,
+      "description": "If true, opens the Edit page for the first search result. This tool always opens the first result when present.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "new_telephone",
+      "type": "string",
+      "format": null,
+      "description": "If provided, the tool will update the customer's Telephone field on the Edit page to this value and save the record. Leave empty to skip updating.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

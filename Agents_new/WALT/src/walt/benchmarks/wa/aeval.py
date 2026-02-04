@@ -392,11 +392,11 @@ def config() -> argparse.Namespace:
     parser.add_argument(
         "--max_tasks_per_proc",
         type=int,
-        default=16,
+        default=10,
         help="Maximum number of concurrent tasks per process",
     )
     parser.add_argument("--test_start_idx", type=int, default=0)
-    parser.add_argument("--test_end_idx", type=int, default=161)
+    parser.add_argument("--test_end_idx", type=int, default=78)
     parser.add_argument("--force_login_every_task", action="store_true")
     parser.add_argument("--run_as_debug_mode", action="store_true")
     parser.add_argument(
@@ -858,7 +858,7 @@ async def evaluate_task_core(
             # 挂载干扰逻辑
             page = await context.get_current_page()
             await page.route("**/*", controller.route_handler)
-            await page.goto("http://172.26.116.102:8081/?logging=StartingRun1", timeout=60000, wait_until="domcontentloaded")
+            await page.goto("http://localhost:8000/?logging=StartingRun1", timeout=60000, wait_until="domcontentloaded")
 
         if with_drift:
             try:

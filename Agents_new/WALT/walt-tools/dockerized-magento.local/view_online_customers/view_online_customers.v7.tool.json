@@ -1,0 +1,307 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session demonstrates logging into Magento admin (already authenticated in tool context), opening the Online Customers grid, closing an 'Incoming Message' popup, filling a set of filters in the grid header (ID range, names, email, IP, session start range, last activity range, type select, last URL) and clicking Search. The grid updates and shows results (or 'No records found'). Stable selectors centered on column header text provide robustness.\n\nTask Definition:\n- Build a reusable automation tool that, given filter values, navigates to the Magento Online Customers grid (in an already-authenticated session), sets provided filters, applies them, and returns the grid rows.\n\nAction Plan:\n1. Navigate to /admin/customer_online/ (no login step).\n2. Wait for grid and filter row.\n3. Close any notification popup that might cover the grid.\n4. Fill each filter input using XPath selectors that locate the column header by visible link text and then the input/select descendant; use index-based XPaths for range inputs.\n5. Select the 'Type' option by visible text.\n6. Click the Search control to apply filters.\n7. Wait for the grid to refresh and extract the resulting rows into structured output.\n\nVariable Identification (inputs required):\n- visitor_id_from, visitor_id_to: ID range inputs.\n- customer_firstname, customer_middlename, customer_lastname: name filters.\n- customer_email: email filter.\n- remote_addr: IP address filter.\n- first_visit_at_from, first_visit_at_to: Session Start Time range.\n- last_visit_at_from, last_visit_at_to: Last Activity range.\n- type: visible text for Type select (e.g. 'Customer').\n- last_url: Last URL filter.\n- grid_table_id: optional to scope selectors (default 'customerGrid_table').\nAll filter inputs are optional (not required) because the tool should be usable for partial filtering.\n\nStep Optimization:\n- Preferred selectors are XPath expressions that match the column header link text (e.g. //th[.//a[normalize-space(text())='Email']]//input). This avoids brittle class-based selectors and handles variations in grid container ids.\n- For range fields, ordinal indexing (input[1], input[2]) is used to deterministically select 'From' and 'To' fields.\n- The popup close and Search button include elementHash backups recorded during the demonstration; these are included but the primary selectors remain semantic XPaths.\n- Navigation directly to the Online Customers URL is used to avoid extra UI clicks.\n- No authentication steps are included because the automation context is expected to be already logged in.\n\nSelectors and Robustness Notes:\n- If an installation uses a different grid id, pass grid_table_id to scope selectors (the tool will attempt header-text-based XPaths which work without grid id).\n- The Type select is selected by visible text to avoid depending on value attributes which can vary by installation.\n- After applying filters, the extraction step returns a structured array 'online_customers_results' containing the requested columns; callers should validate the returned rows and handle zero-row cases.\n\nMissing / Optional Considerations (intentionally excluded):\n- Authentication/login steps are excluded per requirement that the agent is already authenticated.\n- Advanced JS datepicker interactions (opening calendar widgets) are not implemented; instead the tool inputs date/time text values directly. If datepicker prevents direct text entry on some installations, an agentic step would be required to trigger the widget \u2014 excluded to keep the tool deterministic.\n\nThis tool focuses on the single task: set filters on Online Customers grid and return results. It uses deterministic XPath selectors discovered and validated during the recorded session and includes short waits to accommodate client-side rendering.",
+  "name": "magento_online_customers_filter_tool",
+  "description": "Navigate to Magento Admin Online Customers grid (already-authenticated context), set filter fields (ID range, names, email, IP, session/last-activity ranges, Type, Last URL), apply filters (Search) and return the resulting grid rows. Uses robust XPath selectors scoped to column header text and optional grid id scoping.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Online Customers admin grid (assumes the automation context is already authenticated).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/customer_online/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the grid and header/filter row to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Close the 'Incoming Message' popup if present (selector targets the popup close link).",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Allow popup close to finish and grid to become interactable.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Fill ID 'From' filter (use {visitor_id_from}).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//th[.//a[normalize-space(text())='ID']]//input)[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{visitor_id_from}"
+    },
+    {
+      "description": "Fill ID 'To' filter (use {visitor_id_to}).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//th[.//a[normalize-space(text())='ID']]//input)[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{visitor_id_to}"
+    },
+    {
+      "description": "Fill 'First Name' filter.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[normalize-space(text())='First Name']]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{customer_firstname}"
+    },
+    {
+      "description": "Fill 'Middle Name' filter.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[normalize-space(text())='Middle Name']]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{customer_middlename}"
+    },
+    {
+      "description": "Fill 'Last Name' filter.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[normalize-space(text())='Last Name']]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{customer_lastname}"
+    },
+    {
+      "description": "Fill 'Email' filter.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[normalize-space(text())='Email']]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{customer_email}"
+    },
+    {
+      "description": "Fill 'IP Address' filter.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[normalize-space(text())='IP Address']]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{remote_addr}"
+    },
+    {
+      "description": "Fill 'Session Start Time - From' filter (date/time).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//th[.//a[normalize-space(text())='Session Start Time']]//input)[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{first_visit_at_from}"
+    },
+    {
+      "description": "Fill 'Session Start Time - To' filter (date/time).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//th[.//a[normalize-space(text())='Session Start Time']]//input)[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{first_visit_at_to}"
+    },
+    {
+      "description": "Fill 'Last Activity - From' filter (date/time).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//th[.//a[normalize-space(text())='Last Activity']]//input)[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_visit_at_from}"
+    },
+    {
+      "description": "Fill 'Last Activity - To' filter (date/time).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//th[.//a[normalize-space(text())='Last Activity']]//input)[2]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_visit_at_to}"
+    },
+    {
+      "description": "Select the Type dropdown option by visible text (e.g. 'Customer' or 'Visitor').",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_type",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "068ccb660c",
+      "type": "select_change",
+      "selectedText": "{type}"
+    },
+    {
+      "description": "Fill 'Last URL' filter (partial or full path).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//a[normalize-space(text())='Last URL']]//input",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_url}"
+    },
+    {
+      "description": "Short wait to ensure inputs are processed by any JS enhancements (datepickers, etc.).",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Click the Search button to apply filters.",
+      "output": null,
+      "cssSelector": "#id_e2d13ef5cc4a9ecf63e24d9333ca160f",
+      "xpath": "html/body/div/div[8]/div/div[3]/table/tbody/tr/td[2]/button[2]",
+      "elementTag": "button",
+      "elementHash": "c772f9950f",
+      "type": "click"
+    },
+    {
+      "description": "Wait for grid to refresh after search.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Capture resulting grid rows after filters applied. Returns an array of rows with named fields.",
+      "output": "online_customers_results",
+      "type": "extract_page_content",
+      "goal": "Extract Online Customers grid rows (ID, First Name, Middle Name, Last Name, Email, IP Address, Session Start Time, Last Activity, Type, Last URL) into structured output 'online_customers_results'."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "visitor_id_from",
+      "type": "string",
+      "format": null,
+      "description": "Lower bound for visitor/customer ID range (maps to input under 'ID' column, FROM).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visitor_id_to",
+      "type": "string",
+      "format": null,
+      "description": "Upper bound for visitor/customer ID range (maps to input under 'ID' column, TO).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "customer_firstname",
+      "type": "string",
+      "format": null,
+      "description": "Customer first name filter (maps to the 'First Name' column input).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "customer_middlename",
+      "type": "string",
+      "format": null,
+      "description": "Customer middle name filter (maps to the 'Middle Name' column input).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "customer_lastname",
+      "type": "string",
+      "format": null,
+      "description": "Customer last name filter (maps to the 'Last Name' column input).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "customer_email",
+      "type": "string",
+      "format": null,
+      "description": "Customer email filter (maps to the 'Email' column input).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "remote_addr",
+      "type": "string",
+      "format": null,
+      "description": "IP address filter (maps to the 'IP Address' column input).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "first_visit_at_from",
+      "type": "string",
+      "format": null,
+      "description": "Session Start Time 'From' (use date/time format accepted by the site, e.g. 'YYYY-MM-DD HH:MM:SS').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "first_visit_at_to",
+      "type": "string",
+      "format": null,
+      "description": "Session Start Time 'To' (use date/time format accepted by the site).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_visit_at_from",
+      "type": "string",
+      "format": null,
+      "description": "Last Activity 'From' (use date/time format accepted by the site).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_visit_at_to",
+      "type": "string",
+      "format": null,
+      "description": "Last Activity 'To' (use date/time format accepted by the site).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the Type dropdown option to select (e.g. 'Customer' or 'Visitor').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_url",
+      "type": "string",
+      "format": null,
+      "description": "Filter by Last URL (maps to the 'Last URL' column input). Use encoded or raw path as appropriate (e.g. '/checkout/cart').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grid_table_id",
+      "type": "string",
+      "format": null,
+      "description": "Optional grid table id to scope selectors (default 'customerGrid_table'). If empty, selectors locate the table by header text.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

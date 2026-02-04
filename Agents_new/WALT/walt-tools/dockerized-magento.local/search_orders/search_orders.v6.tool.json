@@ -1,0 +1,356 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigated to Magento admin orders grid, logged in, closed a popup, filled filters (order # and billing name), tried selecting store and status, clicked Search, exported CSV, used mass-action, selected a row, and opened the order view to extract details. Several attempts to select the Store filter failed; logs recommend using attribute-based XPaths and waiting for loading overlays.\n\nTask Definition:\n- Create a reusable, deterministic tool that: navigates to the admin orders grid, applies filter inputs (order number, billing name, date ranges, GT ranges, store, status), triggers search, optionally exports results, selects the first row and executes a mass-action, and optionally opens the first matching order View and extracts structured order details.\n\nAction Plan:\n1. Navigate to {base_url}/sales_order/ (start point). 2. Wait for page/loaders. 3. Fill all filter inputs (write empty string when parameter not provided). 4. Use attribute-based selects/XPaths for store and status. 5. Click Search (last filter cell button). 6. Wait for grid reload. 7. Extract visible orders into 'orders'. 8. If export_format provided, select it and click Export. 9. Select first-row checkbox. 10. Choose massaction and click Submit. 11. Wait and extract mass action results. 12. Extract first View href, navigate to it and extract order details.\n\nVariable Identification (inputs):\n- base_url: root admin URL used to construct navigation target. Required to allow different installations.\n- increment_id: order # filter (input[name='increment_id']). Optional.\n- billing_name: billing name filter (input[name='billing_name']). Optional.\n- created_at_from / created_at_to: date-range filters. Optional.\n- gt_base_from / gt_base_to / gt_purchased_from / gt_purchased_to: numeric range filters. Optional.\n- store: visible option text for Purchased From (Store) filter (e.g., 'English'). Optional.\n- status: visible option text for Status filter (e.g., 'Pending'). Optional.\n- export_format: CSV/Excel/XML to trigger export. Optional.\n- massaction: visible text for Actions dropdown (e.g., 'Print Invoices'). Optional.\n- open_first_match: 'true' or 'false' to open first result page and extract details. Optional (default true recommended).\n\nStep Optimization:\n- Use table header-scoped XPaths (thead tr[2] filter row and tbody tr[1]) and core Magento input names where available (increment_id, created_at[from]/[to], billing_name, shipping_name, status, order_ids[]). This is more robust than counting global tabbable indices (the previous attempt produced strict-mode violations). \n- Use attribute-based selectors (select[name*='store'] and select[name='status']) with header-text fallbacks to fix the repeated 'could not select store' failures.\n- Insert waits after operations that trigger AJAX and recommend waiting for #loading-mask invisibility if the runner supports visibility checks. Where conditional waiting isn't available use conservative wait seconds (2-3s) as included.\n- For View navigation prefer reading the anchor href and navigating directly (driver.get(href)) rather than relying on click() to avoid JS interceptors or preventedDefault handlers.\n\nNotes and constraints:\n- The tool assumes an authenticated admin session is already present. Do not include authentication steps.\n- Steps intentionally write empty strings into inputs when parameters are omitted so the sequence remains deterministic and re-executable without conditional branching.\n- If the environment does not support reading outputs as {first_view_href[0].view_href}, callers should use the 'orders' extract output to pick a view href and call the navigation step separately.\n\nOverall: This tool provides a deterministic, attribute-driven automation sequence that reproduces the recorded browser session and includes fixes for the store-select instability and loader handling observed in earlier failures.",
+  "name": "magento_admin_orders_tool",
+  "description": "Automate searching and operating on Magento 1.x admin Orders grid (fill filters, search, export, mass-action, open order view and extract details). Assumes the browser session is already authenticated in the admin.",
+  "version": "2026-02-01-v1",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Orders grid page.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/sales_order/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the page and any initial loaders to appear; give JS time to initialize (if enabled).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extra wait to allow #loading-mask/ajax-loader to settle before interacting. Automation should additionally check for #loading-mask invisibility if supported by the runner.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Set Order # filter (input[name='increment_id']). If {increment_id} is empty this writes an empty value.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_real_order_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "230585ef85",
+      "type": "input",
+      "value": "{increment_id}"
+    },
+    {
+      "description": "Set Billing name filter (input[name='billing_name']). If {billing_name} empty, writes empty value.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_billing_name",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[5]/div/input",
+      "elementTag": "input",
+      "elementHash": "8770abde75",
+      "type": "input",
+      "value": "{billing_name}"
+    },
+    {
+      "description": "Set Purchased On 'From' date filter (created_at[from]). Write empty string if not provided.",
+      "output": null,
+      "cssSelector": "input[name='created_at[from]'], input[name*='created_at'][name*='from']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_at_from}"
+    },
+    {
+      "description": "Set Purchased On 'To' date filter (created_at[to]). Write empty string if not provided.",
+      "output": null,
+      "cssSelector": "input[name='created_at[to]'], input[name*='created_at'][name*='to']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_at_to}"
+    },
+    {
+      "description": "Set G.T. (Base) From value. Leave empty to skip.",
+      "output": null,
+      "cssSelector": "input[name='gt_base[from]'], input[name*='base'][name*='from']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{gt_base_from}"
+    },
+    {
+      "description": "Set G.T. (Base) To value. Leave empty to skip.",
+      "output": null,
+      "cssSelector": "input[name='gt_base[to]'], input[name*='base'][name*='to']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{gt_base_to}"
+    },
+    {
+      "description": "Set G.T. (Purchased) From value. Leave empty to skip.",
+      "output": null,
+      "cssSelector": "input[name='gt_purchased[from]'], input[name*='purchased'][name*='from']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{gt_purchased_from}"
+    },
+    {
+      "description": "Set G.T. (Purchased) To value. Leave empty to skip.",
+      "output": null,
+      "cssSelector": "input[name='gt_purchased[to]'], input[name*='purchased'][name*='to']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{gt_purchased_to}"
+    },
+    {
+      "description": "Select the Purchased From (Store) filter by visible option text. Uses attribute-based select[name*='store'] first, with header-scoped XPath fallback.",
+      "output": null,
+      "cssSelector": "select[name=\"store_id\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/select",
+      "elementTag": "select",
+      "elementHash": "2e752431bb",
+      "type": "select_change",
+      "selectedText": "{store}"
+    },
+    {
+      "description": "Select the Status filter by visible option text (select[name='status']).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_status",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "301a5525e7",
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Click the Search button in the filter row (last filter cell).",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Wait for grid to reload and for any loading-mask/ajax-loader to finish.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Capture first page of matching order rows and their view hrefs into 'orders' output.",
+      "output": "orders",
+      "type": "extract_page_content",
+      "goal": "Extract matching orders: order_number, store, purchased_on, bill_to_name, ship_to_name, grand_total(s), status, and view link hrefs for visible rows"
+    },
+    {
+      "description": "If {export_format} is provided (CSV/Excel/XML), select that export type in the Export control. If the export control is implemented as links instead of a select, the next click steps will still attempt to trigger Export via its button/link.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_export",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "0e5d7d55cb",
+      "type": "select_change",
+      "selectedText": "{export_format}"
+    },
+    {
+      "description": "Click the Export control/button or the appropriate CSV/Excel/XML link to trigger export (if export_format was chosen).",
+      "output": null,
+      "cssSelector": "#id_7e2f4bd83d6b1f11c16dfe53123937c9",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "a5e7da5323",
+      "type": "click"
+    },
+    {
+      "description": "Wait for export action to start/complete (server-driven download or AJAX).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Select the first visible row's checkbox to prepare for a mass-action.",
+      "output": null,
+      "cssSelector": "input[name=\"order_ids\"][type=\"checkbox\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/tbody/tr/td/input",
+      "elementTag": "input",
+      "elementHash": "4eb9597021",
+      "type": "click"
+    },
+    {
+      "description": "Choose a mass-action from the Actions dropdown (choose by visible text).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_massaction-select",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span/select",
+      "elementTag": "select",
+      "elementHash": "e47b96fe25",
+      "type": "select_change",
+      "selectedText": "{massaction}"
+    },
+    {
+      "description": "Click the mass-action Submit button to apply the selected action to selected rows.",
+      "output": null,
+      "cssSelector": "#id_d8bfd2b6262d7e2bdaaa27894bfadf03",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[4]/button",
+      "elementTag": "button",
+      "elementHash": "7d58ef2b7b",
+      "type": "click"
+    },
+    {
+      "description": "Wait for mass-action to complete and any messages to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Extract any messages displayed after executing the mass-action and the current grid state (selected count, visible rows).",
+      "output": "mass_action_result",
+      "type": "extract_page_content",
+      "goal": "Capture mass-action messages and updated grid state (e.g., messages shown in the header and selected items count)"
+    },
+    {
+      "description": "Extract the href of the first 'View' anchor (a[href*='/admin/sales_order/view/order_id/']) to allow direct navigation to the order view page.",
+      "output": "first_view_href",
+      "type": "extract_page_content",
+      "goal": "Locate first visible View link href (if present) into 'first_view_href' to allow direct navigation"
+    },
+    {
+      "description": "Navigate directly to the first matching order's view page using the captured view href. If {open_first_match} is 'false' or no first_view_href present, this navigation may attempt to navigate to an empty URL; calling system should set open_first_match='true' to enable.",
+      "output": null,
+      "type": "navigation",
+      "url": "{first_view_href[0].view_href}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for order view page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture structured order details from the order view page.",
+      "output": "order_details",
+      "type": "extract_page_content",
+      "goal": "Extract order details from the order view: order number, admin order id, status, date, customer (name,email), billing/shipping addresses, payment & shipping methods, items (sku,name,qty,price,row_total), and totals"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base admin URL (omit trailing slash). Example: \"http://dockerized-magento.local/index.php/admin\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Order number / increment id to filter (input[name='increment_id']). Leave empty to skip narrowing by order number.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "billing_name",
+      "type": "string",
+      "format": null,
+      "description": "Billing name free-text filter (input[name='billing_name']). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_from",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Purchased On - From date (created_at[from]) in MM/DD/YYYY format.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_to",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Purchased On - To date (created_at[to]) in MM/DD/YYYY format.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "gt_base_from",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Base) - From numeric filter. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "gt_base_to",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Base) - To numeric filter. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "gt_purchased_from",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Purchased) - From numeric filter. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "gt_purchased_to",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Purchased) - To numeric filter. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "store",
+      "type": "string",
+      "format": null,
+      "description": "Store view option text, e.g. \"English\" (matches visible option text in Purchased From (Store) filter).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Order status option text to select from the Status dropdown, e.g. \"Pending\". Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Export format to trigger after search. Choose one of CSV, Excel, or XML. Leave empty to skip export.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "massaction",
+      "type": "string",
+      "format": null,
+      "description": "Mass-action option visible text to apply (e.g. \"Print Invoices\"). Use exact visible text of the action as shown in the Actions dropdown. Leave empty to skip mass-action.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "open_first_match",
+      "type": "string",
+      "format": null,
+      "description": "If set to 'true', the tool will open the first matching order's View page and extract order details. Use 'true' or 'false'. Default: 'true'.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

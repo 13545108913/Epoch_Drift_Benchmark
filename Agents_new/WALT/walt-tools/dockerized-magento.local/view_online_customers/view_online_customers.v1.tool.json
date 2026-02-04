@@ -1,0 +1,243 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigated to Magento Admin > Customers > Online Customers, logged in, closed a notification banner, inspected and used the grid filter row inputs (ID range, first name, email, last URL, Type select, Last Activity), and clicked Search. The IP Address filter control was not discovered in the recorded DOM snapshot (page warned that JavaScript is disabled), so a dynamic search step is required to locate and fill it at runtime.\n\nTask Definition:\n- Build a reusable tool that opens the Online Customers admin grid, dismisses obstructing notifications, fills the grid filters based on provided parameters (customer ID range, names, email, IP, type, activity times, last URL), clicks Search, and returns the grid results. The tool assumes an authenticated admin session in the browser context.\n\nAction Plan:\n1) Navigate to the Online Customers URL.\n2) Extract page snapshot to confirm context.\n3) Dismiss the 'Incoming Message' notification.\n4) Fill deterministic filter inputs using stable elementHashes captured during recording (ID from/to, first name, email, last URL, type select, last activity from).\n5) Use an agentic search to locate the IP Address filter input because it was not stable in the recorded DOM and may be JS-rendered.\n6) Click Search to apply filters.\n7) Extract the resulting grid content for verification.\n\nVariable Identification:\n- Customer ID range: customer_id_from, customer_id_to (optional)\n- First/Last name: first_name, last_name (optional)\n- Email: email (optional)\n- IP address: ip_address (optional; agentic lookup used when necessary)\n- Type: type (visible select label 'Customer' or 'Visitor')\n- Session/Last activity date ranges: session_start_from, session_start_to, last_activity_from, last_activity_to (optional)\n- Last URL: last_url (optional)\n- per_page: per_page (optional control for rows per page)\n\nStep Optimization:\n- Use direct navigation to the known admin URL instead of clicking through menus.\n- Use stable elementHash-based inputs for fields that were deterministically recorded to avoid brittle XPaths.\n- For the IP filter which was not captured with an elementHash, include an agentic step that computes the IP column index from header text and then selects the corresponding filter <th> and input (this is necessary because the IP input may be rendered only when JS is enabled or may not have stable attributes).\n- Avoid conditional branching by always writing each parameter into its input; empty strings will clear fields, matching the web UI Reset behaviour when needed.\n\nNotes and constraints:\n- The recorded session indicated JavaScript was disabled which prevented discovery of some controls; when running this tool ensure the browser context allows JS. If the IP filter remains absent the agentic step will attempt the header-index approach and then bail after the configured max_steps.\n- The tool does not perform authentication; it assumes the automation session is already authenticated to the Magento admin as in the recorded session.\n\nDeterministic selectors used (from recording):\n- Notification close: elementHash df76c6ce85\n- ID From: elementHash 39a8e4b87a\n- ID To: elementHash 6662425bd9\n- First Name: elementHash f70a21afd3\n- Email: elementHash 2e6ef5fa64\n- Last URL: elementHash 5e5ed49cc3\n- Type select: elementHash 068ccb660c (select by visible text)\n- Last Activity From: elementHash 908cec2c7c\n- Search button: elementHash 90708cd5ce\n\nThis tool provides a single-purpose deterministic flow with one agentic fallback step to handle the IP filter when it isn't available as a stable selector.",
+  "name": "magento_admin_online_customers_filter",
+  "description": "Navigate to the Magento Admin 'Online Customers' grid, dismiss the notification banner, apply a set of grid filters (customer ID range, first/last name, email, IP address, type, session/last-activity ranges, last URL), submit the Search action, and return the resulting grid content. Assumes an authenticated admin session is already available in the browser context.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin 'Online Customers' grid page (starting point).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/customer_online/",
+      "url_operation": null
+    },
+    {
+      "description": "Analyse the page to ensure we have the Online Customers grid and identify if the notification banner or expected filter row exists.",
+      "output": "page_snapshot",
+      "type": "extract_page_content",
+      "goal": "Confirm grid and filter row are present and capture current state (notifications, presence of filter row)."
+    },
+    {
+      "description": "Close the non-modal 'Incoming Message' notification banner (click the 'close' link) to avoid obscuring filter inputs.",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Allow the page to stabilise after dismissing the notification.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Type the customer ID lower bound into the ID 'From' input.",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_customer_id_from",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/thead/tr[2]/th/div/div/input",
+      "elementTag": "input",
+      "elementHash": "39a8e4b87a",
+      "type": "input",
+      "value": "{customer_id_from}"
+    },
+    {
+      "description": "Type the customer ID upper bound into the ID 'To' input.",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_customer_id_to",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/thead/tr[2]/th/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "6662425bd9",
+      "type": "input",
+      "value": "{customer_id_to}"
+    },
+    {
+      "description": "Type the First Name filter value.",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_firstname",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "f70a21afd3",
+      "type": "input",
+      "value": "{first_name}"
+    },
+    {
+      "description": "Type the Email filter value.",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_email",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th[5]/div/input",
+      "elementTag": "input",
+      "elementHash": "2e6ef5fa64",
+      "type": "input",
+      "value": "{email}"
+    },
+    {
+      "description": "Type the Last URL filter value (path or full URL).",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_last_url",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th[10]/div/input",
+      "elementTag": "input",
+      "elementHash": "5e5ed49cc3",
+      "type": "input",
+      "value": "{last_url}"
+    },
+    {
+      "description": "Select the visible Type option in the Type dropdown (use 'Customer' or 'Visitor').",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_type",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "068ccb660c",
+      "type": "select_change",
+      "selectedText": "{type}"
+    },
+    {
+      "description": "Type the Last Activity 'From' date/time value.",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_last_activity1769981634.8044_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th[8]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "908cec2c7c",
+      "type": "input",
+      "value": "{last_activity_from}"
+    },
+    {
+      "description": "The IP filter control may be rendered dynamically or not have a stable elementHash in the recorded session. This agent step will locate the IP Address filter cell (match the 'IP Address' header), find a text input/select inside the corresponding filter <th> (e.g. thead tr.filter th:nth-child(6) input or //th[normalize-space()='IP Address']/following::th[1]//input) and type the {ip_address} value. It will stop after one successful find-and-type or after reaching the max steps.",
+      "output": "ip_fill_result",
+      "type": "agent",
+      "task": "Locate the IP Address filter input in the grid filter row and enter the provided {ip_address} value.",
+      "max_steps": 6
+    },
+    {
+      "description": "Click the Search / Apply Filters button in the grid filter row to submit the filters.",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/table/tbody/tr/td[2]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Extract the resulting Online Customers grid content (rows, pagination, total records text) after filters are applied.",
+      "output": "filter_results",
+      "type": "extract_page_content",
+      "goal": "Capture the updated grid results and any 'No records found.' message or rows returned."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "customer_id_from",
+      "type": "string",
+      "format": null,
+      "description": "Lower bound of the customer/visitor ID range (exact string value typed into the 'From' ID filter). Example: '100'",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "customer_id_to",
+      "type": "string",
+      "format": null,
+      "description": "Upper bound of the customer/visitor ID range (typed into the 'To' ID filter). Example: '200'",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "first_name",
+      "type": "string",
+      "format": null,
+      "description": "First name filter string to type into the First Name filter input. Example: 'Alice'",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_name",
+      "type": "string",
+      "format": null,
+      "description": "Last name filter string to type into the Last Name filter input. Example: 'Smith'",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": null,
+      "description": "Email filter string to type into the Email filter input. Example: 'alice@example.com'",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "ip_address",
+      "type": "string",
+      "format": null,
+      "description": "IP address (or partial IP) to filter by. If present, the tool will attempt to locate the IP Address filter control and type this value. Example: '192.168.1.10'",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "format": null,
+      "description": "Visible option to select in the Type dropdown in the grid filter. Use the visible label text: 'Customer' or 'Visitor'.",
+      "required": false,
+      "enum": [
+        "Customer",
+        "Visitor"
+      ]
+    },
+    {
+      "name": "session_start_from",
+      "type": "string",
+      "format": null,
+      "description": "Session Start Time 'From' value. Use the same format shown by the UI (e.g. '2026-02-02 05:00'). If empty, the field will be left blank.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "session_start_to",
+      "type": "string",
+      "format": null,
+      "description": "Session Start Time 'To' value (matching UI format).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_activity_from",
+      "type": "string",
+      "format": null,
+      "description": "Last Activity 'From' date/time string (UI format). Example: '2026-02-02 05:00'",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_activity_to",
+      "type": "string",
+      "format": null,
+      "description": "Last Activity 'To' date/time string.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_url",
+      "type": "string",
+      "format": null,
+      "description": "Last URL (or partial path) to filter visitors by. Example: '/checkout/cart'",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "per_page",
+      "type": "string",
+      "format": null,
+      "description": "Select how many rows to view per page (20, 30, 50, 100, 200). If empty the page keeps its current value.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

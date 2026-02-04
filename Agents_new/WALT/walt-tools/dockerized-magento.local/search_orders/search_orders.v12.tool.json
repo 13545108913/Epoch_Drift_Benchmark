@@ -1,0 +1,364 @@
+{
+  "tool_analysis": "Step analysis: This tool automates the Magento 1.x admin Orders grid to search for orders using standard filter fields, export results via direct controller navigation (when requested), perform mass actions and return structured grid data. Task definition: Provide a deterministic, parameter-driven sequence to apply filters (increment_id, billing_name, date ranges, totals, store view, status), run Search, optionally export, select visible/first rows and apply a mass action, reset filters and return results. Action plan: 1) Navigate to /admin/sales_order/, 2) wait for loaders, 3) apply all filter inputs and selects, 4) click Search and wait for overlay, 5) extract results, 6) if requested, navigate to export controller action to download CSV/Excel/XML, 7) select visible rows or first row, 8) select mass-action option by visible text and click Submit, 9) Reset filters (if requested), 10) extract final grid state and return results. Variable identification: Inputs are named after Magento form fields where possible: increment_id, billing_name, store_id, status, created_at[from]/to, base_grand_total[from]/to, grand_total[from]/to; export_action is the controller action name (exportCsv/exportExcel/exportXml); mass_action_text is visible text of the action; perform_mass_action/select_visible_rows/reset_filters_after control the flow. Step optimization: The tool avoids brittle class-only selectors and prefers name/id attributes (e.g. input[name='increment_id'], select[name='store_id'], select[name='status'], select[id$='massaction-select']). Export is optimized by directly navigating to the export controller action rather than interacting with a UI select that can vary by theme. Important reliability notes: Magento admin uses a global loading overlay (#loading-mask / ajax-loader-tr.gif) \u2014 automation must wait for that overlay to be hidden before interacting; the tool includes waits and an initial page readiness extract. The tool intentionally returns extracted grid rows so callers can validate actions. The tool assumes the session is already authenticated (developer-provided credentials were used by the recording).",
+  "name": "magento_admin_orders_tool",
+  "description": "Navigate Magento Admin Orders grid and perform a repeatable sequence: apply filters (order increment_id, date range, billing/shipping name, store view, status, totals), run Search, export results, perform a mass-action on selected rows, Reset filters and return the resulting grid. The tool includes robust waits for Magento's loading overlay and uses stable Magento 1.x selectors (name/id patterns) where available.",
+  "version": "2026-02-01",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Orders grid (starting URL). The agent is already authenticated (no login step).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_order/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for initial page load and transient AJAX. The tool also relies on later waits for the overlay; increase wait_for_loader_seconds if your environment is slower.",
+      "output": null,
+      "type": "wait",
+      "seconds": 5.0
+    },
+    {
+      "description": "Check page readiness: detect 'Please wait...' and spinner images so automation can observe loader presence.",
+      "output": "page_status",
+      "type": "extract_page_content",
+      "goal": "Verify or capture presence of Magento global loading overlay (e.g. #loading-mask or ajax-loader-tr.gif) and the orders grid container before interacting."
+    },
+    {
+      "description": "Enter Order # (increment_id) into the filter input. If {increment_id} is empty the input action will input an empty string which leaves the filter unchanged.",
+      "output": null,
+      "cssSelector": "input[name='increment_id']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{increment_id}"
+    },
+    {
+      "description": "Enter bill-to name into the filter row. Leave empty to skip.",
+      "output": null,
+      "cssSelector": "input[name='billing_name']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{billing_name}"
+    },
+    {
+      "description": "Set 'Purchased On' From value (if provided).",
+      "output": null,
+      "cssSelector": "input[name='created_at[from]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_at_from}"
+    },
+    {
+      "description": "Set 'Purchased On' To value (if provided).",
+      "output": null,
+      "cssSelector": "input[name='created_at[to]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_at_to}"
+    },
+    {
+      "description": "Set G.T. (Base) range 'From' value if provided.",
+      "output": null,
+      "cssSelector": "input[name='base_grand_total[from]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{base_grand_total_from}"
+    },
+    {
+      "description": "Set G.T. (Base) range 'To' value if provided.",
+      "output": null,
+      "cssSelector": "input[name='base_grand_total[to]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{base_grand_total_to}"
+    },
+    {
+      "description": "Set G.T. (Purchased) range 'From' value if provided.",
+      "output": null,
+      "cssSelector": "input[name='grand_total[from]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{grand_total_from}"
+    },
+    {
+      "description": "Set G.T. (Purchased) range 'To' value if provided.",
+      "output": null,
+      "cssSelector": "input[name='grand_total[to]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{grand_total_to}"
+    },
+    {
+      "description": "Choose the store view in the 'Purchased From (Store)' filter by visible text. If {store_id} is empty, this step will attempt to select an empty value and leave the filter as-is.",
+      "output": null,
+      "cssSelector": "select[name='store_id']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{store_id}"
+    },
+    {
+      "description": "Choose Status filter by visible text (e.g. 'Canceled'). Leave empty to skip selection.",
+      "output": null,
+      "cssSelector": "select[name='status']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Click the Search button to apply the filters. The selector covers either a button or input variant typical in Magento admin grids.",
+      "output": null,
+      "cssSelector": "(.//*[contains(@id,'sales_order_grid')]//button[@title='Search' or normalize-space(.)='Search'] | .//*[@id='sales_order_grid']//input[@type='button' and (@value='Search' or @title='Search')])[1]",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the Magento loading overlay after applying filters. Consider increasing wait_for_loader_seconds for slow instances.",
+      "output": null,
+      "type": "wait",
+      "seconds": 5.0
+    },
+    {
+      "description": "Capture the filtered result rows to return to the caller. If 0 rows present, returns an empty list.",
+      "output": "orders_list",
+      "type": "extract_page_content",
+      "goal": "Extract the visible orders grid rows and columns (increment id, purchased on, bill to name, ship to name, grand totals, status) and return them as 'orders_list'."
+    },
+    {
+      "description": "If {export_action} is provided (one of 'exportCsv','exportExcel','exportXml'), navigate directly to the export controller to download the file. Leave {export_action} empty to skip this navigation. Example: exportCsv -> /admin/sales_order/exportCsv/",
+      "output": null,
+      "type": "navigation",
+      "url": null,
+      "url_operation": {
+        "base": "http://dockerized-magento.local/index.php/admin/sales_order/",
+        "replace": {
+          "action": "{export_action}"
+        }
+      }
+    },
+    {
+      "description": "Wait briefly for export/download to begin (if an export action was requested).",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Click 'Select Visible' to select all visible rows. This is attempted before mass action if present. If you prefer to only select the first row, the next step checks and selects the first-row checkbox separately.",
+      "output": null,
+      "cssSelector": "(.//a[normalize-space(.)='Select Visible'] | .//*[@id='sales_order_grid']//a[contains(.,'Select Visible')])[1]",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Click the first-row checkbox (select first order). If no rows exist this will not match and may fail; the tool previously captured 'orders_list' to avoid selecting when empty.",
+      "output": null,
+      "cssSelector": "(//table[contains(@id,'sales_order_grid') or contains(@class,'grid')]//tbody/tr[1]//input[@type='checkbox'])[1]",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Select the requested mass action by visible text (e.g. 'Print Invoices'). Leave {mass_action_text} empty to skip mass-action selection.",
+      "output": null,
+      "cssSelector": "(//select[contains(@id,'massaction') or contains(@name,'massaction')])[1]",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{mass_action_text}"
+    },
+    {
+      "description": "Click the mass-action Submit button to apply the selected action.",
+      "output": null,
+      "cssSelector": "(//button[contains(@id,'massaction-submit') or normalize-space(.)='Submit' or @title='Submit'])[1]",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for mass-action processing and for any overlay to clear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 5.0
+    },
+    {
+      "description": "Click Reset Filter to clear filters (if reset_filters_after true).",
+      "output": null,
+      "cssSelector": "(//button[@title='Reset Filter' or normalize-space(.)='Reset Filter' or //a[normalize-space(.)='Reset Filter']])[1]",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for reset action to take effect and overlay to clear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Return the final grid rows and a summary of performed actions (export attempted, mass-action attempted, filters reset).",
+      "output": "final_orders_list",
+      "type": "extract_page_content",
+      "goal": "Final extract of the orders grid after actions (return final_orders_list and page state summary)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Order increment id (Order #). Matches input[name='increment_id'] (example: '145000036'). Leave empty to skip this filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "billing_name",
+      "type": "string",
+      "format": null,
+      "description": "Bill to name filter. Matches input[name='billing_name'] in the grid filter row (example: 'Sarah Miller'). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "store_id",
+      "type": "string",
+      "format": null,
+      "description": "Store view visible text to select in the 'Purchased From (Store)' filter (visible text, e.g. 'English'). Use the exact visible option text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Order Status visible text to select in the Status filter (e.g. 'Canceled', 'Complete'). Use the exact visible option text. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_from",
+      "type": "string",
+      "format": null,
+      "description": "Filter 'Purchased On' - From value. Use format matching the admin (e.g. 'Feb 1, 2026 1:00:00 PM'). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_at_to",
+      "type": "string",
+      "format": null,
+      "description": "Filter 'Purchased On' - To value. Use format matching the admin. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "base_grand_total_from",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Base) numeric range 'From' filter (example: '100'). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "base_grand_total_to",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Base) numeric range 'To' filter. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grand_total_from",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Purchased) numeric range 'From'. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grand_total_to",
+      "type": "string",
+      "format": null,
+      "description": "G.T. (Purchased) numeric range 'To'. Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_action",
+      "type": "string",
+      "format": null,
+      "description": "If provided, navigate to the matching export controller action to download the grid (use controller action names: 'exportCsv', 'exportExcel', 'exportXml'). Leave empty to skip exporting.",
+      "required": false,
+      "enum": [
+        "exportCsv",
+        "exportExcel",
+        "exportXml"
+      ]
+    },
+    {
+      "name": "perform_mass_action",
+      "type": "bool",
+      "format": null,
+      "description": "If true, select rows and apply a mass action specified in mass_action_text (default false).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "mass_action_text",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the mass-action option to apply (e.g. 'Print Invoices', 'Cancel'). Use the visible label exactly as shown in the Actions dropdown.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "select_visible_rows",
+      "type": "bool",
+      "format": null,
+      "description": "If true, click 'Select Visible' to check all visible rows before performing mass action. If false, the tool will check the first row only. Defaults to false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "reset_filters_after",
+      "type": "bool",
+      "format": null,
+      "description": "If true, click the Reset Filter control after actions are performed. Defaults to true.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_for_loader_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait for the Magento loading overlay to clear between actions (useful for slow environments). Default is 5 seconds.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

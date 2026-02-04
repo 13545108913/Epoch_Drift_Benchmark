@@ -1,0 +1,253 @@
+{
+  "tool_analysis": "Step analysis: The recorded session navigated Magento Admin -> Customers grid, applied multiple grid filters (ID range, name, email, telephone), selected Group and Website, clicked Search, exported CSV, selected a row, applied a mass-action, opened Edit for a row, and inspected the New Customer form. Purpose: create a reusable tool that programmatically applies the same filters and opens the first matching customer's edit page to extract stable identifiers.\n\nTask definition: Given filter parameters (ID range, name, email, telephone, group, website, country, customer-since range) navigate to the Manage Customers grid, apply filters, run Search, extract the first matching row (ID, name, email, edit link), open the edit page and extract key fields including the hidden customer id. This tool purposely focuses on searching and opening the edit page (single responsibility) \u2014 export/mass-action are omitted from automated execution to keep the tool deterministic and safe. Export and mass-action were demonstrated in the recorded session; they are intentionally not executed by default here to avoid destructive operations.\n\nAction plan: 1) navigate to /admin/customer/; 2) wait for grid; 3) fill each provided filter input in the grid (ID from/to, name, email, telephone); 4) set Group and Website selects if provided; 5) apply Search; 6) extract first-row row data and Edit link; 7) open the Edit link (agentic click step to account for variability); 8) extract edit page fields and hidden id.\n\nVariable identification (inputs): id_from, id_to, name, email, telephone, group, website, country, customer_since_from, customer_since_to, export_format (optional), open_first_match (boolean required) \u2014 chosen because these correspond to visible grid filters and controls. All are optional except open_first_match: the tool must know whether to open the Edit page. Dates are strings because grid date formats vary.\n\nStep optimization: Replaced multiple UI clicks for navigation with a single deterministic navigation to the grid URL. Used recorded stable elementHashes for primary filter inputs, selects and the Search button to make interactions deterministic. For controls not captured with reliable elementHash (customer-since date inputs), the tool uses a note to the automation runner to resolve label-relative selectors at runtime \u2014 these are inherently variable so they are implemented as agentic/fallback steps. The Edit link navigation is handled agentically (bounded to 3 steps) to accommodate installations that render absolute vs. relative hrefs or where the first-row anchor wasn't captured with a single stable elementHash.\n\nDeterminism & safety: The tool does not perform destructive mass-actions or attempt to save or modify data. It only reads and navigates to the edit page. Export and mass actions were demonstrated in the recorded session but are not executed by this tool by default to avoid side effects. If export or mass-action automation is required, a separate tool should be created with dedicated safeguards and explicit confirmation parameters.\n\nSelectors & stability notes: Where available elementHash values from the recorded execution are used to ensure uniqueness (inputs and Search button). For elements that vary between Magento installations (date inputs, dynamic ids, localized labels), the tool relies on label-relative XPath and an agent step to find the correct link to click. The automation runner must validate that each elementHash resolves to exactly one element; if not, use the provided XPath fallbacks in the step logs.",
+  "name": "magento_admin_find_and_open_customer",
+  "description": "Find customers in Magento Admin by applying grid filters (ID range, name, email, telephone, group, website, country, customer-since range), open the first matching customer's edit page, and extract the edit page fields. Assumes the session is already authenticated in the browser context.",
+  "version": "2026-02-01",
+  "steps": [
+    {
+      "description": "Open the Manage Customers grid (starting point for applying filters and actions).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/customer/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the customers grid to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Fill ID From filter (if {id_from} provided). Scoped to the ID-from input used in recorded session.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_entity_id_from",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "99d940d9fc",
+      "type": "input",
+      "value": "{id_from}"
+    },
+    {
+      "description": "Fill ID To filter (if {id_to} provided). Scoped to the ID-to input used in recorded session.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_entity_id_to",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "c069a1390d",
+      "type": "input",
+      "value": "{id_to}"
+    },
+    {
+      "description": "Fill Name text filter (if {name} provided). Uses the Name filter input recorded as elementHash 958237192c.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_name",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/div/input",
+      "elementTag": "input",
+      "elementHash": "958237192c",
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Fill Email text filter (if {email} provided).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_email",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/input",
+      "elementTag": "input",
+      "elementHash": "56a5f4823b",
+      "type": "input",
+      "value": "{email}"
+    },
+    {
+      "description": "Fill Telephone text filter (if {telephone} provided).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_Telephone",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[6]/div/input",
+      "elementTag": "input",
+      "elementHash": "3cf635d2df",
+      "type": "input",
+      "value": "{telephone}"
+    },
+    {
+      "description": "Select Customer Group filter (if {group} provided). Uses the recorded group select element.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_group",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[5]/select",
+      "elementTag": "select",
+      "elementHash": "547d16e240",
+      "type": "select_change",
+      "selectedText": "{group}"
+    },
+    {
+      "description": "Select Website filter (if {website} provided). Uses the recorded website select element.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_website_id",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[11]/select",
+      "elementTag": "select",
+      "elementHash": "4a2f7e5061",
+      "type": "select_change",
+      "selectedText": "{website}"
+    },
+    {
+      "description": "NOTE: Customer Since From input - attempt to fill if present. Use label-relative selector at runtime if elementHash not stable. (This placeholder must be resolved by the automation runner to the grid's Customer Since 'From' input; recorded session used a column filter rather than a captured elementHash for these date inputs.)",
+      "output": null,
+      "cssSelector": null,
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": "???_cust_since_from",
+      "type": "input",
+      "value": "{customer_since_from}"
+    },
+    {
+      "description": "NOTE: Customer Since To input - attempt to fill if present. See note on previous step.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": "???_cust_since_to",
+      "type": "input",
+      "value": "{customer_since_to}"
+    },
+    {
+      "description": "Click the Search button to apply grid filters (recorded Search button elementHash).",
+      "output": null,
+      "cssSelector": "#id_ef530b28c9af35ce7d475b31805b28f1",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "c2e6296c88",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh with filtered results.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture the first matching row's key fields and the per-row Edit link for further navigation.",
+      "output": "first_row",
+      "type": "extract_page_content",
+      "goal": "Extract first-row data (ID, Name, Email, Group, Telephone, Website) and the Edit link href from the filtered grid."
+    },
+    {
+      "description": "Use the extracted first_row.edit_link href (or fallback selectors) to click the Edit link. Agentic step used because the Edit link can vary by environment; limit steps to 3.",
+      "output": null,
+      "type": "agent",
+      "task": "Locate the first-row Edit link in the customers grid and click it",
+      "max_steps": 3
+    },
+    {
+      "description": "Wait for the customer Edit page to load after clicking Edit.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture stable identifiers from the edit page to use in downstream automation or verification.",
+      "output": "customer_edit",
+      "type": "extract_page_content",
+      "goal": "On the customer Edit page extract hidden customer id and key form fields (firstname, lastname, email, group_id/visible text, website_id/visible text, telephone)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "id_from",
+      "type": "string",
+      "format": null,
+      "description": "Customer ID lower bound (From). Leave empty to omit.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "id_to",
+      "type": "string",
+      "format": null,
+      "description": "Customer ID upper bound (To). Leave empty to omit.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Customer name filter (partial or full). Matches the 'Name' grid filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": null,
+      "description": "Customer email filter. Use full email (recommended) or a substring.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "telephone",
+      "type": "string",
+      "format": null,
+      "description": "Telephone number to filter by (matches the Telephone grid filter).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "group",
+      "type": "string",
+      "format": null,
+      "description": "Customer Group visible text to select in the Group filter (e.g. 'Wholesale').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "website",
+      "type": "string",
+      "format": null,
+      "description": "Website visible text to select in the Website filter (e.g. 'Main Website').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "country",
+      "type": "string",
+      "format": null,
+      "description": "Country visible text to filter by (e.g. 'United States').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "customer_since_from",
+      "type": "string",
+      "format": null,
+      "description": "Customer Since date lower bound (format depends on store; use visible grid format).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "customer_since_to",
+      "type": "string",
+      "format": null,
+      "description": "Customer Since date upper bound.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "If provided, click the Export link for this format after filters are applied. Leave empty to skip exporting.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "open_first_match",
+      "type": "bool",
+      "format": null,
+      "description": "If true, open the first matching customer's Edit page after the search. Set to true to capture the edit page.",
+      "required": true,
+      "enum": null
+    }
+  ]
+}

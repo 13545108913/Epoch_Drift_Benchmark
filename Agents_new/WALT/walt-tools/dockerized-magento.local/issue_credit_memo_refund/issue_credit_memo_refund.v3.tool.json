@@ -1,0 +1,163 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigated the Magento admin to an order view, opened a New Credit Memo form for order_id=204, set per-item qtys and back_to_stock checkboxes, clicked Update Qty's, set an adjustment amount, and submitted the credit memo using a Refund (offline) action. The key stable selectors discovered are name-based Magento creditmemo fields (creditmemo[items][<id>][qty], creditmemo[items][<id>][back_to_stock], creditmemo[shipping_amount], creditmemo[adjustment_positive], creditmemo[adjustment_negative]) scoped to form#edit_form. The Refund submit can be targeted by exact value/title matches (value='Refund' or title='Refund').\n\nTask Definition:\n- Create a reusable tool that, given an order_id and a list of per-item quantities (and optional per-item return-to-stock flags), will open the New Credit Memo form for that order, set per-item and global adjustment values, optionally update qtys to recalc totals, set offline/online refund mode, and submit the credit memo. The tool must use stable selectors anchored on Magento naming conventions and the creditmemo form scope to avoid ambiguous matches.\n\nAction Plan:\n1) Navigate directly to the credit memo creation URL for the given order_id (deterministic URL). 2) Iterate provided items and set each creditmemo[items][<item_id>][qty] and creditmemo[items][<item_id>][back_to_stock] accordingly (agent step because the item list is variable). 3) Click the 'Update Qty's' control to refresh totals. 4) Set shipping_amount and adjustment_positive/adjustment_negative fields using exact name selectors scoped to form#edit_form. 5) Ensure the offline checkbox (do_offline or equivalent) is set per input. 6) Click the Refund submit button (exact-value/title match scoped to form#edit_form). 7) Wait and extract the confirmation page info.\n\nVariable Identification (inputs):\n- base_url: host to use in navigation (optional; recorded base was http://dockerized-magento.local)\n- order_id: numeric/string id embedded in admin URLs (required)\n- items_json: JSON array listing {item_id, qty, back_to_stock} entries (required)\n- shipping_amount: decimal string to set shipping refund (optional)\n- adjustment_positive / adjustment_negative: decimal strings to set adjustments (optional)\n- do_offline: boolean to choose offline refund processing (optional)\n- update_qty: boolean indicating whether to click 'Update Qty's' (optional)\n- admin_form_id: form id (defaults to 'edit_form') to scope selectors (optional)\n\nStep Optimization:\n- Navigation optimized: direct navigation to /admin/sales_order_creditmemo/new/order_id/{order_id}/ replaces clicking the 'Create Credit Memo' link for determinism and speed.\n- Deterministic selectors: preference for name-based selectors (creditmemo[...] patterns) scoped to form#edit_form to avoid localization or class-based ambiguity.\n- Dynamic item count handled by an agent step: static step sequences cannot enumerate variable numbers of items; use a controlled agent loop to set per-item fields deterministically and verify each update.\n- Avoid text-only selectors for final submit: the tool uses exact attribute equality (value='Refund' or title='Refund') scoped to the form to avoid matching 'Save' buttons elsewhere and to disambiguate 'Refund' vs 'Refund Offline' when needed.\n\nDeterministic assumptions & verification:\n- Assumes Magento 1.x admin form names follow the creditmemo[...] patterns (recorded instance used Magento CE 1.9.x). If a custom admin theme changes names/ids provide admin_form_id or verify item_id attribute names in items_json.\n- The tool includes an extraction step after submit to confirm creation; callers should inspect the returned 'creditmemo_confirmation' for memo id and success message and add retries if network delays occur.\n\nInputs are intentionally low-level (use Magento field names and item ids) so the automation is robust and mappable 1:1 to DOM elements discovered in the recording.",
+  "name": "magento_create_credit_memo_tool_v2",
+  "description": "Automate creating a Magento 1.x admin credit memo from an order view: open credit memo form for a given order_id, set per-item refund quantities and return-to-stock flags, set shipping/adjustments, optionally update quantities, choose offline vs online refund, and submit the credit memo. Selectors are scoped to form#edit_form and use canonical Magento name attributes (creditmemo[...] patterns) for stability.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the New Credit Memo page for the specified order_id. Uses direct URL navigation to reach the credit memo form (faster and deterministic).",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/sales_order_creditmemo/new/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Dynamic per-item updates: iterate the provided items JSON and set each qty and back_to_stock checkbox. Agent step used because the number of items and item ids vary per order.",
+      "output": "items_update_summary",
+      "type": "agent",
+      "task": "Set per-item quantities and per-item back-to-stock checkboxes using items defined in {items_json}. For each array element {item_id, qty, back_to_stock}: 1) target input selector \"form#{admin_form_id} input[name='creditmemo[items][{item_id}][qty]']\" and set its value to {qty}; 2) if back_to_stock is true, ensure checkbox \"form#{admin_form_id} input[name='creditmemo[items][{item_id}][back_to_stock]']\" is checked, otherwise ensure it is unchecked. Use up to 20 steps to iterate through items and verify each field was updated. If a per-item exact selector doesn't exist, fall back to form#{admin_form_id} input[name^='creditmemo[items]'][name$='[qty]'] and match by nearby row containing data-item-id or SKU text. Output a summary of applied item changes.",
+      "max_steps": 20
+    },
+    {
+      "description": "Click 'Update Qty's' to refresh totals after changing per-item quantities. This selector covers the common button or input implementations. This step is necessary to recalc refund totals.",
+      "output": null,
+      "cssSelector": "form#{admin_form_id} button[title=\"Update Qty's\"], form#{admin_form_id} input[type='button'][value=\"Update Qty's\"], button[title=\"Update Qty's\"], input[type='button'][value=\"Update Qty's\"]",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Set the shipping refund amount (creditmemo[shipping_amount]). Provide a decimal string like '5.00'. If empty string is supplied, this step will overwrite with an empty value (explicit).",
+      "output": null,
+      "cssSelector": "form#{admin_form_id} input[name='creditmemo[shipping_amount]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{shipping_amount}"
+    },
+    {
+      "description": "Set the positive adjustment amount (creditmemo[adjustment_positive]). Use decimal string or empty string to leave blank.",
+      "output": null,
+      "cssSelector": "form#{admin_form_id} input[name='creditmemo[adjustment_positive]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{adjustment_positive}"
+    },
+    {
+      "description": "Set the negative adjustment amount (creditmemo[adjustment_negative]). Use decimal string or empty string to leave blank.",
+      "output": null,
+      "cssSelector": "form#{admin_form_id} input[name='creditmemo[adjustment_negative]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{adjustment_negative}"
+    },
+    {
+      "description": "Set or unset the offline checkbox (Magento commonly uses name 'do_offline'). We use an agent step since some themes implement this as a checkbox or a separate submit variant.",
+      "output": "offline_control_state",
+      "type": "agent",
+      "task": "Control the offline-refund checkbox: locate an input inside form#{admin_form_id} with name='do_offline' or name containing 'offline' or a checkbox associated with label text 'Refund Offline'. If {do_offline} is true, ensure it is checked; otherwise ensure it is unchecked. Verify its state after change. Max 4 steps.",
+      "max_steps": 4
+    },
+    {
+      "description": "Click the Refund submit action scoped to the credit memo form. Exact match on value/title is used to avoid accidentally clicking other 'save' buttons. This will submit the credit memo. Prefer exact 'Refund' or 'Refund Offline' matches so the intended action is executed.",
+      "output": null,
+      "cssSelector": "form#{admin_form_id} input[type='submit'][value='Refund'], form#{admin_form_id} button[title='Refund'], form#{admin_form_id} input[type='submit'][value='Refund Offline'], form#{admin_form_id} button[title='Refund Offline']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Short wait for the submission to process and redirect/render confirmation.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture the page response to confirm that the credit memo was created and return the confirmation details (memo id, success message).",
+      "output": "creditmemo_confirmation",
+      "type": "extract_page_content",
+      "goal": "After submit, extract confirmation text and any credit memo id or success message. Capture redirect URL if present (may contain sales_creditmemo/view/memo_id/<id> or a success admin message)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base admin URL of the Magento instance (include protocol and host). Example: \"http://dockerized-magento.local\". If omitted the tool will use http://dockerized-magento.local",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Internal order_id from Magento admin URL (the numeric id used in URLs). Example: \"204\". This maps to the URL path /admin/.../order_id/{order_id}/",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "items_json",
+      "type": "string",
+      "format": null,
+      "description": "JSON array specifying item updates. Format: [{\"item_id\":\"512\",\"qty\":\"1\",\"back_to_stock\":true}, ...]. item_id is the Magento order_item_id used in input names creditmemo[items][<item_id>][qty]. Use strings for ids to avoid schema coercion.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "shipping_amount",
+      "type": "string",
+      "format": null,
+      "description": "Amount to place into input[name='creditmemo[shipping_amount]']. Use a decimal string (e.g. \"5.00\"). Leave empty string to leave as-is.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "adjustment_positive",
+      "type": "string",
+      "format": null,
+      "description": "Amount to place into input[name='creditmemo[adjustment_positive]'] (increase refund). Decimal string, e.g. \"5.00\".",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "adjustment_negative",
+      "type": "string",
+      "format": null,
+      "description": "Amount to place into input[name='creditmemo[adjustment_negative]'] (decrease refund). Decimal string, e.g. \"2.50\".",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "do_offline",
+      "type": "bool",
+      "format": null,
+      "description": "If true the tool will enable the offline-refund control (checkbox named do_offline or similar) before submitting so the refund is processed offline. Default behavior: true if omitted.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "update_qty",
+      "type": "bool",
+      "format": null,
+      "description": "If true the tool will click the 'Update Qty's' control after writing per-item qtys to recalc totals. Default behavior: true if omitted.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "admin_form_id",
+      "type": "string",
+      "format": null,
+      "description": "Form id to scope selectors to. Default: \"edit_form\" (selectors use form#edit_form). Use only if your theme uses a different id.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

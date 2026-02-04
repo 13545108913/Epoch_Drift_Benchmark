@@ -1,0 +1,248 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded steps navigate to the Magento admin categories page, dismiss an incoming message popup, select a category in the left tree by visible text, click 'Add Subcategory', fill the new-subcategory form (Name, Is Active, URL Key, Include in Navigation, Description), and click 'Save Category'. After saving the page updates with a success message and the new node appears in the tree. Deterministic selectors used in the recording were primarily label-based XPaths for inputs and visible-text XPaths for tree nodes and buttons.\n\nTask Definition:\n- Purpose: reliably create a new subcategory under a specified parent category in Magento 1.x admin, setting the most-used fields (name, active flag, url key, include-in-menu, optional description) and confirming creation. Assumes the user is already authenticated to the admin UI.\n\nAction Plan:\n1) Navigate to {admin_base_url}/catalog_category/.\n2) Analyse page and dismiss an incoming 'Incoming Message' popup if present.\n3) Select the provided parent category by exact visible anchor text (//a[normalize-space() = '{parent_category}']).\n4) Click 'Add Subcategory'.\n5) Optionally set store view if {store_view} provided.\n6) Fill Name, Is Active, URL Key (if provided), Include in Navigation Menu, optional Description.\n7) Click Save Category and verify success by extracting a page success message and the new node header.\n\nVariable Identification (inputs required):\n- admin_base_url (required): base admin URL used to navigate to the categories page.\n- parent_category (required): exact visible tree link text to identify the parent node.\n- name (required): Category name (required by Magento form).\n- is_active (required): visible option text 'Yes'/'No' to set active state.\n- include_in_menu (required): visible option text 'Yes'/'No' to set navigation inclusion.\n- url_key (optional): SEO-friendly URL key.\n- store_view (optional): store view visible text to choose before editing store-scoped fields.\n- description (optional): category description text.\n- display_mode/is_anchor (optional advanced display settings) - included in schema for completeness but not actively modified by the example steps.\n\nStep Optimization:\n- Use label-based XPaths for form inputs (e.g. //label[normalize-space()='Name *']/following::input[1]) because Magento admin IDs/names can vary by install and theme; label-relative XPaths are robust.\n- Use visible-text XPaths for action buttons and tree nodes (e.g. //button[normalize-space()='Add Subcategory'], //a[normalize-space() = '{parent_category}']). This avoids brittle class- or id-based selectors.\n- Prefer direct navigation to the categories URL rather than clicking through the admin menu to reduce flakiness.\n- Include brief waits after navigation/selection to allow the UI (and potential WYSIWYG iframe) to initialise. The tool uses deterministic waits rather than long polling; callers can add retries externally if needed.\n- The tool intentionally focuses on a single, deterministic task: creating a subcategory. This keeps the sequence linear and avoids branching logic. Root-category creation and other flows can be built as separate tools reusing the same selector strategy.\n\nNotes and caveats:\n- This tool assumes an active, authenticated admin session. It does not perform login.\n- Incoming message popups can vary; the tool attempts to dismiss a popup by clicking a 'close' link text. If your admin theme uses a different close control text/selector adjust the XPath accordingly.\n- WYSIWYG editors (Description) may be iframe-based; the tool writes into the underlying textarea (label-based XPath). If the editor blocks input, additional iframe switching may be required.\n- The tool sets select/radio values by visible option text (e.g., 'Yes'/'No'). Ensure the provided text matches the visible option text in your admin UI (case-sensitive).",
+  "name": "magento_admin_create_subcategory",
+  "description": "Create a subcategory under a specified parent category in Magento 1.x admin. Navigates to the Categories admin page, selects the parent category in the category tree, opens Add Subcategory, fills core fields (Name, Is Active, URL Key, Include in Navigation Menu, optional Description), and saves the category. Uses label-based XPaths and stable visible-text XPaths captured during a recorded session for reliability.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Categories admin page.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_base_url}/catalog_category/",
+      "url_operation": null
+    },
+    {
+      "description": "Brief wait for the admin page to load and any dynamic scripts to initialise.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Analyse the page to detect blocking popups or store view options before interacting.",
+      "output": "page_analysis",
+      "type": "extract_page_content",
+      "goal": "Confirm Categories admin page loaded and capture any blocking messages (e.g., incoming message popup)."
+    },
+    {
+      "description": "If an incoming message popup is present, click its 'close' link/button to dismiss it. (XPath matches common visible 'close' texts.)",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space() = 'close' or normalize-space() = 'Close']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Short wait after closing popup so the page becomes interactive.",
+      "output": null,
+      "type": "wait",
+      "seconds": 0.5
+    },
+    {
+      "description": "Select the parent category in the left tree by exact visible anchor text (use the provided {parent_category} parameter).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space() = '{parent_category}']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the category form to load after selecting the parent node.",
+      "output": null,
+      "type": "wait",
+      "seconds": 0.6
+    },
+    {
+      "description": "Click the 'Add Subcategory' button to open the new-subcategory form for the selected parent node.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space() = 'Add Subcategory']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the Add Subcategory form to appear and any WYSIWYG editor to initialise.",
+      "output": null,
+      "type": "wait",
+      "seconds": 0.8
+    },
+    {
+      "description": "If {store_view} is provided, select that store view from the 'Choose Store View' dropdown so store-scoped fields are editable. If {store_view} is empty this step selects no option (some controllers ignore empty selection).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//label[contains(normalize-space(.),'Choose Store View')]/following::select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{store_view}"
+    },
+    {
+      "description": "Enter the category Name using a label-based XPath (robust across Magento installs).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//label[normalize-space(.)='Name *' or normalize-space(.)='Name']/following::input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Set the 'Is Active' field to the visible option text (Yes/No). This XPath covers either a select or radio implementation.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//label[contains(normalize-space(.),'Is Active')]/following::select[1] | //label[contains(normalize-space(.),'Is Active')]/following::input[@type='radio'][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{is_active}"
+    },
+    {
+      "description": "Set the URL Key if provided. If {url_key} is empty the step will input an empty string (Magento will auto-generate a URL key on save).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//label[normalize-space(.)='URL Key']/following::input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{url_key}"
+    },
+    {
+      "description": "Set 'Include in Navigation Menu' to the visible option text (Yes/No).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//label[contains(normalize-space(.),'Include in Navigation Menu')]/following::select[1] | //label[contains(normalize-space(.),'Include in Navigation Menu')]/following::input[@type='radio'][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{include_in_menu}"
+    },
+    {
+      "description": "Optional: enter the Description text into the WYSIWYG/textarea field. If left empty no text is entered.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//label[normalize-space(.)='Description']/following::textarea[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{description}"
+    },
+    {
+      "description": "Click the 'Save Category' button in the form toolbar to submit and create the new subcategory.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space() = 'Save Category']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the save to complete and for the admin page to update (success message / tree refresh).",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.2
+    },
+    {
+      "description": "Extract page content to confirm creation (success notification text and new category header).",
+      "output": "creation_result",
+      "type": "extract_page_content",
+      "goal": "Verify that the category has been created/updated and capture the success message and the selected node header (e.g., 'Automation Women Hats (ID: 56)')."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base URL of the Magento admin (e.g. \"http://dockerized-magento.local/index.php/admin\"). Tool will navigate to {admin_base_url}/catalog_category/.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "parent_category",
+      "type": "string",
+      "format": null,
+      "description": "Exact visible tree anchor text of the parent category to select (include the count text if present). Example: \"Women (51)\". This value is used with an XPath: //a[normalize-space() = '{parent_category}'].",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Category Name (will be entered into the 'Name' text input). This field is required by Magento.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "is_active",
+      "type": "string",
+      "format": null,
+      "description": "Set the 'Is Active' field. Use the visible option text exactly as it appears (usually 'Yes' or 'No').",
+      "required": true,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "url_key",
+      "type": "string",
+      "format": null,
+      "description": "Optional URL Key for the category (e.g. \"women-hats-auto\"). Leave empty to let Magento generate a URL key.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "include_in_menu",
+      "type": "string",
+      "format": null,
+      "description": "Set the 'Include in Navigation Menu' field. Use visible option text (usually 'Yes' or 'No').",
+      "required": true,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "store_view",
+      "type": "string",
+      "format": null,
+      "description": "Optional store view to select from 'Choose Store View' dropdown before editing store-scoped fields (e.g. 'All Store Views', 'English'). If omitted the current selection remains unchanged.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "format": null,
+      "description": "Optional category Description (WYSIWYG/textarea). If provided the tool will input this into the Description textarea.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "display_mode",
+      "type": "string",
+      "format": null,
+      "description": "Optional Display Mode value to set under Display Settings tab.",
+      "required": false,
+      "enum": [
+        "Products only",
+        "Static block only",
+        "Static block and products"
+      ]
+    },
+    {
+      "name": "is_anchor",
+      "type": "string",
+      "format": null,
+      "description": "Optional 'Is Anchor' value for Display Settings. If omitted, the existing/global setting remains unchanged.",
+      "required": false,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    }
+  ]
+}

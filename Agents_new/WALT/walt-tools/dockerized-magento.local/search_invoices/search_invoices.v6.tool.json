@@ -1,0 +1,224 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session loads the Magento admin Invoices grid, fills filters (invoice increment id, order id, bill-to name, status, amount range), clicks Search to refresh the grid, then demonstrates Export (CSV), mass-action (PDF Invoices) and opening a specific invoice's View page. Selectors discovered are consistent with Magento 1.x admin grids: input[name='increment_id'], input[name='order_increment_id'], input[name='billing_name'], select[name='state'], input[name='grand_total[from]'], input[name='grand_total[to]'], button[title='Search'], anchors with href containing '/exportCsv' etc., select[id$='_massaction-select'], and row-scoped View links matching '/sales_invoice/view/invoice_id/<id>/'.\n\nTask Definition:\n- Provide a reusable, parameterized tool that: 1) navigates to the invoices grid, 2) applies user-supplied filters, 3) runs the Search, 4) returns the filtered rows and view-link hrefs, and 5) optionally performs export, mass-action, and opens a specified invoice. The tool must be robust to common Magento id/name variations and admin frontName differences.\n\nAction Plan (detailed to-do list):\n1) Navigate to provided invoices_url.\n2) Populate filter inputs by attribute selectors (name-based) for invoice #, order #, bill-to, status, amount from/to.\n3) Click Search and wait for grid to refresh.\n4) Extract search results (rows) and their view-link hrefs for verification.\n5) Agent-driven post-actions: export (navigate to export link), mass-action (select visible rows or specific checkboxes, choose action, click submit), open invoice view (click row-scoped View link). This step is agentic because ids and onclick handlers for export/massaction vary between installations and may require runtime detection and fallback selectors.\n6) Capture final page or export href used and return consolidated results.\n\nVariable Identification (input parameters):\n- invoices_url (required): full target URL for the invoices grid.\n- increment_id, order_increment_id, billing_name, state, grand_total_from, grand_total_to: filters applied to the grid (all optional except invoices_url).\n- export_format: one of exportCsv/exportExcel/exportXml to trigger export after filter application (optional).\n- perform_mass_action (bool) + mass_action_value (string): control mass-action execution; mass_action_value should be the option value (e.g., 'pdfinvoices_order') when known.\n- select_visible (bool): whether to click the page 'Select Visible' link before running mass-action.\n- open_invoice_number: invoice increment id to open (optional).\n- wait_seconds: time to wait for grid refresh (optional; default used in step is 2 seconds).\n\nStep Optimization:\n- Prefer attribute-based CSS selectors (input[name='increment_id'], select[name='state'], input[name='grand_total[from]']) because they are stable across themes and localization.\n- Use id$='_massaction-select' pattern for the massaction select since grid id prefixes vary per page; provide fallback name='massaction'.\n- For Search/Reset buttons use XPath by visible text and title attribute to avoid reliance on classes that may change across themes.\n- Replace extended UI-click sequences for export with a single navigation to the export anchor href when possible (the agent step will detect the correct export anchor href at runtime and navigate directly). This improves reliability and reduces flakiness from JS-heavy export controls.\n- Use an agentic step for post-filter interactions (export, mass-action, open) because these actions require runtime validation of element ids, hrefs, option values and may involve JS (onclick) handlers; deterministic static steps would be fragile.\n\nAssumptions and Constraints:\n- The agent is already logged into the Magento admin or the invoices_url is reachable without re-authentication. If a login screen appears, the automation must perform a login step first (login is not included here per instructions). \n- This tool targets Magento 1.x admin grids and uses common naming conventions found in core modules; custom modules or strongly modified themes may change attribute names/structures, so the agent step includes runtime checks and fallbacks.\n- The tool intentionally scopes queries to the grid container where possible (id contains 'sales_invoice_grid') to avoid collisions with other page elements.\n\nDeterministic Execution and Robustness:\n- Input-driven selectors avoid hardcoded sample values from the recording (e.g., invoice 100000040). When a specific row is to be opened, the tool uses row-scoped XPath that matches the provided invoice increment id.\n- Agent step handles optional behavior and runtime selector resolution, keeping the other steps strictly deterministic and sequential.\n\nThis tool focuses only on the essential steps for the original task: filter search, export, mass-action, and opening an invoice. It does not add unrelated navigation, sorting, or exploratory UI interactions.",
+  "name": "magento_admin_invoices_tool",
+  "description": "Locate invoices in a Magento 1.x admin invoices grid using column filters (invoice #, order #, bill-to name, status, amount range), then optionally export results, run a mass-action, or open a specific invoice. Uses attribute-based selectors found on standard Magento 1.x grids to be robust across themes and admin frontName changes.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento admin invoices grid page (starting point for all interactions).",
+      "output": null,
+      "type": "navigation",
+      "url": "{invoices_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Enter Invoice # into the Invoice # filter input (input[name='increment_id']). If empty, an empty value will be entered which leaves the filter unchanged.",
+      "output": null,
+      "cssSelector": "input[name='increment_id']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{increment_id}"
+    },
+    {
+      "description": "Enter Order # into the Order # filter input (input[name='order_increment_id']).",
+      "output": null,
+      "cssSelector": "input[name='order_increment_id']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{order_increment_id}"
+    },
+    {
+      "description": "Enter Bill to Name into the Bill to Name filter input (input[name='billing_name']).",
+      "output": null,
+      "cssSelector": "input[name='billing_name']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{billing_name}"
+    },
+    {
+      "description": "Set the Status filter (select[name='state']) by visible text (e.g., 'Paid'). If {state} is empty or 'Any' the agent step later will treat it as no-op; selecting 'Any' may not change the DOM selection.",
+      "output": null,
+      "cssSelector": "select[name='state']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{state}"
+    },
+    {
+      "description": "Set Amount 'From' filter (input[name='grand_total[from]']).",
+      "output": null,
+      "cssSelector": "input[name='grand_total[from]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{grand_total_from}"
+    },
+    {
+      "description": "Set Amount 'To' filter (input[name='grand_total[to]']).",
+      "output": null,
+      "cssSelector": "input[name='grand_total[to]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{grand_total_to}"
+    },
+    {
+      "description": "Click the Search button to apply the filters and refresh the invoices grid.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space()='Search'] | //button[@title='Search'] | //input[@value='Search']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the grid to refresh after clicking Search. Adjust {wait_seconds} at runtime if necessary.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture the grid results after filtering so the caller can inspect matches and target row link hrefs.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Extract filtered invoice rows: invoice increment id, order increment id, bill-to name, status, amount, and any row 'View' link hrefs. Output as 'search_results'."
+    },
+    {
+      "description": "Agentic step to handle optional branching and dynamic DOM differences (export, mass-action, open). This step is used because export and mass-action controls (ids/onclick) vary between installs and need runtime validation.",
+      "output": null,
+      "type": "agent",
+      "task": "Perform optional post-filter actions using the provided inputs: 1) If export_format is set, find an anchor under the grid whose href contains '/export' and the export format substring ('exportCsv','exportExcel' or 'exportXml') and navigate to it (open href). 2) If perform_mass_action is true: scope to the grid container (id contains 'sales_invoice_grid'), if {select_visible} is true click the 'Select Visible' control, then locate the massaction select (select[id$='_massaction-select' or name='massaction']) and choose option with value '{mass_action_value}' (or the first non-empty option if mass_action_value is empty), then locate and click the massaction submit button (id ending '_massaction-submit' or button/input with text 'Submit'). 3) If open_invoice_number is provided: find the table row with td text equal to '{open_invoice_number}' and click the 'View' link inside that row (anchor href contains '/sales_invoice/view/invoice_id/'). For each navigation or click, record the resolved href (for exports and View) and any resulting page URL. Use {invoices_url} as the base to scope selectors and detect admin frontName differences. Return a JSON object summarizing actions taken and any hrefs navigated to.",
+      "max_steps": null
+    },
+    {
+      "description": "Final extraction to report results of export/mass-action/open operations so the caller can confirm outcomes.",
+      "output": "post_action_result",
+      "type": "extract_page_content",
+      "goal": "After post-actions: capture final page URL (if navigated) and brief page title/heading or export link used; output as 'post_action_result'."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "invoices_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL to the Magento admin invoices grid page (example: \"http://dockerized-magento.local/index.php/admin/sales_invoice/\"). The tool will navigate here first.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Invoice increment id to filter by (matches input[name='increment_id']). Leave empty to skip this filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "order_increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Order increment id to filter by (matches input[name='order_increment_id']). Leave empty to skip this filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "billing_name",
+      "type": "string",
+      "format": null,
+      "description": "Bill to Name filter (matches input[name='billing_name']). Leave empty to skip this filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "state",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the Status filter (select[name='state']). Use visible option text (e.g., 'Paid'). Leave empty or 'Any' to not constrain by status.",
+      "required": false,
+      "enum": [
+        "Any",
+        "Pending",
+        "Paid",
+        "Canceled"
+      ]
+    },
+    {
+      "name": "grand_total_from",
+      "type": "string",
+      "format": null,
+      "description": "Amount range - From value (matches input[name='grand_total[from]']). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grand_total_to",
+      "type": "string",
+      "format": null,
+      "description": "Amount range - To value (matches input[name='grand_total[to]']). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "If set, the tool will trigger the corresponding export format after applying filters. Use 'exportCsv', 'exportExcel', or 'exportXml'. Leave empty to skip export.",
+      "required": false,
+      "enum": [
+        "exportCsv",
+        "exportExcel",
+        "exportXml"
+      ]
+    },
+    {
+      "name": "perform_mass_action",
+      "type": "bool",
+      "format": null,
+      "description": "If true, the tool will select the invoice row(s) found and attempt to run the mass-action identified by mass_action_value (e.g., PDF Invoices).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "mass_action_value",
+      "type": "string",
+      "format": null,
+      "description": "The option value (not visible text) to select in the massaction dropdown. Example seen on the page: 'pdfinvoices_order'. If empty and perform_mass_action is true, the tool will attempt to pick the first available action.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "select_visible",
+      "type": "bool",
+      "format": null,
+      "description": "If true and perform_mass_action is true, the tool will click the 'Select Visible' control to select all visible rows before executing mass-action.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "open_invoice_number",
+      "type": "string",
+      "format": null,
+      "description": "Invoice increment id to open after filtering (e.g., '100000040'). If provided the tool will navigate to that invoice's View page by locating the row-scoped View link.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait after clicking Search to allow the grid to refresh. Default: 2.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

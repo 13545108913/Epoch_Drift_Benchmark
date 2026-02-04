@@ -1,0 +1,221 @@
+{
+  "tool_analysis": "Step Analysis:\n- Recorded browser interactions navigated to Magento Admin -> Online Customers, closed an information overlay, located the grid filter row and its inputs, filled ID, First Name, Email, Last URL and Type select, and clicked Search. The IP filter in the static snapshot was absent (JS disabled), so an nth-child column selector was used as the expected IP input target. Stable element hashes were recorded for the overlay close, several filter inputs, the Type select, and the Search button.\n\nTask Definition:\n- Create a reusable tool that navigates to the Online Customers admin grid, closes blocking overlays, fills the standard grid filter fields (ID range, first name, email, IP, type, last URL, optional date ranges), clicks Search, and extracts the filtered results into a structured output.\n\nAction Plan (detailed):\n1) Navigate to the Online Customers grid URL.\n2) Wait briefly for DOM to stabilize.\n3) Close the incoming message overlay (recorded elementHash). This is essential because it blocks filter fields visually/interaction-wise.\n4) Fill the ID 'From' and 'To' fields. The 'From' input has a recorded elementHash; the 'To' field did not, so use a column-position CSS selector for the second input in the ID cell.\n5) Fill First Name, Email and Last URL using recorded elementHash selectors for reliability.\n6) Fill IP address using a column-position selector anchored to the filter row (6th column). Note: on the recorded page the IP input was absent when JS was disabled; the selector will resolve only if the control exists. Recommend ensuring JS is enabled when running.\n7) Set the Type dropdown using recorded elementHash and visible option text.\n8) Click the Search button (recorded elementHash) to apply filters.\n9) Wait briefly and extract the grid rows and columns into structured output.\n\nVariable Identification (inputs required):\n- id_from (string) \u2014 ID lower bound (optional)\n- id_to (string) \u2014 ID upper bound (optional)\n- first_name (string) \u2014 first name filter (optional)\n- email (string) \u2014 email filter (optional)\n- ip_address (string) \u2014 IP address (optional; may require JS to be visible)\n- type (string) \u2014 select option: 'Customer','Visitor','All' (optional)\n- last_url (string) \u2014 last URL filter (optional)\n- session_start_from, session_start_to, last_activity_from, last_activity_to (strings) \u2014 optional date range filters\n\nStep Optimization and Deterministic Choices:\n- Where stable elementHash values were recorded (overlay close, First Name, Email, Last URL, Type select, Search button, ID-from) they are used for deterministic interactions.\n- For elements not present in the static DOM (ID 'To' and IP input), column-position CSS selectors (tr.filter td:nth-child(N) input) are supplied; these are deterministic if the grid structure and column order remain unchanged.\n- The tool avoids conditional branching; all steps are executed in sequence and empty input values are typed when parameters are not provided (this keeps execution deterministic). Consumers should pass empty string for fields they do not wish to set.\n- Important limitation: the recorded session showed JavaScript disabled which removed the IP input from the static DOM. The tool includes a selector for the IP cell but enabling JS before running yields the most reliable results. If running in an environment where JS is disabled, the IP input will not be found and the IP input step will be a no-op.\n\nNotes on reliability:\n- Prefer replacing the column-position selectors with a stable grid id (e.g. #customerGrid) if available in a target environment; the tool's selectors are written to be robust across standard Magento 1.x admin grids.\n- All UI interactions assume the agent is already authenticated (recording logged in). The tool does not perform authentication.\n\nVersion: 2026-02-01",
+  "name": "magento_admin_online_customers_filter",
+  "description": "Navigate to Magento admin 'Online Customers' grid, close overlay, fill the grid filter controls (ID, first name, email, IP, Type, Last URL), click Search, and extract the filtered results. Uses recorded stable element hashes where available and robust column-position selectors for controls that were not present in the static DOM (IP).",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Online Customers grid (starting page for this tool).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/customer_online/",
+      "url_operation": null
+    },
+    {
+      "description": "Short wait for page DOM to stabilize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Close the 'Incoming Message' overlay if present (recorded elementHash for the overlay close link).",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Allow overlay to close and page to reflow.",
+      "output": null,
+      "type": "wait",
+      "seconds": 0.5
+    },
+    {
+      "description": "Type ID 'From' value into the ID filter input (recorded stable elementHash).",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_customer_id_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th/div/div/input",
+      "elementTag": "input",
+      "elementHash": "39a8e4b87a",
+      "type": "input",
+      "value": "{id_from}"
+    },
+    {
+      "description": "Type ID 'To' value into the second ID filter input. No recorded elementHash for the 'To' input; use column-position selector (nth-child) to reach the second input in the ID cell.",
+      "output": null,
+      "cssSelector": "tr.filter td:nth-child(1) input:nth-of-type(2)",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{id_to}"
+    },
+    {
+      "description": "Type First Name filter into the First Name filter input (recorded elementHash).",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_firstname",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "f70a21afd3",
+      "type": "input",
+      "value": "{first_name}"
+    },
+    {
+      "description": "Type Email filter into the Email filter input (recorded elementHash).",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_email",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th[5]/div/input",
+      "elementTag": "input",
+      "elementHash": "2e6ef5fa64",
+      "type": "input",
+      "value": "{email}"
+    },
+    {
+      "description": "Type IP address into the IP Address filter cell at column position 6. This selector targets the filter cell where the IP input should appear (recorded DOM showed the IP input may be absent when JS is disabled).",
+      "output": null,
+      "cssSelector": "tr.filter td:nth-child(6) input",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{ip_address}"
+    },
+    {
+      "description": "Set the Type select (recorded elementHash). Use 'Customer' or 'Visitor'. If '{type}' is 'All' an empty selection will be attempted (select unchanged).",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_type",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "068ccb660c",
+      "type": "select_change",
+      "selectedText": "{type}"
+    },
+    {
+      "description": "Type Last URL filter into the Last URL input (recorded elementHash).",
+      "output": null,
+      "cssSelector": "#onlineGrid_filter_last_url",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/table/thead/tr[2]/th[10]/div/input",
+      "elementTag": "input",
+      "elementHash": "5e5ed49cc3",
+      "type": "input",
+      "value": "{last_url}"
+    },
+    {
+      "description": "Click the 'Search' button to apply the grid filters (recorded elementHash for Search button).",
+      "output": null,
+      "cssSelector": "#id_7673cab1961aaa9349f3e8e76f114da8",
+      "xpath": "html/body/div/div[8]/div/div[3]/table/tbody/tr/td[2]/button[2]",
+      "elementTag": "button",
+      "elementHash": "4855d22150",
+      "type": "click"
+    },
+    {
+      "description": "Wait for filter results to load/update; short pause for grid refresh.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Collect the resulting grid into structured output (rows + columns).",
+      "output": "filtered_online_customers",
+      "type": "extract_page_content",
+      "goal": "Extract the Online Customers grid rows and columns after filters applied (capture all visible rows, each row's columns: ID, First Name, Middle Name, Last Name, Email, IP Address, Session Start Time, Last Activity, Type, Last URL)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "id_from",
+      "type": "string",
+      "format": null,
+      "description": "Lower-bound ID value (enter as plain number). Will be typed into the 'From' control for the ID column.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "id_to",
+      "type": "string",
+      "format": null,
+      "description": "Upper-bound ID value (enter as plain number). If provided, will be typed into the 'To' control for the ID column. If left empty an empty value will be submitted.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "first_name",
+      "type": "string",
+      "format": null,
+      "description": "Customer first name filter (partial or full).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": null,
+      "description": "Customer email filter (full email or partial).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "ip_address",
+      "type": "string",
+      "format": null,
+      "description": "IP address to filter by (IPv4 or IPv6 string). Note: recorded page showed the IP filter may require JavaScript to appear; selector will target the 6th filter cell.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "format": null,
+      "description": "Select filter for the Type column. Use 'Customer' or 'Visitor' (or 'All' to leave unchanged).",
+      "required": false,
+      "enum": [
+        "Customer",
+        "Visitor",
+        "All"
+      ]
+    },
+    {
+      "name": "last_url",
+      "type": "string",
+      "format": null,
+      "description": "Last URL path or partial string to match (e.g. '/checkout/cart').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "session_start_from",
+      "type": "string",
+      "format": null,
+      "description": "Session Start 'From' date/time string as expected by admin locale (if you want to filter by session start).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "session_start_to",
+      "type": "string",
+      "format": null,
+      "description": "Session Start 'To' date/time string as expected by admin locale.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_activity_from",
+      "type": "string",
+      "format": null,
+      "description": "Last Activity 'From' date/time string as expected by admin locale.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_activity_to",
+      "type": "string",
+      "format": null,
+      "description": "Last Activity 'To' date/time string as expected by admin locale.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

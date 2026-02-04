@@ -1,0 +1,287 @@
+{
+  "tool_analysis": "Step Analysis:\n- This recorded session logs a full admin product edit flow on Magento CE 1.9.x: open product edit URL, handle admin login (already authenticated), edit General attributes (name, SKU, weight, status, visibility), switch to Prices tab to edit price, switch to Categories/Websites tabs to assign categories and websites, switch to Inventory tab to set Manage Stock/Qty/Stock Availability, and Save. The session also demonstrated Save and Continue Edit, Duplicate and Delete actions; for reliability and single-purpose design this tool focuses on editing and saving product data.\n\nTask Definition:\n- Purpose: provide a reusable, parameterized tool that opens the Magento admin product edit screen for a given product_id, updates supplied product fields (General, Prices, Inventory, Category/Website assignments), and saves changes. The tool assumes an authenticated admin session is available.\n\nAction Plan (detailed to-do list):\n1) Navigate to the product edit URL: /admin/catalog_product/edit/id/{product_id}/\n2) Confirm form loaded and extract form_key for verification.\n3) Flush any WYSIWYG editors (tinyMCE) so HTML is synced to textareas.\n4) Update General tab fields: name, sku, weight, status, visibility.\n5) Open Prices tab and update price.\n6) Assign categories (variable list) via a small DOM script (agentic step) to handle tree checkboxes and dynamic expansions.\n7) Assign websites (variable list) via DOM script to find inputs[name='product[website_ids][]'] by value.\n8) Open Inventory tab and set manage_stock, qty, is_in_stock.\n9) Click the requested Save action (Save or Save and Continue Edit) and wait for completion.\n10) Extract page confirmation and re-read saved fields for verification.\n\nVariable Identification (inputs required):\n- product_id (required): used to build the edit URL.\n- name, description_html, short_description_html, sku, weight, price: field values to write.\n- status, visibility: visible option labels to select.\n- category_ids: comma-separated list of category ids to check.\n- website_ids: comma-separated list of website ids to check.\n- manage_stock, qty, is_in_stock: inventory settings.\n- save_button_title: exact toolbar button label to click (e.g., 'Save' or 'Save and Continue Edit').\n\nStep Optimization:\n- Navigation: use direct URL navigation to product edit (faster and deterministic).\n- Deterministic selectors: prefer id and name selectors (input#name, input#sku, input#price, select[name='product[stock_data][is_in_stock]']). When interacting with dynamic lists (categories/websites) use small DOM scripts (agent steps) that accept comma-separated ids to avoid brittle per-row selectors or loops encoded in static steps.\n- WYSIWYG: flush TinyMCE using a short agent script (tinyMCE.triggerSave) before switching tabs or saving; this avoids losing editor content.\n- Waits & loaders: rely on page-ready checks and success message extraction after Save. The agent steps include instructions to wait for #loading-mask or ajax-loader images when necessary.\n\nNotes and constraints:\n- The tool does not perform authentication; it assumes the automation context already has an authenticated admin session.\n- The tool focuses on editing and saving changes only (single-purpose). Duplicate and Delete were demonstrated in the recorded session but are intentionally excluded to keep the tool deterministic and safe.\n- The Categories and Websites assignments are implemented as agentic steps (scripts) because they require reading runtime DOM values (checkbox value attributes) and iterating over variable lists \u2014 this avoids fragile fixed-step enumerations.\n\nSelectors used (examples):\n- General: form#product_form input#name, input#sku, input#weight, select#status, select#visibility\n- Prices: input#price (input[name='product[price]'])\n- Categories: input[type='checkbox'][value='{category_id}'] inside the categories pane\n- Websites: input[name='product[website_ids][]'][value='{website_id}']\n- Inventory: select[name='product[stock_data][manage_stock]'], input[name='product[stock_data][qty]'], select[name='product[stock_data][is_in_stock]']\n\nThis tool converts the recorded interactive flow into a reusable, parameter-driven sequence that is deterministic where possible and uses small agentic scripts for dynamic list operations.",
+  "name": "magento_admin_edit_product",
+  "description": "Edit a Magento CE 1.x product in the admin product edit screen and save changes. Navigates to the product edit URL, flushes WYSIWYG editors, updates General/Prices/Inventory fields, assigns categories and websites (via JS), and saves. Assumes the automation session is already authenticated as an admin user.",
+  "version": "2026-02-02-1",
+  "steps": [
+    {
+      "description": "Open the product edit page for the specified product id.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/catalog_product/edit/id/{product_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Verify the edit form exists (form#product_form or form#product_edit_form) and capture form_key and presence of WYSIWYG editors.",
+      "output": "form_meta",
+      "type": "extract_page_content",
+      "goal": "Confirm product edit form loaded and extract hidden form_key if present (for verification)"
+    },
+    {
+      "description": "Ensure editor content is committed to textareas before inputs or tab switches.",
+      "output": null,
+      "type": "agent",
+      "task": "Flush any active WYSIWYG editors so HTML content in description and short_description is copied to their underlying textareas. Execute tinyMCE.triggerSave() if tinyMCE exists; otherwise copy iframe body innerHTML into the related textarea ids 'description' and 'short_description'.",
+      "max_steps": 4
+    },
+    {
+      "description": "Set the product name (input#name). If {name} is empty the input will be left as provided (caller should supply value when update desired).",
+      "output": null,
+      "cssSelector": "form#product_form input#name, form#product_edit_form input#name, input#name",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Set the SKU (input#sku).",
+      "output": null,
+      "cssSelector": "form#product_form input#sku, input#sku",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Set the product weight (input#weight).",
+      "output": null,
+      "cssSelector": "form#product_form input#weight, input#weight",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{weight}"
+    },
+    {
+      "description": "Select Status by visible label (e.g. 'Enabled' / 'Disabled').",
+      "output": null,
+      "cssSelector": "form#product_form select#status, select[name='product[status]'], select#status",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Select Visibility by visible label (e.g. 'Catalog, Search').",
+      "output": null,
+      "cssSelector": "form#product_form select#visibility, select[name='product[visibility]'], select#visibility",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{visibility}"
+    },
+    {
+      "description": "Open the Prices tab to access price fields. Uses visible tab link text to switch tab.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='Prices' or contains(.,'Prices')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Set the Price field in the Prices tab (input#price).",
+      "output": null,
+      "cssSelector": "form#product_form input#price, input#price, input[name='product[price]']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{price}"
+    },
+    {
+      "description": "Select categories by id using a script (handles variable-length list and tree expansion).",
+      "output": null,
+      "type": "agent",
+      "task": "If {category_ids} is provided (comma-separated), for each id in the list locate input[type='checkbox'][value='{id}'] within the Categories tab container and click to ensure it is checked. Use label/ancestor scoping if direct value selector not present. Wait for any AJAX loaders (#loading-mask or ajax-loader images) between interactions.",
+      "max_steps": 6
+    },
+    {
+      "description": "Select website checkboxes by value or by nearby label text using a small DOM script, then wait for any UI refresh.",
+      "output": null,
+      "type": "agent",
+      "task": "If {website_ids} is provided (comma-separated), locate inputs[name='product[website_ids][]'][value='{id}'] for each id and click to set website assignments. If no direct input is present, find the checkbox closest to the label text matching the website name (e.g., 'Main Website' / 'Madison Island').",
+      "max_steps": 6
+    },
+    {
+      "description": "Open the Inventory tab so stock controls are visible.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='Inventory' or contains(.,'Inventory')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Set Manage Stock (select 'Yes' or 'No') in Inventory. If {manage_stock} empty this step will attempt a no-op selection.",
+      "output": null,
+      "cssSelector": "select[name='product[stock_data][manage_stock]'], select#product_manage_stock, select#manage_stock",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{manage_stock}"
+    },
+    {
+      "description": "Set Qty (product[stock_data][qty]).",
+      "output": null,
+      "cssSelector": "input[name='product[stock_data][qty]'], input#qty, input#stock_qty",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{qty}"
+    },
+    {
+      "description": "Set Stock Availability by visible label (e.g., 'In Stock'/'Out of Stock').",
+      "output": null,
+      "cssSelector": "select[name='product[stock_data][is_in_stock]'], select#is_in_stock, select#stock_data_is_in_stock",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{is_in_stock}"
+    },
+    {
+      "description": "Click the top-of-form save action. Provide exact save_button_title such as 'Save' or 'Save and Continue Edit'. If omitted, default 'Save' should be used by the caller.",
+      "output": null,
+      "cssSelector": "button[title='{save_button_title}'], button[onclick*='{save_button_title}'], //button[contains(normalize-space(.), '{save_button_title}')]",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Capture the success message and re-read core fields to confirm persistence.",
+      "output": "save_result",
+      "type": "extract_page_content",
+      "goal": "Verify save success: wait for the success message (e.g. 'The product has been saved.' or similar) and extract updated values for verification (name, sku, price, qty, stock availability)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "product_id",
+      "type": "string",
+      "format": null,
+      "description": "Product numeric id (from admin URL). Used to build the product edit URL (example: '2796').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Product name. Maps to form input id '#name' (product[name]). Leave empty to not change.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "description_html",
+      "type": "string",
+      "format": null,
+      "description": "Full description HTML. Will be written to the WYSIWYG-backed description textarea (will flush TinyMCE).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "short_description_html",
+      "type": "string",
+      "format": null,
+      "description": "Short description HTML. Will be written to the WYSIWYG-backed short_description textarea.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "format": null,
+      "description": "Product SKU. Maps to input#sku (product[sku]).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "weight",
+      "type": "string",
+      "format": null,
+      "description": "Product weight. Maps to input#weight (product[weight]). Use dot decimal (e.g. '4.50').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price",
+      "type": "string",
+      "format": null,
+      "description": "Product base price. Maps to input#price (product[price]). Use dot decimal (e.g. '24.99').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Visible option label to select in Status dropdown (e.g. 'Enabled' or 'Disabled'). Automation selects by visible text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visibility",
+      "type": "string",
+      "format": null,
+      "description": "Visible option label to select in Visibility dropdown (e.g. 'Catalog, Search'). Automation selects by visible text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "category_ids",
+      "type": "string",
+      "format": null,
+      "description": "Comma-separated list of category ids to check in the Categories tree (e.g. '75,63'). The tool will locate checkboxes by value attribute and toggle them ON.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "website_ids",
+      "type": "string",
+      "format": null,
+      "description": "Comma-separated list of website ids to check in the Websites panel (e.g. '1,2'). The tool will locate inputs[name='product[website_ids][]'][value='{id}'] and click them.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "manage_stock",
+      "type": "string",
+      "format": null,
+      "description": "Manage Stock value: use visible option 'Yes' or 'No' (automation selects by visible text). Maps to product[stock_data][manage_stock].",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty",
+      "type": "string",
+      "format": null,
+      "description": "Quantity value to set in inventory (product[stock_data][qty]). Provide integer/decimal as string (e.g. '150').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_in_stock",
+      "type": "string",
+      "format": null,
+      "description": "Stock Availability visible label to select (e.g. 'In Stock' or 'Out of Stock'). Automation selects by visible text or option value ('1'/'0').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "save_button_title",
+      "type": "string",
+      "format": null,
+      "description": "Exact visible title/text of the top toolbar save action to click after edits. Example: 'Save' or 'Save and Continue Edit'. If omitted defaults to 'Save'. Use the exact label as rendered in the admin.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

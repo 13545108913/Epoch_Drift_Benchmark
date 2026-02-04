@@ -1,0 +1,141 @@
+{
+  "tool_analysis": "Step Analysis: The recorded browser session logs show a complete interaction: login (handled earlier), closing a notification popup, opening Add Root/Add Subcategory form, filling Name and Is Active, saving, and verifying success. Selectors recorded include element hashes for popup close and several clicks; label-anchored XPaths were used for inputs and save.\n\nTask Definition: A reusable tool that creates a category (root or subcategory) in Magento Admin > Catalog > Manage Categories using robust selectors (label-anchored XPaths and recorded element hashes for overlays) and confirms success.\n\nAction Plan (detailed steps):\n- Navigate to the categories manager URL.\n- Close any notification overlay that blocks controls (recorded close link elementHash used).\n- Agentic step: choose between creating a root or subcategory. If 'sub', click the provided parent category link text then click Add Subcategory. If 'root', click Add Root Category. Wait for the form.\n- Fill required fields: Name (label-based XPath) and Is Active (select/radio).\n- Agentic step to set optional fields such as URL Key when provided.\n- Click Save Category and wait for save.\n- Extract page content to confirm success message and presence of new node in the category tree.\n\nVariable Identification (inputs required):\n- create_type (root|sub): required because the UI path differs.\n- parent_category (string): required by the admin UI when creating a subcategory; provided as exact visible anchor text.\n- name (string): required (Name *).\n- url_key (string): optional; may be absent on some installations or hidden by store scope.\n- is_active (Yes|No): required by the Magento form.\n- starting_url (string): optional override of the recorded starting URL.\n\nStep Optimization and Notes:\n- Prefer label-anchored XPaths for inputs (//label[...] / following::input[1]) because Magento admin can vary IDs and names across installations; this is implemented in input/select steps.\n- Use the recorded elementHash for the popup close to ensure overlay removal; overlay close is necessary to avoid blocked controls.\n- Use an agent step to handle branching (root vs sub) and to handle optional fields (URL Key) because the static, linear step list cannot cleanly encode conditional actions without becoming brittle. Agent steps include clear tasks and limited max_steps to keep execution deterministic.\n- Keep waits short and deterministic; rely on form appearance checks inside agent steps where needed.\n\nWarnings and assumptions:\n- This tool assumes the session is already authenticated as an admin and JavaScript is enabled in the browser. The recorded session indicated a 'JavaScript seems to be disabled' banner earlier; that must not be present in the execution environment for the tree and add/subcategory actions to work reliably.\n- The parent_category parameter should match the visible anchor text exactly (including counts in parentheses) for deterministic selection, or include a unique fragment if the agent can find the correct node.\n- Because some fields (URL Key) were not visible in the recorded snapshot, they are treated as optional and set by an agentic fallback when present.\n\nSelector stability guidance:\n- Primary: label-based XPaths and title-based button XPaths (implemented above).\n- Secondary: elementHash is used only for the popup close (stable overlay control recorded during session).\n- The agent steps are used sparingly to handle variations that cannot be expressed deterministically in a single static sequence (branching and optional controls).\n\nThis tool implements only the essential interactions required to create and save a category (root or subcategory) and confirm success. It intentionally avoids extra filtering/sorting or non-essential UI explorations.",
+  "name": "magento_admin_category_create",
+  "description": "Create a category (root or subcategory) in Magento Admin Catalog > Manage Categories using recorded, robust selectors. Assumes an authenticated admin session is already present and JavaScript is enabled in the browser session.",
+  "version": "2026-02-02",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Admin Categories manager. If {starting_url} is blank the execution environment should use the currently loaded admin page.",
+      "output": null,
+      "type": "navigation",
+      "url": "{starting_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Close the 'Incoming Message' notification popup if present (recorded close control). This removes overlays that block the toolbar and form controls.",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[7]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Agentic step to handle branching (select parent node when creating subcategory or click Add Root). This uses visible-text XPaths so the tool can work for different parent names. Limit retries and waits to 5 attempts.",
+      "output": "open_form_state",
+      "type": "agent",
+      "task": "Choose creation path and open the category creation form based on {create_type} and {parent_category}. If create_type == 'sub' then: find the parent category anchor by XPath //a[normalize-space(.)='{parent_category}'] and click it, then click the 'Add Subcategory' control (match //button[normalize-space(.)='Add Subcategory'] | //a[normalize-space(.)='Add Subcategory']). If create_type == 'root' then click the 'Add Root Category' control (match //button[normalize-space(.)='Add Root Category'] | //a[normalize-space(.)='Add Root Category']). Wait for the category form to appear (General Information section).",
+      "max_steps": 5
+    },
+    {
+      "description": "Short wait to allow the category form to fully render after opening.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Enter the provided category name into the 'Name *' input (label-anchored XPath to be robust to id/name differences).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//label[normalize-space(.)='Name *' or normalize-space(.)='Name']/following::input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Agentic handling for optional fields (URL Key, store view adjustments). This avoids brittle conditional branching in the static step list.",
+      "output": "optional_fields_set",
+      "type": "agent",
+      "task": "Set optional fields provided by inputs: if {url_key} is non-empty, find the URL Key field using XPath //label[normalize-space(.)='URL Key']/following::input[1] and input {url_key}. If the store view selector or other scope controls must be changed, perform those actions using label-anchored selectors. If any of these optional controls are not present, skip them.",
+      "max_steps": 4
+    },
+    {
+      "description": "Set the 'Is Active' field. This targets the select control when present. If the UI uses radio inputs instead of a select, the agent step above will handle the alternate input type.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//label[normalize-space(.)='Is Active *' or normalize-space(.)='Is Active']/following::select[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{is_active}"
+    },
+    {
+      "description": "Click the top 'Save Category' action to save the new category.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space(.)='Save Category' or @title='Save Category'][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the save operation and admin messages to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Check the page for a success flash message and for the presence of the new category anchor in the tree.",
+      "output": "save_confirmation",
+      "type": "extract_page_content",
+      "goal": "Confirm creation succeeded by extracting any admin success message (look for text like 'The category has been saved.') and capture the category tree snapshot to verify the new node is present under the intended parent."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "create_type",
+      "type": "string",
+      "format": null,
+      "description": "Type of category to create. Use 'root' to create a root category or 'sub' to create a subcategory under an existing category.",
+      "required": true,
+      "enum": [
+        "root",
+        "sub"
+      ]
+    },
+    {
+      "name": "parent_category",
+      "type": "string",
+      "format": null,
+      "description": "Exact visible text of the parent category anchor when creating a subcategory (example: 'Default Category (1893)'). Required when create_type='sub'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Category name (visible 'Name *' field). Provide the exact text to enter into the Name field.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "url_key",
+      "type": "string",
+      "format": null,
+      "description": "URL Key for the new category (maps to the 'URL Key' field). Optional \u2014 leave blank if you want Magento to autogenerate.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_active",
+      "type": "string",
+      "format": null,
+      "description": "Set whether the category is active. Must be 'Yes' or 'No'. This maps to the 'Is Active *' select/radio.",
+      "required": true,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "starting_url",
+      "type": "string",
+      "format": null,
+      "description": "Admin Categories start URL. Use the site-specific admin URL if different from the recorded one. Example: 'http://dockerized-magento.local/index.php/admin/catalog_category/'",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

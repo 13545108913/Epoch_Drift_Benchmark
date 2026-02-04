@@ -1,0 +1,174 @@
+{
+  "tool_analysis": "Step Analysis: The recorded browser session visits a Magento 1 admin invoices grid, enumerates filters (invoice, order, bill-to, status, date, amount), applies filters, exports CSV, performs a mass action (PDF Invoices), selects the row checkbox, then opens the invoice 'View' link to inspect invoice detail page. Task Definition: Create a reusable automation tool that applies invoice grid filters, runs Search, optionally exports results, optionally executes mass 'PDF Invoices', and optionally opens an invoice view to capture invoice-detail selectors and values. Action Plan: 1) Navigate to the invoices grid. 2) Apply provided filters using positional selectors tied to the grid id (default sales_invoice_grid). 3) Click Search to apply filters. 4) Extract grid summary and first row details (invoice increment id and view link). 5) Optionally export results in requested format. 6) Optionally perform massaction PDF: ensure checkbox selected, select option, submit, and capture messages. 7) Optionally open invoice view by direct navigation to captured href and extract invoice number, totals, and print/PDF link. Variable Identification: Inputs identified: invoice_increment_id, order_increment_id, bill_to_name, status, amount_from, amount_to, export_format, perform_massaction_pdf (bool), open_invoice_view (bool), grid_id (string, default 'sales_invoice_grid'). Step Optimization: Use direct href navigation for opening invoice detail pages; prefer href-based selectors for export and view links; rely on grid id '#sales_invoice_grid' for positional selectors. Replace UI-heavy steps where URL operations suffice (e.g., exporting via export link). Use agentic steps for dynamic actions (filling filters, selecting massaction option) to keep resilience when attributes differ. The tool avoids non-essential exploratory steps and focuses only on the essential interactions required by the original task.",
+  "name": "magento_admin_invoices_tool_v2",
+  "description": "Automates locating and interacting with Magento 1 admin Invoices grid: apply filters (invoice#, order#, bill-to, status, date range, amount range), run Search, export results (CSV/Excel/XML), perform mass actions (PDF Invoices), select invoice rows, and open invoice view. Uses stable selectors based on #sales_invoice_grid where possible and falls back to XPath when needed.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Admin Invoices grid page.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_invoice/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the grid page to load and JavaScript to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Inputs are applied only when the corresponding parameter is provided. Use positional selectors '#{grid_id} thead tr.filter th:nth-child(N) input/select' to target filters. Limit attempts to 6 steps.",
+      "output": "filters_applied",
+      "type": "agent",
+      "task": "Fill grid filter inputs using provided parameters (invoice_increment_id, order_increment_id, bill_to_name, status, amount_from, amount_to) using positional selectors under the grid header row. Do not change filters if parameter is empty.",
+      "max_steps": 6
+    },
+    {
+      "description": "Click the Search / Apply Filters button to apply the grid filters and refresh the results.",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to update after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Read grid results to determine if any rows matched and capture the first row's View link href (invoice detail URL) and the invoice numeric id if present in href.",
+      "output": "grid_summary",
+      "type": "extract_page_content",
+      "goal": "Capture number of results, first invoice row details (invoice id, invoice increment id, view link href) and presence of massaction/export controls."
+    },
+    {
+      "description": "Exports the current filtered grid to the requested format. Use href-based selectors //a[contains(@href,'export') and contains(.,'{export_format}')] or select[name*='export'] when present. Limit to 4 steps.",
+      "output": "export_action",
+      "type": "agent",
+      "task": "If {export_format} is provided, locate the export link matching the format (CSV/Excel/XML) by href containing 'export' and link text containing the export format; click it to trigger download. If link is inside a select, choose the option then click the adjacent Export button.",
+      "max_steps": 4
+    },
+    {
+      "description": "Wait for export request/download to initiate.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Performs mass PDF action for selected invoices. Uses select[name*='massaction'] and massaction submit button selectors. Limit to 6 steps.",
+      "output": "massaction_result",
+      "type": "agent",
+      "task": "If perform_massaction_pdf is true, ensure at least one row checkbox is selected (select first row checkbox if none), select the massaction option 'PDF Invoices' by visible text and submit the massaction form. Store any flash messages found in '#messages' selectors.",
+      "max_steps": 6
+    },
+    {
+      "description": "Wait for the massaction to process and any resulting downloads or messages to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Open invoice detail page and capture stable selectors and values for invoice number, totals, and PDF/Print link. Limit to 6 steps.",
+      "output": "invoice_detail",
+      "type": "agent",
+      "task": "If open_invoice_view is true and a view link was found in grid_summary, click the exact captured view link href to open the invoice detail page (use direct navigation to the href to avoid JS click handlers). Then extract invoice detail fields: invoice number heading, grand total, and print/PDF link href (href containing '/print/invoice_id/{id}/' or '/print/').",
+      "max_steps": 6
+    },
+    {
+      "description": "Aggregates captured data and returns a concise summary useful for automation and verification.",
+      "output": "final_report",
+      "type": "extract_page_content",
+      "goal": "Return final consolidated results: filters applied, grid_summary, export_action, massaction_result, invoice_detail (if opened)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "invoice_increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Invoice increment id to filter on (e.g., '100000040'). Leave empty to skip this filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "order_increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Order increment id to filter on (e.g., '100000210'). Leave empty to skip this filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "bill_to_name",
+      "type": "string",
+      "format": null,
+      "description": "Billing name to filter on (e.g., 'John Doe'). Leave empty to skip this filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Invoice status filter. Use visible option text exactly as shown (e.g., 'Paid', 'Pending', 'Canceled'). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "amount_from",
+      "type": "string",
+      "format": null,
+      "description": "Lower bound for Amount filter (numeric string, e.g., '0'). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "amount_to",
+      "type": "string",
+      "format": null,
+      "description": "Upper bound for Amount filter (numeric string, e.g., '100'). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Export format to use when exporting grid results. Choose one of CSV, Excel, or XML. Leave empty to skip export.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "perform_massaction_pdf",
+      "type": "bool",
+      "format": null,
+      "description": "If true, select visible invoice rows and perform mass action 'PDF Invoices' then submit. Default false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "open_invoice_view",
+      "type": "bool",
+      "format": null,
+      "description": "If true, open the first matching invoice 'View' link after filters are applied and capture invoice detail selectors. Default false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grid_id",
+      "type": "string",
+      "format": null,
+      "description": "ID of the invoices grid table. Default 'sales_invoice_grid'. Change only if your installation uses a different grid id.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

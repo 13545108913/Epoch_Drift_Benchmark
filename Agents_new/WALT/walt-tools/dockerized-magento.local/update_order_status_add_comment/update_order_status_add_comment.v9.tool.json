@@ -1,0 +1,97 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigates to a Magento admin order view URL for an internal order id (example order_id=204), enters text into the 'Add Order Comments' textarea, chooses a status from the Status dropdown, checks 'Notify Customer by Email' and 'Visible on Frontend' checkboxes, and clicks 'Submit Comment'. The session recorded stable element hashes for the controls: textarea (fcc90341f4), status select (a29f177603), notify checkbox (6ff6db733b), visible checkbox (394ae2565e), submit button (d49cd5dc23). The session shows the comment appears in the Comments History and the order status updates.\n\nTask Definition:\n- Create a deterministic, reusable tool that: 1) opens the admin order view for a provided order internal id, 2) inputs a comment, 3) (optionally) changes the order status, 4) (optionally) sets the notify and visible checkbox states, 5) submits the comment, and 6) extracts the newly-added (latest) comment entry for verification.\n\nAction Plan (detailed steps to implement):\n1) Navigate to the order view URL: {base_url}/index.php/admin/sales_order/view/order_id/{order_id}/.\n2) Input the provided {comment_text} into the comments textarea (deterministic input using elementHash fcc90341f4).\n3) Use an agentic step to inspect and set the Status dropdown (elementHash a29f177603) only if a {status} is provided, and to ensure the two checkboxes (elementHash 6ff6db733b for 'Notify Customer', elementHash 394ae2565e for 'Visible on Frontend') match the requested booleans {notify_customer} and {visible_on_frontend}. The agent step is needed because toggling a checkbox must be conditional (only click when current state differs from requested state) and selecting a dropdown option should only occur when a new value is specified.\n4) Click the Submit Comment button (elementHash d49cd5dc23) to post the comment.\n5) Extract the latest comment entry from the Comments History to confirm success and return the timestamp, status, customer_notified flag, and comment text.\n\nVariable Identification (inputs needed):\n- base_url (string, required): Admin base URL (example: \"http://dockerized-magento.local\"). Used to build the order view URL.\n- order_id (string, required): Internal order id used in admin URL (example: \"204\"). Tool will navigate to /admin/sales_order/view/order_id/{order_id}/.\n- comment_text (string, required): The text to add to order history.\n- status (string, optional): Visible text of the status option to select (e.g., \"Processing\"). If omitted, the status will not be changed.\n- notify_customer (bool, optional): Whether to notify the customer by email. Default false.\n- visible_on_frontend (bool, optional): Whether the comment should be visible on the storefront. Default false.\n\nStep Optimization and Robustness:\n- Use direct URL navigation to open the order view page; this replaces prior UI navigation (dashboard -> orders grid -> view) and makes the tool deterministic.\n- Use recorded elementHash values for the exact UI elements (textarea, select, checkboxes, submit button) so selectors target a single stable control. This avoids brittle class-only selectors.\n- Because checkbox toggling and conditional status selection require reading the current state and deciding whether to click/select, include a single small agentic step to inspect and adjust the controls. This avoids unsafe unconditional clicks that might invert states.\n- Keep steps minimal and strictly relevant (no extra filtering, sorting, or exploring other pages). The agent is assumed to be already authenticated in the browser session; therefore no login steps are included.\n- The final extraction step verifies the operation by returning the latest comment entry so the caller can confirm success.\n\nEdge cases handled:\n- If JavaScript is disabled in the browser, most Magento admin interactive features still render server-side HTML; the recorded session shows it worked without JS enabled. The agent step will inspect DOM states rather than rely on front-end event handlers.\n- If the provided {status} text does not match any visible option, the agent step will attempt to find an option whose visible text equals {status} and report a failure if not found.\n\nSecurity and assumptions:\n- The tool assumes an active authenticated admin session in the browser context performing the actions; it does not perform authentication.\n- The tool uses elementHash values captured from the recorded session to improve selector stability. If the admin theme changes significantly, the element hashes may no longer resolve; in that case the agent step will attempt semantic selectors as fallback.\n\nOutcome:\n- A concise sequence of deterministic navigation and input steps plus one agent step for conditional controls and a final extraction to confirm the added comment.\n",
+  "name": "magento_admin_add_order_comment",
+  "description": "Adds an order history comment to a Magento 1 admin order (by order internal id), optionally changes order status, optionally notifies the customer and marks comment visible on storefront. Uses recorded stable element hashes from the order view page to perform exact interactions.",
+  "version": "2026-02-01-1",
+  "steps": [
+    {
+      "description": "Navigate directly to the admin order view page for the specified internal order id.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Enter the provided comment into the 'Add Order Comments' textarea (stable elementHash fcc90341f4).",
+      "output": null,
+      "cssSelector": "#history_comment",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/span[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "fcc90341f4",
+      "type": "input",
+      "value": "{comment_text}"
+    },
+    {
+      "description": "Agent should: 1) If {status} is provided and not empty, find the select element with elementHash 'a29f177603' and select the visible option whose text equals '{status}'. 2) For the 'Notify Customer by Email' checkbox (elementHash '6ff6db733b'), ensure its checked state matches {notify_customer} (click it only if the current state differs). 3) For the 'Visible on Frontend' checkbox (elementHash '394ae2565e'), ensure its checked state matches {visible_on_frontend} (click only if different). 4) Report an error if a requested status option cannot be found. Use at most 6 iterations to locate elements and adjust states.",
+      "output": "agent_status_adjust",
+      "type": "agent",
+      "task": "Set status and checkbox states for order {order_id} if requested.",
+      "max_steps": 6
+    },
+    {
+      "description": "Click the 'Submit Comment' button (stable elementHash d49cd5dc23) to save the comment and apply status/notification changes.",
+      "output": null,
+      "cssSelector": "#id_dd91f5d8efccfd52a167edade36607c7",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/div[3]/button",
+      "elementTag": "button",
+      "elementHash": "d49cd5dc23",
+      "type": "click"
+    },
+    {
+      "description": "After submission, extract the topmost comment in the Comments History to verify the comment was added and the status/notification state.",
+      "output": "latest_comment",
+      "type": "extract_page_content",
+      "goal": "Extract the latest comment entry from the Comments History and return timestamp, status, customer_notified flag, and comment text."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base URL of the Magento admin (scheme+host, e.g. \"http://dockerized-magento.local\").",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Internal order id used in the admin URL (example: \"204\"). Tool navigates to /index.php/admin/sales_order/view/order_id/{order_id}/.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment_text",
+      "type": "string",
+      "format": null,
+      "description": "Text to add to the order's Comments History (the comment body).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the Status dropdown option to select (e.g., \"Processing\"). If omitted, the order status will not be changed.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "notify_customer",
+      "type": "bool",
+      "format": null,
+      "description": "If true, ensure the 'Notify Customer by Email' checkbox is checked; otherwise ensure it is unchecked. Default: false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visible_on_frontend",
+      "type": "bool",
+      "format": null,
+      "description": "If true, ensure the 'Visible on Frontend' checkbox is checked; otherwise ensure it is unchecked. Default: false.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

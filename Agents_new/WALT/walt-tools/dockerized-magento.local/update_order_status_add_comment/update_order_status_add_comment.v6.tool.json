@@ -1,0 +1,137 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigates to a Magento admin order view, locates the 'Add Order Comments' form, fills the Comment textarea, optionally sets the Status dropdown, toggles 'Notify Customer' and 'Visible on Frontend' checkboxes, and submits the form. Label-based XPaths scoped to the form (located by the Submit button) provide the most robust selectors across Magento installs.\n\nTask Definition:\n- Create a reusable tool that, given an admin base URL and order_id, adds an order history comment and optionally updates the order status, notifies the customer, and marks the comment visible on the storefront.\n\nAction Plan:\n1) Navigate to the order view URL constructed from admin_base_url and order_id. 2) Confirm form presence by locating the Submit button and its ancestor form (form root). 3) Fill the comment textarea using a label-scoped XPath within that form. 4) If a status value is provided, select it inside the form (agentic step handles option lookup and logging). 5) For each checkbox (notify, visible) use an agentic step to find the checkbox by its label and set it idempotently to the requested boolean value. 6) Click the Submit Comment button. 7) Wait and extract page content to confirm the comment appears or capture any error messages.\n\nVariable Identification (inputs):\n- admin_base_url: base admin URL (required) used to build the navigation URL. Directly used in navigation step.\n- order_id: order id (required) used to build the navigation URL.\n- comment: comment text (required) fills the textarea[name='comment'] via label-based XPath.\n- status: visible label text of the status option to select (optional). The agent step will only attempt selection if non-empty and will log available options on failure.\n- notify: boolean (optional) whether to ensure the Notify checkbox is checked. Agent step will set idempotently.\n- is_visible_on_front: boolean (optional) whether to ensure the Visible on Frontend checkbox is checked. Agent step will set idempotently.\n- submit_button_text: optional override for the Submit button visible text (defaults to 'Submit Comment' if not provided).\n\nStep Optimization:\n- Replaced multiple fragile id/class selectors with label-scoped XPaths anchored to the Submit button: //button[normalize-space(.)='Submit Comment']/ancestor::form[1] to reliably identify the correct form.\n- For deterministic simple actions (navigate, fill textarea, click submit) use direct navigation, input and click steps. For conditional or environment-variable actions (choose status only if provided; ensure checkbox state without knowing current state), use controlled agentic steps that can read state, select only when necessary, and report actions. This avoids brittle assumptions about checkbox name/id across Magento installs and addresses prior failures caused by ambiguous selectors or dynamic page structure.\n- The tool avoids unnecessary page interactions and scopes all element lookups to the same form root for determinism.\n\nNotes on robustness and constraints:\n- Assumes the caller is already authenticated in the admin session (recorded session used admin credentials). Do not include authentication steps.\n- Agentic steps include clear tasks and limited max_steps to handle dynamic detection and idempotent setting of checkboxes and optional status selection.\n- If the environment uses a different language/localization, the submit_button_text override allows adaptation. Prefer providing the exact visible status label when using the status parameter.\n\nVersion: 1.0",
+  "name": "magento_admin_add_order_comment",
+  "description": "Navigate to a Magento admin order view and add an order history comment. Optionally update order status, notify the customer by email, and mark the comment visible on the storefront. Uses label-scoped XPaths (form located by the 'Submit Comment' button) for robust selection across Magento installs.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the admin order view page for the provided order_id.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_base_url}/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Short wait for the order view page to load and JS to stabilise.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Locate the form that contains the 'Submit Comment' button (used as interaction root).",
+      "output": "form_presence",
+      "type": "extract_page_content",
+      "goal": "Confirm the presence of the 'Add Order Comments' form by locating the Submit button and surrounding form."
+    },
+    {
+      "description": "Fill the Comment textarea inside the Add Order Comments form. Uses label-scoped XPath for resilience.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space(.)='{submit_button_text}' or normalize-space(.)='Submit Comment']/ancestor::form[1]//label[normalize-space(.)='Comment']/following::textarea[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{comment}"
+    },
+    {
+      "description": "Set the Status dropdown to the requested visible text option (agentic step handles existence checks and logging).",
+      "output": "status_set_result",
+      "type": "agent",
+      "task": "If the 'status' parameter is non-empty, select the option with visible text exactly matching '{status}' inside the Add Order Comments form. Use the form root located by //button[normalize-space(.)='{submit_button_text}' or normalize-space(.)='Submit Comment']/ancestor::form[1]. If the option is not present, log available option texts and leave the select unchanged. Report success or reason for failure.",
+      "max_steps": 6
+    },
+    {
+      "description": "Idempotently set the Notify checkbox to the requested boolean value (agentic step to handle input location and current state detection).",
+      "output": "notify_set_result",
+      "type": "agent",
+      "task": "Ensure the 'Notify Customer by Email' checkbox inside the Add Order Comments form is set to {notify}. Locate the checkbox by finding the label 'Notify Customer by Email' within the same form and resolving the associated input (either label wrapping input or label[@for] -> input[@id]). If the checkbox is already in the desired state, do nothing. Report action taken.",
+      "max_steps": 6
+    },
+    {
+      "description": "Idempotently set the Visible on Frontend checkbox to the requested boolean value (agentic step to handle input location and current state detection).",
+      "output": "visible_set_result",
+      "type": "agent",
+      "task": "Ensure the 'Visible on Frontend' checkbox inside the Add Order Comments form is set to {is_visible_on_front}. Locate the checkbox by finding the label 'Visible on Frontend' within the same form and resolving the associated input. If the checkbox is already in the desired state, do nothing. Report action taken.",
+      "max_steps": 6
+    },
+    {
+      "description": "Click the Submit Comment button to submit the Add Order Comments form.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space(.)='{submit_button_text}' or normalize-space(.)='Submit Comment']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the page to process the submission and refresh the Comments History.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Verify submission success by extracting the first few entries of the Comments History block or any inline messages.",
+      "output": "submission_result",
+      "type": "extract_page_content",
+      "goal": "Confirm that the submitted comment appears in the Comments History section or capture any error/success messages in the form scope."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base admin URL including protocol and the admin frontName, e.g. 'http://dockerized-magento.local/index.php/admin' (no trailing slash).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Order entity id used in the admin URL (example from session: '204').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment",
+      "type": "string",
+      "format": null,
+      "description": "Text to add to the order history (the comment body).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the status option to set inside the 'Status' dropdown (e.g., 'Complete'). Leave empty to keep the current status.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "notify",
+      "type": "bool",
+      "format": null,
+      "description": "Whether the customer should be notified by email (true = ensure the 'Notify Customer by Email' checkbox is checked).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_visible_on_front",
+      "type": "bool",
+      "format": null,
+      "description": "Whether the comment should be visible on the storefront (true = ensure 'Visible on Frontend' checkbox is checked).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "submit_button_text",
+      "type": "string",
+      "format": null,
+      "description": "Exact visible text of the submit button if different from 'Submit Comment' (default behaviour uses 'Submit Comment').",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

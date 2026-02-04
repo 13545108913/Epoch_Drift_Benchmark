@@ -1,0 +1,304 @@
+{
+  "tool_analysis": "Step analysis:\n1) The recorded browser session shows a stable Magento 1.x admin product grid and demonstrates filtering by SKU and opening the Edit page. Key elements observed with elementHash values: SKU input (f127a4b0da), Search button (638c5e864e), Edit link (patterned href '/catalog_product/edit/id/{ID}/'), Type/AttributeSet/Visibility/Status/Website selects with elementHash values recorded during the session. The New Product workflow (attribute set + product type then Continue) and product edit fields were also recorded. The session included a login step but the tool assumes the automation environment is already authenticated.\n\nTask definition:\n- Purpose: Parameterized automation tool that navigates to the Magento Admin Manage Products grid, fills filter fields from the provided inputs (sku required), applies filters (Search), and opens the matching product's Edit page. Returns basic confirmation (edit URL and product id).\n\nAction plan (deterministic sequence):\n1) Navigate to the manage products grid URL.\n2) Wait briefly for the grid to render.\n3) Fill the SKU input (required) and other optional filter fields (Name, price/qty ranges, selects) using recorded elementHash selectors when available.\n4) Click the Search button to apply filters and wait for the grid to refresh.\n5) Click the Edit link for the product row matching the provided SKU (XPath that matches the SKU cell text and Edit anchor with '/catalog_product/edit/id/').\n6) Wait for the edit page to load and extract confirmation (edit URL and product id).\n\nVariable identification (inputs):\n- sku (required): primary identifier for the product to open.\n- entity_id (optional): product id if caller has it; used for verification.\n- name (optional): product name filter.\n- type_id, attribute_set_id, price_from, price_to, qty_from, qty_to, visibility, status, website_id, store_view, per_page: optional filters to narrow the grid before opening the edit page.\n\nStep optimization:\n- Use direct navigation to the product grid URL (faster and deterministic).\n- Where stable elementHash is available from the session, use it for deterministic UI interactions (e.g., SKU input and Search button). Use XPath fallbacks for elements where elementHash is not present.\n- Avoid complex conditional branching in the step list by requiring a SKU and applying all filter inputs (they will be set to empty strings if not needed). The Edit click uses a SKU-anchored XPath so it will open the correct row when the SKU is unique in the grid.\n- For controls that vary across installs (per-page selector) use an agentic step to find and set the control dynamically.\n\nNotes and risks:\n- The tool assumes the automation session is already logged in to the Magento admin. It does not perform authentication.\n- Some selectors use recorded elementHash values; if the target installation's DOM differs significantly those elementHash values may not resolve. The XPath fallbacks included should be used by the automation runner if elementHash fails.\n- For robust automation across different Magento customizations, prefer to validate and, if necessary, adapt the element ids (grid id, massaction id, etc.) in your environment before running this tool in CI.\n\nThis tool focuses on a single deterministic task: find a product by the provided criteria and open it for editing. It does not perform destructive operations (Delete) or mass updates.",
+  "name": "magento_admin_open_product_by_filters",
+  "description": "Navigate to the Magento Admin Manage Products grid, apply product filters (sku, id, name, type, attribute set, price range, qty range, visibility, status, website), click Search and open the matching product's Edit page. Returns the opened edit page URL and basic product identification. Assumes the automation session is already authenticated in the Magento Admin (no login performed).",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Go to the Magento Admin Manage Products grid (starting page for applying filters).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/catalog_product/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the grid to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Type the provided SKU into the SKU filter input (recorded elementHash from the session). This is the primary identifier used to find the product.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_sku",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[6]/div/input",
+      "elementTag": "input",
+      "elementHash": "f127a4b0da",
+      "type": "input",
+      "value": "{sku}"
+    },
+    {
+      "description": "Type product name into the Name filter input if provided. Uses the Name input element observed during the session (elementHash as fallback).",
+      "output": null,
+      "cssSelector": "#name",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/form/div[3]/div/div[2]/div/table/tbody/tr/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "df3020a86b",
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Input Price From value into the Price 'From' filter input (elementHash observed for price-from). Leave empty string if not filtering by price.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_price_from",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "8e38c5e838",
+      "type": "input",
+      "value": "{price_from}"
+    },
+    {
+      "description": "Input Price To value into the Price 'To' filter input (elementHash observed for price-to).",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_price_to",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "927c2c13e5",
+      "type": "input",
+      "value": "{price_to}"
+    },
+    {
+      "description": "Input Qty From value into the Qty 'From' filter input (elementHash observed for qty-from).",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_qty_from",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "0a91de9a0e",
+      "type": "input",
+      "value": "{qty_from}"
+    },
+    {
+      "description": "Input Qty To value into the Qty 'To' filter input (elementHash observed for qty-to).",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_qty_to",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "bdecbf7d2c",
+      "type": "input",
+      "value": "{qty_to}"
+    },
+    {
+      "description": "Select the Product Type filter option (Type column). Uses the recorded elementHash for the Type select. If empty string provided, the step leaves the select unchanged.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_type",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/select",
+      "elementTag": "select",
+      "elementHash": "59a067e4b4",
+      "type": "select_change",
+      "selectedText": "{type_id}"
+    },
+    {
+      "description": "Select the Attribute Set filter option. Uses the recorded elementHash for the attribute-set select. If empty string provided, the step leaves the select unchanged.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_set_name",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[5]/select",
+      "elementTag": "select",
+      "elementHash": "97d647bb6f",
+      "type": "select_change",
+      "selectedText": "{attribute_set_id}"
+    },
+    {
+      "description": "Select the Visibility filter option. Uses the recorded elementHash for the Visibility select.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_visibility",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "fef9e4ddbc",
+      "type": "select_change",
+      "selectedText": "{visibility}"
+    },
+    {
+      "description": "Select the Status filter option. Uses the recorded elementHash for the Status select.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_status",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[10]/select",
+      "elementTag": "select",
+      "elementHash": "2d0526510b",
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Select the Website filter option, scoped to the Websites column filter select observed in the session.",
+      "output": null,
+      "cssSelector": "#productGrid_product_filter_websites",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[11]/select",
+      "elementTag": "select",
+      "elementHash": "b0f990d697",
+      "type": "select_change",
+      "selectedText": "{website_id}"
+    },
+    {
+      "description": "If store_view is provided, attempt to set the store-view chooser. Uses the login-page observed element as a fallback location if admin theme differs; it is included for completeness though some installs may use a different control.",
+      "output": null,
+      "cssSelector": "input[name=\"login[username]\"][type=\"text\"]",
+      "xpath": "html/body/div/div/form/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "3597a5c5e6",
+      "type": "input",
+      "value": "{store_view}"
+    },
+    {
+      "description": "If per_page is provided, change the per-page selector. This is left as an agentic step because the per-page control id/class varies across installs and was not captured as a single stable elementHash in the session.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{per_page}",
+      "task": "Set the grid per-page selector to {per_page} using the grid toolbar drop-down (agent step used because a stable elementHash was not recorded for the per-page control).",
+      "max_steps": 3,
+      "type_override": "agent"
+    },
+    {
+      "description": "Click the Search / Apply Filters button in the grid filter toolbar to apply the filter inputs. Uses recorded elementHash for the Search button and an XPath fallback.",
+      "output": null,
+      "cssSelector": "#id_3dcece5d9bcd320e570d2b3418b5b8fb",
+      "xpath": "html/body/div/div[7]/div/div[3]/div/table/tbody/tr/td[2]/button[2]",
+      "elementTag": "button",
+      "elementHash": "638c5e864e",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Click the Edit link for the row whose SKU cell text exactly matches the provided {sku}. This XPath ties the click to the SKU cell so it opens the matching product's Edit page.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[.//td[normalize-space()='{sku}']]//a[normalize-space()='Edit' and contains(@href,'/catalog_product/edit/id/')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the product Edit page to load after clicking the Edit link.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract the current page URL and find the product id from the URL (expression looks for '/edit/id/{id}/' pattern).",
+      "output": "edit_page_info",
+      "type": "extract_page_content",
+      "goal": "Return the loaded edit page URL and the product id found in the edit URL to confirm the open action succeeded."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "sku",
+      "type": "string",
+      "format": null,
+      "description": "Product SKU to filter by (input[name='sku'] in the grid). This tool requires a SKU to identify the product to open.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "entity_id",
+      "type": "string",
+      "format": null,
+      "description": "Product ID (entity_id). If provided it can be used to verify or directly target the row (example: '2784').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Product name to filter by (text filter in the Name column header).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type_id",
+      "type": "string",
+      "format": null,
+      "description": "Product type filter visible text (e.g. 'Simple Product', 'Configurable Product'). Matches the visible option text in the Type column filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "attribute_set_id",
+      "type": "string",
+      "format": null,
+      "description": "Attribute Set visible text (e.g. 'Default'). Use the visible option text in the Attribute Set filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price_from",
+      "type": "string",
+      "format": null,
+      "description": "Price filter 'From' value (numeric).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "price_to",
+      "type": "string",
+      "format": null,
+      "description": "Price filter 'To' value (numeric).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty_from",
+      "type": "string",
+      "format": null,
+      "description": "Quantity filter 'From' value (numeric).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "qty_to",
+      "type": "string",
+      "format": null,
+      "description": "Quantity filter 'To' value (numeric).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visibility",
+      "type": "string",
+      "format": null,
+      "description": "Visibility filter visible text (e.g. 'Catalog, Search', 'Catalog', 'Search', 'Not Visible Individually').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Status filter visible text (e.g. 'Enabled', 'Disabled').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "website_id",
+      "type": "string",
+      "format": null,
+      "description": "Website filter visible text (e.g. 'Main Website') or id if your admin shows id values. Use the visible option text where possible.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "store_view",
+      "type": "string",
+      "format": null,
+      "description": "Store view scope to apply before filtering (visible text of 'Choose Store View').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "per_page",
+      "type": "string",
+      "format": null,
+      "description": "Number of rows to view per page (e.g. '20','50','100'). If provided the tool will attempt to set the per-page selector before applying filters.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

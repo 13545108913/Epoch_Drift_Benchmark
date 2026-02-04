@@ -1,0 +1,154 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session logs a full interaction flow to the Magento Admin Orders grid: navigating to the admin orders URL, authenticating (login recorded but not required here), closing popups, applying filters (order number, billing name, store, status), clicking Search, resetting filters, exporting CSV, selecting visible rows, choosing mass-action options, submitting mass-action, and opening individual order View pages. Multiple stable element hashes were captured for key controls which makes deterministic automation possible.\n\nTask Definition:\n- Create a deterministic, parameterized tool that: navigates to a Magento Admin Orders grid, applies user-provided filter criteria (order increment id, billing name, store view, status), runs Search, and returns the visible order rows in structured form. Optionally triggers Export or selects visible rows when requested. The tool assumes the browser is already authenticated to the admin session at the provided admin_url.\n\nAction Plan:\n1. Navigate to the provided admin_url (Orders grid).\n2. Wait for page load.\n3. Populate the 'Order #' input with {increment_id} (clear it if empty).\n4. Populate the 'Bill to Name' input with {billing_name} (clear if empty).\n5. Select the store view from the 'Purchased From (Store)' select using {store_view}.\n6. Select the 'Status' filter from the status select using {status}.\n7. Click the 'Search' button to apply filters.\n8. Wait for the grid to refresh.\n9. Extract the visible order rows into structured records: increment_id, internal order_id, purchased_on, store, bill_to_name, ship_to_name, grand_total, status, view_url.\n10. Optionally (agent steps): perform export and select-visible actions if user requested (these are agentic because export and selection controls vary between themes and sometimes render as links vs selects.)\n\nVariable Identification (input parameters):\n- admin_url (required): exact orders-grid URL to open.\n- increment_id (optional): free text to filter by Order #.\n- billing_name (optional): free text for Bill to Name filter.\n- store_view (optional): visible store text to select in the Purchased From filter (e.g., 'English').\n- status (optional): visible status label to select (e.g., 'Canceled', 'Complete').\n- export_format (optional): 'CSV'|'Excel'|'XML' \u2014 if provided the tool will attempt export via an agent step.\n- select_visible_and_return (optional): 'true' to select visible rows and return selection info.\n\nStep Optimization and Rationale:\n- Use direct navigation to admin_url instead of clicking through menus \u2014 deterministic and faster.\n- Use deterministic element targeting where elementHash was recorded: order input (elementHash '230585ef85'), billing input ('8770abde75'), store select ('2e752431bb'), status select ('301a5525e7'), Search button ('90708cd5ce'). These element hashes were captured from the live session and are used to make interactions robust.\n- Avoid including mass-action submission in the core flow because the tool's primary purpose is to find and return matching order records. Mass-action was recorded in the session (and is demonstrable), but it modifies data and in the recording it failed due to order state and JS notices. Instead expose selection/export as optional agentic steps to keep the core tool single-purpose and deterministic.\n- Agentic steps are included for export and select-visible because export controls vary (links vs select+button) and selecting visible rows may rely on different DOM constructs; agentic steps give limited autonomous logic to choose the correct control safely.\n\nSelectors and Stability Notes:\n- Preferred deterministic selectors use the recorded elementHash values. Where elementHash is not present for a control (e.g., date range, numeric ranges), those filters are not explicitly set by deterministic steps; they can be added later if stable selectors are discovered.\n- The tool will input empty strings for unspecified optional filters, which effectively clears them.\n\nLimitations and Assumptions:\n- The tool assumes the browser context is already authenticated to the Magento admin session and has permission to view Sales > Orders. Do not include authentication in this tool.\n- The Orders grid in Magento 1.x often requires JavaScript; recorded session included a JS warning. If JS is disabled in the automation environment some controls (select visible, mass actions, export) may behave differently or be unavailable. The tool attempts the standard DOM interactions and uses agentic fallbacks for export/selection.\n- Date range and numeric-range filters (Purchased On, G.T. ranges) are not implemented as deterministic steps due to lack of stable element hashes in the recording. They can be added later if stable element selectors are identified.\n\nEssentiality Check:\n- The steps included are strictly those required to perform the core task (navigate, apply filters, search, extract). Export and selection behaviors are optional and implemented via limited agentic steps as they are not necessary to return matching order records.\n\nExecution notes for integrators:\n- Provide a valid admin_url and ensure the automation environment preserves the authenticated session (cookies/storage). If the admin frontName differs (not 'admin') ensure admin_url points to the correct frontName path.\n- If you need date or price-range filters automated, capture stable element selectors for those inputs and add deterministic input/select steps similar to the existing ones.\n\nGenerated version: 1.0",
+  "name": "magento_admin_find_orders_tool_v1",
+  "description": "Navigate to a Magento Admin Orders grid, apply supplied filter criteria (order/increment id, billing name, store view, status), run Search and return the matching order rows. Assumes an authenticated browser session with access to the provided admin URL. Uses stable element hashes captured during recording for deterministic interactions.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento admin Orders grid page at the provided admin_url.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the Orders page to load and scripts/DOM to stabilize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Set the 'Order #' filter input to the provided increment_id (empty string clears the input).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_real_order_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "230585ef85",
+      "type": "input",
+      "value": "{increment_id}"
+    },
+    {
+      "description": "Set the 'Bill to Name' filter input to the provided billing_name (empty string clears the input).",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_billing_name",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[5]/div/input",
+      "elementTag": "input",
+      "elementHash": "8770abde75",
+      "type": "input",
+      "value": "{billing_name}"
+    },
+    {
+      "description": "Choose the store view in the 'Purchased From (Store)' filter. If {store_view} is empty this action will attempt to select an empty/placeholder value (effectively leaving the store filter unchanged).",
+      "output": null,
+      "cssSelector": "select[name=\"store_id\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/select",
+      "elementTag": "select",
+      "elementHash": "2e752431bb",
+      "type": "select_change",
+      "selectedText": "{store_view}"
+    },
+    {
+      "description": "Choose the order status option in the 'Status' filter. If {status} is empty this action will attempt to leave the status unchanged.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_status",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "301a5525e7",
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Click the 'Search' button to apply the filters.",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters (allow server response and any ajax rendering).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Scrape the current grid page and return the list of visible orders matching the applied filters.",
+      "output": "order_rows",
+      "type": "extract_page_content",
+      "goal": "Extract visible order rows from the orders grid and return structured records (increment id, order id, purchased_on, store, bill_to_name, ship_to_name, grand_total, status, view_url)."
+    },
+    {
+      "description": "Agentic step used to perform export (the export control can be rendered as links or a select+button depending on theme). This step is used because export implementations vary across themes and may require reasoning to pick the correct control. Max 4 attempts.",
+      "output": "export_result",
+      "type": "agent",
+      "task": "If {export_format} equals 'CSV' or 'Excel' or 'XML', trigger the Export control using the export select and export button in the Orders grid (use export select element and click Export). Otherwise skip.",
+      "max_steps": 4
+    },
+    {
+      "description": "Agentic step for selecting visible rows and confirming selection count. Uses 'Select Visible' link if present or toggles header checkbox as fallback. Max 3 attempts.",
+      "output": "selection_result",
+      "type": "agent",
+      "task": "If {select_visible_and_return} is 'true', click the 'Select Visible' link to select all visible rows and return the selection count and selected order_ids. Otherwise skip.",
+      "max_steps": 3
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the Magento admin Orders grid (example: 'http://dockerized-magento.local/index.php/admin/sales_order/'). The tool will navigate to this URL and operate within that admin session.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Order increment id / order number to filter by (text). Matches the 'Order #' grid filter (e.g., '145000036'). Leave empty to not filter by order number.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "billing_name",
+      "type": "string",
+      "format": null,
+      "description": "Billing name (free-text) to filter by using the 'Bill to Name' grid filter. Leave empty to not filter by billing name.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "store_view",
+      "type": "string",
+      "format": null,
+      "description": "Store view / 'Purchased From (Store)' visible option to select from the store dropdown (e.g., 'English', 'French'). Leave empty to not change the store filter.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Order status visible option to select from the 'Status' filter (e.g., 'Canceled', 'Pending', 'Complete'). Use the visible text of the option as shown in the Admin UI. Leave empty to not filter by status.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Optional: if provided (CSV|Excel|XML) the tool will trigger the Export control with this format after search. Leave empty to skip export.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "select_visible_and_return",
+      "type": "string",
+      "format": null,
+      "description": "Optional: set to 'true' to click 'Select Visible' after search and include selection_count in the returned results. Any other value or empty will skip this action.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

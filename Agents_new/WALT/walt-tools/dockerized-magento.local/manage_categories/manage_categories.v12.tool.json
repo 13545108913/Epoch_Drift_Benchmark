@@ -1,0 +1,157 @@
+{
+  "tool_analysis": "Step Analysis: The recorded browser session demonstrates logging into Magento admin, navigating to the Manage Categories page, selecting category tree nodes, creating a subcategory, editing fields (name, url_key, is_active, include_in_menu, display_mode), creating a root category, and saving changes. The session recorded element_hash values for many interacted elements and discovered that selectors should prefer form#edit_form scoping and label-relative XPaths. Task Definition: Provide a reusable tool that automates these sequence: select a category node, optionally add a subcategory, optionally add a root category, edit canonical fields (name, URL key, is_active, include_in_menu, display_mode), save, and verify the save success message and tree update. Action Plan: 1) Navigate to the categories page. 2) Select given category node. 3) Optionally add subcategory: click Add Subcategory, fill name and options, save. 4) Optionally add root category: click Add Root Category, fill fields, save. 5) Optionally set/update url_key, is_active, include_in_menu, display_mode for current category. 6) Save category. 7) Extract success message and updated tree node. Variable Identification: category_node_name, create_subcategory, subcategory_name, create_root_category, root_category_name, set_url_key, set_is_active, set_include_in_menu, set_display_mode, store_view. Step Optimization: Replaced many UI interaction sequences with deterministic, label-driven XPath selectors and form#edit_form scoped selectors. Agent steps used only for conditional creation flows where the exact UI rendering may vary. Avoided unnecessary interactions like collapsing/expanding tree or inspecting product grid. Selectors chosen to be robust across Magento 1.x admin variations; prefer id/name/data-* where available; fallback to label-relative XPath. Additional notes: Assumes authenticated session; includes wait steps to ensure form rendering. This tool focuses only on the essential actions requested and avoids optional exploratory steps.",
+  "name": "magento_manage_categories_tool",
+  "description": "Automate common Magento 1.x admin category management tasks: select a category node, add subcategory or root category, edit category fields (name, url_key, is_active, include_in_menu, display_mode), and save the category. Uses label-driven XPaths and id/name-based selectors scoped to form#edit_form where available. The agent is expected to be already authenticated.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Manage Categories page (assumes authenticated session).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/catalog_category/",
+      "url_operation": null
+    },
+    {
+      "description": "Select the category node by its exact visible label text in the category tree.",
+      "output": null,
+      "cssSelector": "#ext-gen28",
+      "xpath": "html/body/div/div[9]/div/div/div/div/div[4]/div/ul/div/li/ul/li[2]/div/a",
+      "elementTag": "a",
+      "elementHash": "796a1e017a",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the category edit form to load and populate after selecting node.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Create and save a subcategory with provided fields when requested. Uses label-driven selectors scoped to form#edit_form.",
+      "output": null,
+      "type": "agent",
+      "task": "If {create_subcategory} is true: Click 'Add Subcategory', wait for form#edit_form to appear, then set Name to {subcategory_name}, set Is Active to {set_is_active} if provided, set Include in Navigation Menu to {set_include_in_menu} if provided, then click Save Category. Otherwise skip.",
+      "max_steps": 8
+    },
+    {
+      "description": "Create and save a root category when requested.",
+      "output": null,
+      "type": "agent",
+      "task": "If {create_root_category} is true: Click the 'Add Root Category' control, wait for New Root Category form to appear, set Name to {root_category_name}, set Is Active to {set_is_active} if provided, set Include in Navigation Menu to {set_include_in_menu} if provided, then click Save Category. Otherwise skip.",
+      "max_steps": 8
+    },
+    {
+      "description": "Set the URL Key in the edit form if {set_url_key} provided; relies on form#edit_form input[name='url_key'] presence.",
+      "output": null,
+      "cssSelector": "#group_4url_key",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[5]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "1914e4f18c",
+      "type": "input",
+      "value": "{set_url_key}"
+    },
+    {
+      "description": "Click the Save Category button to persist changes.",
+      "output": null,
+      "cssSelector": "button[title=\"Save Category\"][title=\"Save Category\"]",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/div/div/p/button[2]",
+      "elementTag": "button",
+      "elementHash": "9982095afd",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the save to complete and for success message to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Confirm 'The category has been saved.' message and return the updated tree node details.",
+      "output": "save_result",
+      "type": "extract_page_content",
+      "goal": "Verify save by extracting the success message and capture the new/updated category node text and attributes (data-category-id/title) from the category tree."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "category_node_name",
+      "type": "string",
+      "format": null,
+      "description": "Exact visible label text of the category node to select from the tree (e.g. 'Accessories (62)' or 'Default Category (1896)')",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "create_subcategory",
+      "type": "bool",
+      "format": null,
+      "description": "If true, add a subcategory under the selected category. If false, do not add a subcategory.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "subcategory_name",
+      "type": "string",
+      "format": null,
+      "description": "Name of the subcategory to create (required if create_subcategory is true).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "create_root_category",
+      "type": "bool",
+      "format": null,
+      "description": "If true, open Add Root Category form and create a root category with provided name.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "root_category_name",
+      "type": "string",
+      "format": null,
+      "description": "Name of the root category to create (required if create_root_category is true).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "set_url_key",
+      "type": "string",
+      "format": null,
+      "description": "URL Key to set for the category being edited (if field present).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "set_is_active",
+      "type": "string",
+      "format": null,
+      "description": "Set Is Active value. Use '1' for Yes and '0' for No. If omitted, current value is left unchanged.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "set_include_in_menu",
+      "type": "string",
+      "format": null,
+      "description": "Set Include in Navigation Menu value. Use '1' for Yes and '0' for No. If omitted, current value is left unchanged.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "set_display_mode",
+      "type": "string",
+      "format": null,
+      "description": "Display Mode option visible text to set (e.g. 'Products only', 'Static block and products').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "store_view",
+      "type": "string",
+      "format": null,
+      "description": "Store view to switch to before editing (e.g. 'All Store Views', 'English'). Optional.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

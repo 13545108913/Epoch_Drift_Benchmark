@@ -1,0 +1,297 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded steps demonstrate a complete workflow in Magento 1 admin: open Shipments grid, filter by Shipment #, Search, select the shipment row, run a Mass Action (PDF Packingslips), Export results (CSV), open the View page for the shipment, add a tracking entry (carrier, title, tracking number), send tracking information (email), and invoke Print. Some Print/Create-Label actions are JS-driven (href='#' or onclick) so printable PDF URLs were not captured in the extract; inferred URL patterns are included as recommendations.\n\nTask Definition:\n- Create a deterministic, re-usable automation tool that: navigates to the shipments grid, applies a shipment filter (increment_id), searches, selects the result, performs a mass action, exports the grid, opens the shipment view, adds tracking, optionally sends tracking email, and optionally invokes the Print action. The tool must rely on the stable element hashes captured during recording for reliable targeting.\n\nAction Plan (ordered, essential steps only):\n1) Navigate to shipments grid: {base_admin_url}/sales_shipment/\n2) Input shipment increment id into the recorded shipment filter element (elementHash a16414da11). (Optional if not provided)\n3) Click Search (elementHash 8c178b0d4b)\n4) Wait briefly for grid update\n5) Click the row checkbox to select shipment (elementHash 77e24b6a3f)\n6) Select mass action (elementHash f61b130718) using visible option text {mass_action}\n7) Click mass action Submit (elementHash 33937c56c8)\n8) Select export format (elementHash b9908203f9) using visible option text {export_format}\n9) Click Export (elementHash 5d9a22adb7)\n10) Click View for the shipment row (elementHash 85c0bdf16d)\n11) On the View page: select Carrier (elementHash 9314d9e945), input Title (elementHash d9cfbc65aa), input Number (elementHash b8e6364316)\n12) Click Add (elementHash e65fb32a28) and wait for UI update\n13) If requested: click Send Tracking (elementHash d1e07b1383) and wait\n14) If requested: click Print (elementHash 9d388f3123) and wait\n15) Extract page content to capture status messages and any printable hrefs produced\n\nVariable Identification (input parameters needed):\n- base_admin_url (required): the admin base URL up to the admin frontName (e.g. http://dockerized-magento.local/index.php/admin)\n- increment_id (optional): Shipment increment id (the visible shipment number, e.g. \"100000031\") used for the Shipment # filter\n- mass_action (optional): mass action visible text to choose (e.g. \"PDF Packingslips\", \"Print Shipping Labels\")\n- export_format (optional): visible export option text (\"CSV\",\"Excel\",\"XML\")\n- carrier (optional): visible option text to choose in Carrier select (e.g. \"United Parcel Service\")\n- tracking_title (optional): text to store in Title input (e.g. \"UPS 3 Day Select\")\n- tracking_number (optional): tracking number (e.g. \"1Z999AA10123456784\")\n- send_tracking (optional): boolean to trigger Send Tracking Information\n- do_print (optional): boolean to trigger Print action\n- shipment_internal_id (optional): internal shipment id (e.g. \"34\") for direct view navigation (used instead of clicking View when provided)\n\nStep Optimization / Notes:\n- All steps are deterministic and use recorded elementHash values for stable targeting. Navigation uses a direct URL to the shipments grid which is more reliable than clicking menus.\n- The tool limits UI interactions to those recorded and essential for the core task. It does not attempt to fill other grid filters because stable selectors were not recorded for them.\n- Print and Create Shipping Label controls were JS-driven in the recording (href='#' or onclick); therefore the tool will attempt the recorded click and then extract the page to detect any server-generated printable URL. If consuming code needs the direct PDF link, it should inspect the live DOM (onclick or setLocation attributes) or the network responses.\n- The agent is assumed to be already authenticated in the admin session; this tool does not perform login.\n- Selects use visible option text (selectedText) to choose the desired option.\n- Wait steps are included after actions that trigger page updates (Search, Add, Send Tracking, Print) to allow the UI to update before extraction.\n\nConfidence & Fallbacks:\n- Search-by-shipment and grid actions are high confidence because elementHashes for those elements were recorded.\n- Print and label creation actions are medium confidence due to JS-driven behavior and lack of explicit hrefs in the extract. The tool captures and returns page text so the caller can confirm printable URLs or messages.\n\n",
+  "name": "magento_admin_shipments_tool",
+  "description": "Automates locating shipments in Magento admin (shipments grid) by applying a shipment filter, selecting a row, performing a mass action (PDF packingslips / print labels), exporting results, opening the shipment view, adding tracking, sending tracking email and invoking Print. Uses the exact DOM element hashes captured during recording for deterministic interactions.",
+  "version": "2026-02-01",
+  "steps": [
+    {
+      "description": "Open the Shipments grid in Magento admin.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_admin_url}/sales_shipment/",
+      "url_operation": null
+    },
+    {
+      "description": "Allow the grid page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Enter the Shipment # into the Shipment filter input (skip if {increment_id} empty).",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_filter_increment_id",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "a16414da11",
+      "type": "input",
+      "value": "{increment_id}"
+    },
+    {
+      "description": "Click the 'Search' button to apply filters.",
+      "output": null,
+      "cssSelector": "#id_865c04321173388dda4880bb2dcc69db",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "8c178b0d4b",
+      "type": "click"
+    },
+    {
+      "description": "Wait for search results to update.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Select the checkbox for the matching shipment row.",
+      "output": null,
+      "cssSelector": "input[name=\"shipment_ids\"][type=\"checkbox\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/tbody/tr/td/input",
+      "elementTag": "input",
+      "elementHash": "77e24b6a3f",
+      "type": "click"
+    },
+    {
+      "description": "Choose the Mass Action from the Actions dropdown (skip if {mass_action} empty).",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_massaction-select",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span/select",
+      "elementTag": "select",
+      "elementHash": "f61b130718",
+      "type": "select_change",
+      "selectedText": "{mass_action}"
+    },
+    {
+      "description": "Click the Mass Action 'Submit' button to apply the selected action (only used if {mass_action} was provided).",
+      "output": null,
+      "cssSelector": "#id_cbc007021b865a05d19921234bc5cad3",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[4]/button",
+      "elementTag": "button",
+      "elementHash": "33937c56c8",
+      "type": "click"
+    },
+    {
+      "description": "Wait for mass action to process and any UI updates.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Select export format from the 'Export to:' dropdown (skip if {export_format} empty).",
+      "output": null,
+      "cssSelector": "#sales_shipment_grid_export",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "b9908203f9",
+      "type": "select_change",
+      "selectedText": "{export_format}"
+    },
+    {
+      "description": "Click the 'Export' button to download/export the grid in the selected format (only used if {export_format} was provided).",
+      "output": null,
+      "cssSelector": "button[title=\"Export\"][title=\"Export\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "5d9a22adb7",
+      "type": "click"
+    },
+    {
+      "description": "Allow export action to trigger (download / server processing).",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "If {shipment_internal_id} provided, navigate directly to the shipment View page (otherwise the next step clicks the recorded View link).",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_admin_url}/sales_shipment/view/shipment_id/{shipment_internal_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Click the 'View' link for the selected shipment row (used when {shipment_internal_id} is not provided).",
+      "output": null,
+      "cssSelector": "tr > td > a[href=\"http://dockerized-magento.local/index.php/admin/sales_shipment/view/shipment_id/34/\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/tbody/tr/td[8]/a",
+      "elementTag": "a",
+      "elementHash": "85c0bdf16d",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the shipment View page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Select the Carrier for the tracking entry (skip if {carrier} empty).",
+      "output": null,
+      "cssSelector": "select[name=\"carrier\"]",
+      "xpath": "html/body/div/div[6]/div/div[10]/div/fieldset/div[3]/div/table/tfoot/tr/td/select",
+      "elementTag": "select",
+      "elementHash": "9314d9e945",
+      "type": "select_change",
+      "selectedText": "{carrier}"
+    },
+    {
+      "description": "Enter the tracking 'Title' text (skip if {tracking_title} empty).",
+      "output": null,
+      "cssSelector": "#tracking_title",
+      "xpath": "html/body/div/div[6]/div/div[10]/div/fieldset/div[3]/div/table/tfoot/tr/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "d9cfbc65aa",
+      "type": "input",
+      "value": "{tracking_title}"
+    },
+    {
+      "description": "Enter the tracking 'Number' (skip if {tracking_number} empty).",
+      "output": null,
+      "cssSelector": "#tracking_number",
+      "xpath": "html/body/div/div[6]/div/div[10]/div/fieldset/div[3]/div/table/tfoot/tr/td[3]/input",
+      "elementTag": "input",
+      "elementHash": "b8e6364316",
+      "type": "input",
+      "value": "{tracking_number}"
+    },
+    {
+      "description": "Click 'Add' to add the tracking entry.",
+      "output": null,
+      "cssSelector": "#id_51be8006e2cf766d15b2a6ae0234852a",
+      "xpath": "html/body/div/div[6]/div/div[10]/div/fieldset/div[3]/div/table/tfoot/tr/td[4]/button",
+      "elementTag": "button",
+      "elementHash": "e65fb32a28",
+      "type": "click"
+    },
+    {
+      "description": "Wait for tracking row to appear/for UI to update after Add.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Click 'Send Tracking Information' to send shipment tracking email (only used if {send_tracking} is true).",
+      "output": null,
+      "cssSelector": "#id_c3f54c0bacb4f8089d9d3a1213ce5c9a",
+      "xpath": "html/body/div/div[6]/div/div[2]/p/button[3]",
+      "elementTag": "button",
+      "elementHash": "d1e07b1383",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the send-tracking action to complete and page to update.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Click 'Print' action on the shipment view to generate a printable packing slip/label (only used if {do_print} is true).",
+      "output": null,
+      "cssSelector": "#id_2ec8275042ce9c038b6478f8d3a2465b",
+      "xpath": "html/body/div/div[6]/div/div[2]/p/button[2]",
+      "elementTag": "button",
+      "elementHash": "9d388f3123",
+      "type": "click"
+    },
+    {
+      "description": "Wait for Print action to open a new window or trigger PDF generation.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract page content so caller can confirm send/print outcomes and retrieve any generated printable URLs.",
+      "output": "shipment_action_result",
+      "type": "extract_page_content",
+      "goal": "Capture status messages, updated shipment header text (e.g. 'the shipment email was sent'), tracking row content, and any printable hrefs/URLs generated by the Print action."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Magento admin base URL including frontName (e.g. 'http://dockerized-magento.local/index.php/admin'). The tool appends '/sales_shipment/' to this value to reach the shipments grid.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Shipment increment id (Shipment # visible on the grid) to filter by, e.g. '100000031'. If omitted the tool will not input a shipment filter and will operate on visible rows.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "mass_action",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the mass action to perform from the Actions dropdown (choose a recorded option).",
+      "required": false,
+      "enum": [
+        "PDF Packingslips",
+        "Print Shipping Labels"
+      ]
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Export format to select from the 'Export to:' dropdown. If omitted, no export will be performed.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "carrier",
+      "type": "string",
+      "format": null,
+      "description": "Visible carrier option text to select when creating a tracking entry (e.g. 'United Parcel Service').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "tracking_title",
+      "type": "string",
+      "format": null,
+      "description": "Title to enter for the tracking row (e.g. 'UPS 3 Day Select').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "tracking_number",
+      "type": "string",
+      "format": null,
+      "description": "Tracking number to enter (e.g. '1Z999AA10123456784').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "send_tracking",
+      "type": "bool",
+      "format": null,
+      "description": "If true, the tool will click 'Send Tracking Information' after adding the tracking entry.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "do_print",
+      "type": "bool",
+      "format": null,
+      "description": "If true, the tool will click the Print action on the shipment view after other actions complete.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "shipment_internal_id",
+      "type": "string",
+      "format": null,
+      "description": "Internal shipment id (numeric, e.g. '34'). If provided the tool will navigate directly to the shipment View page URL (appends '/sales_shipment/view/shipment_id/{shipment_internal_id}/') instead of clicking the row View link.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

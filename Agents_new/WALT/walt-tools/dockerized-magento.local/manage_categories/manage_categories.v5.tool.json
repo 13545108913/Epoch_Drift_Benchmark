@@ -1,0 +1,136 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session logs navigation to Magento admin categories, login, analysis of page elements, selection of 'Default Category', clicking 'Add Subcategory', filling Name, URL Key, setting Is Active, saving, and verifying the new node 'Spring Collection 2026'.\n- The tool will reproduce these actions in a parameterized way: navigate to categories page, select a parent by visible text, click Add Subcategory, fill fields (name, url_key, is_active), save, and verify the new node.\n\nTask Definition:\n- Purpose: Provide a reusable automation tool to create a subcategory under a given parent in Magento 1.x Admin and return the new node selector and sibling index.\n\nAction Plan:\n1) Navigate to the categories admin page.\n2) Verify that the categories panel is present (detect login redirect); if login page detected, fail with message.\n3) Select parent category using an XPath anchored to 'Categories' header and the provided parent label.\n4) Click 'Add Subcategory' toolbar action.\n5) Wait for the form to render.\n6) Fill Name, URL Key (if provided), set Is Active.\n7) Click Save Category and wait for completion.\n8) Verify new node in tree by exact match under parent; return XPath (scoped) and sibling index.\n\nVariable Identification:\n- parent_category_name (string, required): visible parent node label\n- new_category_name (string, required): name for new subcategory\n- new_category_url_key (string, optional): url_key for new category\n- is_active (string, required): 'Yes' or 'No'\n\nStep Optimization:\n- Use direct navigation to the categories page instead of navigating through menus.\n- Use label-anchored XPath selectors for tree nodes and toolbar actions to be robust against id/class changes.\n- Prefer id-based selectors for form inputs when available (e.g., input#name, input#url_key, select#is_active).\n- Use waiting steps after actions that trigger client-side updates (selecting tree node, opening Add Subcategory, saving) to allow the DOM to refresh.\n\nNotes on stability and fallbacks:\n- Tree nodes often include counts; tool uses exact text when the user provides the parent label; if counts differ, caller must supply appropriate text or the tool will fail to find parent.\n- If new_category_url_key omitted, the tool will skip URL key input.\n- The admin is assumed logged in; if navigation lands on login page, the tool will detect and report.\n\n",
+  "name": "magento_category_tool",
+  "description": "Automate browsing and editing Magento 1.x admin category tree: select category, add subcategory/root, set fields (name, url_key, is_active, include_in_menu), and save. Uses stable, label-scoped XPath/CSS selectors and falls back to id/name attributes. Assumes admin is already logged in.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to Magento Admin > Catalog > Manage Categories page (assumes session already authenticated).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/catalog_category/",
+      "url_operation": null
+    },
+    {
+      "description": "Verify that the Categories panel (tree and category edit form) is loaded; fail early if login page appears.",
+      "output": "page_check",
+      "type": "extract_page_content",
+      "goal": "Confirm Categories panel is present and extract tree container, toolbar, and form presence to validate environment"
+    },
+    {
+      "description": "Select the parent category in the tree by exact visible text (scoped to the 'Categories' header).",
+      "output": null,
+      "cssSelector": "#ext-gen14",
+      "xpath": "html/body/div/div[7]/div/div/div/div/div[4]/div/ul/div/li/div/a",
+      "elementTag": "a",
+      "elementHash": "50702e9810",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the form to update after selecting the category.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Click 'Add Subcategory' in the Categories toolbar to open the new category form.",
+      "output": null,
+      "cssSelector": "ul > li > a[href=\"http://dockerized-magento.local/index.php/admin/sales_shipment/\"]",
+      "xpath": "html/body/div/div/div[3]/ul/li[2]/ul/li[3]/a",
+      "elementTag": "a",
+      "elementHash": "0ed0ef3a13",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the New Subcategory form to render (WYSIWYG and JS widgets).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Fill the Name field for the new category (use id='name' primary selector, fallback to name attribute).",
+      "output": null,
+      "cssSelector": "#group_4name",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[2]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "a075ffff62",
+      "type": "input",
+      "value": "{new_category_name}"
+    },
+    {
+      "description": "Fill the URL Key field if provided (id='url_key' or name contains 'url_key').",
+      "output": null,
+      "cssSelector": "#group_4url_key",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[4]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "1914e4f18c",
+      "type": "input",
+      "value": "{new_category_url_key}"
+    },
+    {
+      "description": "Set the Is Active control to 'Yes' or 'No'.",
+      "output": null,
+      "cssSelector": "#group_4is_active",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[3]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "5208d8669b",
+      "type": "select_change",
+      "selectedText": "{is_active}"
+    },
+    {
+      "description": "Click the Save Category button in the form header to persist the new category.",
+      "output": null,
+      "cssSelector": "#id_08193ae08396af92fcb171868b86765a",
+      "xpath": "html/body/div/div[7]/div/div/div[2]/div/div[2]/div/div/p/button[2]",
+      "elementTag": "button",
+      "elementHash": "56ca2d43a5",
+      "type": "click"
+    },
+    {
+      "description": "Wait for save operation and tree refresh.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Locate the newly created category (match by visible name) scoped under the parent node and return stable XPath (scoped) and 1-based sibling index.",
+      "output": "new_node_verification",
+      "type": "extract_page_content",
+      "goal": "Verify the new category exists under the parent category in the tree and return its XPath/CSS selector and sibling index"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "parent_category_name",
+      "type": "string",
+      "format": null,
+      "description": "Exact visible parent category label as shown in admin tree (e.g., 'Default Category (1893)'). Use exact text or stable partial with counts.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "new_category_name",
+      "type": "string",
+      "format": null,
+      "description": "Name for the new category to create (e.g., 'Spring Collection 2026').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "new_category_url_key",
+      "type": "string",
+      "format": null,
+      "description": "URL Key for the new category (e.g., 'spring-collection-2026'). If omitted, Magento may generate one automatically.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_active",
+      "type": "string",
+      "format": null,
+      "description": "Set to 'Yes' or 'No' to control the Is Active field. Defaults to 'Yes' if omitted.",
+      "required": true,
+      "enum": null
+    }
+  ]
+}

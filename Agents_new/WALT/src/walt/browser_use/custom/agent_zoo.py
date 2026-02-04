@@ -188,30 +188,62 @@ class AgentWithMessageTracker(Agent):
     async def get_next_action(
         self, input_messages: list[BaseMessage]
     ) -> Union[AgentOutput, Dict[str, Any]]:
-        """Get next action from LLM based on current state"""
+        """Get next action from LLM based on current state with Retry Logic"""
 
         input_messages = self._convert_input_messages(input_messages)
         provider = self.llm.__class__.__name__
+        logger.info(f"tool calling method: {self.tool_calling_method}")
+
+        # === 核心修改开始：添加重试机制 ===
+        max_retries = 2
+        current_try = 0
+        
+        # 针对 RAW 模式的特殊处理 (Claude/DeepSeek 等常用模式)
         if self.tool_calling_method == "raw":
-            if "openai" in provider.lower():
-                with get_openai_callback() as cb:
-                    output = self.llm.invoke(input_messages)
-                usage = get_usage(cb)
-                logger.info(f"Get Next Action Usage: {usage}")
-            else:
-                output = self.llm.invoke(input_messages)
-                if "usage_metadata" in output.content:
-                    usage = output.content["usage_metadata"]
+            while current_try < max_retries:
+                if "openai" in provider.lower():
+                    with get_openai_callback() as cb:
+                        output = self.llm.invoke(input_messages)
+                    usage = get_usage(cb)
+                    logger.info(f"Get Next Action Usage: {usage}")
                 else:
-                    usage = {}
-            # TODO: currently invoke does not return reasoning_content, we should override invoke
-            output.content = self._remove_think_tags(str(output.content))
-            try:
-                parsed_json = extract_json_from_model_output(output.content)
-                parsed = self.AgentOutput(**parsed_json)
-            except (ValueError, ValidationError) as e:
-                logger.warning(f"Failed to parse model output: {output} {str(e)}")
-                raise ValueError("Could not parse response.")
+                    output = self.llm.invoke(input_messages)
+                    if "usage_metadata" in output.content:
+                        usage = output.content["usage_metadata"]
+                    else:
+                        usage = {}
+                
+                # TODO: currently invoke does not return reasoning_content, we should override invoke
+                output.content = self._remove_think_tags(str(output.content))
+                
+                try:
+                    parsed_json = extract_json_from_model_output(output.content)
+                    parsed = self.AgentOutput(**parsed_json)
+                    # 如果成功解析，直接返回
+                    return parsed, usage, log_response(parsed, self.state.n_steps)
+                    
+                except (ValueError, ValidationError) as e:
+                    logger.warning(f"Failed to parse model output (Attempt {current_try + 1}/{max_retries}): {str(e)}")
+                    
+                    current_try += 1
+                    if current_try == max_retries:
+                        # 超过最大重试次数，抛出异常
+                        logger.error(f"Final failure output: {output.content}")
+                        raise ValueError(f"Could not parse response after {max_retries} attempts.")
+                    
+                    # === 关键：构建纠错对话 ===
+                    # 1. 把模型错误的回答加进去
+                    input_messages.append(AIMessage(content=output.content))
+                    # 2. 加上用户的纠正指令
+                    error_msg = (
+                        f"Error: Your response was not a valid JSON object. "
+                        f"The error was: {str(e)}. "
+                        "Please respond ONLY with the raw JSON object. Do not output markdown code blocks or conversational text."
+                    )
+                    input_messages.append(HumanMessage(content=error_msg))
+                    logger.info("♻️  Retrying with error feedback to model...")
+
+        # === 核心修改结束 ===
 
         elif self.tool_calling_method is None:
             structured_llm = self.llm.with_structured_output(
@@ -969,6 +1001,10 @@ class AgentWithCustomPlanner(AgentWithMessageTracker):
                 "cumulative_input_token_count": tokens,
             }
             try:
+                # ---【在这里添加代码】---
+                logger.info("😴 Cooling down for 5 seconds to allow API rate limit reset...")
+                await asyncio.sleep(5) 
+                # ----------------------
                 # llm call
                 model_output, get_next_action_usage, logged_res = (
                     await self.get_next_action(input_messages)

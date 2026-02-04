@@ -1,0 +1,273 @@
+{
+  "tool_analysis": "Step Analysis: Recorded session logs show an authenticated admin session on Magento 1.9.3.8 and direct interactions with the Credit Memos grid: closed an 'Incoming Message' overlay, filled filters, applied Search, used Export (CSV), selected a row, applied a mass-action 'PDF Credit Memos', and opened a credit memo View page. Task Definition: Create a reusable tool that navigates to the credit memo grid, optionally applies filters (credit memo #, order #, bill-to, refunded range), triggers export, performs a mass-action, and opens a credit memo View. Action Plan: 1) Navigate to grid URL; 2) close overlay if present; 3) set zero or more filters (creditmemo_number, order_increment_id, bill_to_name, refunded_from, refunded_to); 4) click Search; 5) capture filtered grid; 6) optionally select export format and trigger Export; 7) select first row checkbox; 8) optionally select mass-action option and Submit; 9) optionally open View link for a specified credit memo id; 10) extract View page details. Variable Identification: base_admin_url (required), grid_id (optional for scoping), creditmemo_number, order_increment_id, bill_to_name, refunded_from, refunded_to, export_format (CSV/Excel/XML), massaction_option (e.g. 'PDF Credit Memos'), view_creditmemo_id. Step Optimization: - Navigation uses direct URL to grid to avoid extra clicks. - Overlay close uses visible text 'close' with recorded elementHash fallback. - Filters use header-text XPaths scoped by grid id when provided to maximize stability. - Export and mass-action use select+button interactions rather than trying to construct export URLs (form_key is session-specific). - Where stable elementHashes were recorded they are included as fallbacks, but primary selectors target semantic XPaths/CSS. Assumptions & Limitations: - Tool assumes the browser context is already authenticated (session cookie present). - Some admin installations may change header text/localization; grid_id helps scope selectors. - form_key and other CSRF tokens are handled by the browser session; this tool does not perform login. - The tool is deterministic (no branching) but steps that depend on optional inputs are executed; if inputs are empty they will be attempted but have no effect (caller should provide only the filters/actions desired).",
+  "name": "magento_admin_creditmemo_tool",
+  "description": "Locate and operate on Magento admin Credit Memos (filters, search, export, mass-action, open View). Assumes an authenticated admin session is already available in the browser context. Uses grid-scoped selectors and fallbacks recorded during a session on dockerized-magento.local.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the Credit Memos grid page.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_admin_url}/sales_creditmemo/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the grid and any overlays to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Close the incoming-message overlay if present (uses visible 'close' link). Fallback: recorded elementHash.",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Allow overlay to close and grid to re-render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set Credit Memo # filter when provided. Scoped to grid id if {grid_id} provided, otherwise locate by header text.",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_filter_increment_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "03c157e592",
+      "type": "input",
+      "value": "{creditmemo_number}"
+    },
+    {
+      "description": "Set Order # filter when provided.",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_filter_order_increment_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/input",
+      "elementTag": "input",
+      "elementHash": "cc96d85676",
+      "type": "input",
+      "value": "{order_increment_id}"
+    },
+    {
+      "description": "Set Bill to Name filter when provided.",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_filter_billing_name",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[6]/div/input",
+      "elementTag": "input",
+      "elementHash": "202c249021",
+      "type": "input",
+      "value": "{bill_to_name}"
+    },
+    {
+      "description": "Set Refunded 'From' filter when provided (first input in Refunded header cell).",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_filter_grand_total_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "625428c813",
+      "type": "input",
+      "value": "{refunded_from}"
+    },
+    {
+      "description": "Set Refunded 'To' filter when provided (second input in Refunded header cell).",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_filter_grand_total_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[8]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "ffd5265d96",
+      "type": "input",
+      "value": "{refunded_to}"
+    },
+    {
+      "description": "Click the Search button to apply filters. Fallback elementHash recorded.",
+      "output": null,
+      "cssSelector": "#id_6017aecb8b667acff50b6426eafd818c",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "7299101935",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the filtered grid results to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": null,
+      "output": "filtered_grid",
+      "type": "extract_page_content",
+      "goal": "Capture grid results after filtering (rows, view links, and available controls)."
+    },
+    {
+      "description": "If {export_format} provided: select the export format in the grid export control (visible text: CSV/Excel/XML). Uses recorded export select as fallback.",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_export",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "6d263e26f7",
+      "type": "select_change",
+      "selectedText": "{export_format}"
+    },
+    {
+      "description": "If {export_format} provided: click the Export button to trigger export. Uses recorded elementHash as fallback.",
+      "output": null,
+      "cssSelector": "button[title=\"Export\"][title=\"Export\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "5d9a22adb7",
+      "type": "click"
+    },
+    {
+      "description": "Allow export to start / download to trigger.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Select the first visible row checkbox (used before mass-action). Fallback to recorded elementHash for the first-row checkbox.",
+      "output": null,
+      "cssSelector": "input[name=\"creditmemo_ids\"][type=\"checkbox\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/tbody/tr/td/input",
+      "elementTag": "input",
+      "elementHash": "6ef10b7568",
+      "type": "click"
+    },
+    {
+      "description": "If {massaction_option} provided: select the mass-action option (e.g. 'PDF Credit Memos').",
+      "output": null,
+      "cssSelector": "#sales_creditmemo_grid_massaction-select",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span/select",
+      "elementTag": "select",
+      "elementHash": "dbb92199d2",
+      "type": "select_change",
+      "selectedText": "{massaction_option}"
+    },
+    {
+      "description": "If massaction selected: click the massaction Submit button to apply it.",
+      "output": null,
+      "cssSelector": "button[title=\"Submit\"][title=\"Submit\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[4]/button",
+      "elementTag": "button",
+      "elementHash": "e5da8d6705",
+      "type": "click"
+    },
+    {
+      "description": "Wait for mass-action processing to complete (PDF generation / download may start).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "If {view_creditmemo_id} provided: open the View page for that credit memo id using the href fragment. Fallback: click the first View link if id omitted.",
+      "output": null,
+      "cssSelector": "tr > td > a[href=\"http://dockerized-magento.local/index.php/admin/sales_creditmemo/view/creditmemo_id/8/\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/tbody/tr/td[9]/a",
+      "elementTag": "a",
+      "elementHash": "7918677254",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the credit memo View page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": null,
+      "output": "creditmemo_view",
+      "type": "extract_page_content",
+      "goal": "Extract key details from the credit memo View page (order number, billing/shipping, totals) and return as 'creditmemo_view'."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Base admin URL including index.php/admin path, e.g. 'http://dockerized-magento.local/index.php/admin'",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "grid_id",
+      "type": "string",
+      "format": null,
+      "description": "HTML id of the credit memo grid container (used to scope selectors). Observed value: 'sales_creditmemo_grid'. Leave empty to use header-text selectors.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "creditmemo_number",
+      "type": "string",
+      "format": null,
+      "description": "Filter value for Credit Memo # (increment id), e.g. '100000008'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "order_increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Filter value for Order # (increment id), e.g. '000000299'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "bill_to_name",
+      "type": "string",
+      "format": null,
+      "description": "Filter value for Bill to Name, e.g. 'Sarah Miller'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "refunded_from",
+      "type": "string",
+      "format": null,
+      "description": "Filter for Refunded 'From' value (numeric or currency without symbol), e.g. '20'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "refunded_to",
+      "type": "string",
+      "format": null,
+      "description": "Filter for Refunded 'To' value (numeric or currency without symbol), e.g. '30'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Export format to choose from grid export controls. Use 'CSV', 'Excel' or 'XML'. Default behavior: no export if omitted.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "massaction_option",
+      "type": "string",
+      "format": null,
+      "description": "Visible label of the mass-action option to apply (example: 'PDF Credit Memos'). If omitted the mass-action step is skipped.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "view_creditmemo_id",
+      "type": "string",
+      "format": null,
+      "description": "Credit memo numeric id to open the View page (for example '8'). If omitted the View step is skipped.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "tool_analysis": "Step Analysis: The recorded browser session logs show a complete sequence: load Manage Attributes, close an 'Incoming Message' popup, set grid filters (attribute_code, frontend_label, scope), apply Search, and open the Edit page for the 'color' attribute. The Edit page contains Save/Save and Continue/Back/Reset controls. Task Definition: Build a deterministic, reusable tool that navigates to the Magento admin Manage Attributes page (assumes an authenticated admin session), applies column filters by attribute code and frontend label, selects scope, applies the Search, and opens the Edit page for the specified attribute code. Action Plan (detailed): 1) Navigate directly to Manage Attributes URL to avoid JS-dependent menu interactions. 2) Close any overlay popup that blocks header actions. 3) Fill attribute_code filter input. 4) Fill frontend_label filter input (optional). 5) Select visible scope option by its text. 6) Click Search to apply filters. 7) Wait briefly for results. 8) Click Edit link located in the row where the Attribute Code cell equals the provided attribute_code. 9) Extract confirmation that the Edit page loaded and capture Save-related button selectors. Variable Identification: - admin_base_url (string, required): admin base URL to navigate to. - attribute_code (string, required): attribute code to filter and open for edit. - frontend_label (string, optional): optional label filter. - scope_text (string, required): visible scope option to select. Step Optimization: - Use direct navigation ({admin_base_url}/catalog_product_attribute/) instead of menu clicks to avoid JS/menu fragility. - Use name-based selectors where available (input[name='attribute_code'], input[name='frontend_label'], select[name='is_global']) for deterministic matching. - Use an XPath anchored to the attribute_code cell to find the Edit link for an exact single-match: //tr[td[normalize-space(.)='{attribute_code}']]//a[contains(@href,'/catalog_product_attribute/edit') or contains(@href,'/edit/')][1]. - Close the popup via visible-text-based XPath to ensure header controls are reachable. - Add a short wait after Search to ensure the grid refreshes before clicking the row link. Assumptions & Notes: The tool assumes an authenticated admin session exists in the browser context (no login step). It uses visible-text and name-based selectors that are standard on Magento 1.x admin grids; localization could break visible-text matching. If the environment uses a custom admin frontName, admin_base_url must point to the correct base. The tool focuses on the core task (search+open edit) and omits the Add New Attribute flow to keep the tool single-purpose and deterministic.",
+  "name": "magento_attribute_search_and_open",
+  "description": "Navigate to Magento admin Manage Attributes, apply filters (attribute code, frontend label, scope) and open the Edit page for a specified attribute code. Assumes an authenticated admin session is already present in the browser.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Manage Attributes listing page directly (reliable even if menus require JS).",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_base_url}/catalog_product_attribute/",
+      "url_operation": null
+    },
+    {
+      "description": "Close the 'Incoming Message' popup if present so header buttons and grid filters are interactable.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[normalize-space(.)='close' or normalize-space(.)='Close']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Fill the Attribute Code filter input with the exact attribute code to search (e.g. 'color').",
+      "output": null,
+      "cssSelector": "input[name='attribute_code']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{attribute_code}"
+    },
+    {
+      "description": "Fill the Attribute Label (frontend_label) filter input. Pass empty string if unused.",
+      "output": null,
+      "cssSelector": "input[name='frontend_label']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{frontend_label}"
+    },
+    {
+      "description": "Select the Scope filter visible option by its visible text (Store View / Website / Global).",
+      "output": null,
+      "cssSelector": "select[name='is_global']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{scope_text}"
+    },
+    {
+      "description": "Click the Search / Apply Filters control to apply the grid filters.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//button[normalize-space(text())='Search' or normalize-space(.)='Search'] | //input[@type='submit' and @value='Search']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the grid to refresh and show filtered results.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Click the Edit link inside the row whose Attribute Code cell exactly matches {attribute_code}. This targets the standard Magento attribute-edit anchor in that row.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[td[normalize-space(.)='{attribute_code}']]//a[contains(translate(@href,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'catalog_product_attribute/edit') or contains(translate(@href,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), '/edit/')][1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "After opening the attribute edit page, extract whether Save/Save and Continue/Back/Reset buttons are present and capture their likely selectors (ids/titles/classes).",
+      "output": "edit_page_buttons",
+      "type": "extract_page_content",
+      "goal": "Confirm presence of edit page action buttons (Save, Save and Continue, Back, Reset) and capture their common selectors"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base admin URL up to the admin frontName (example: \"http://dockerized-magento.local/index.php/admin\"). Must be the same host/session where the user is already authenticated.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "attribute_code",
+      "type": "string",
+      "format": null,
+      "description": "The attribute code to search for and open for editing (e.g. \"color\"). This should match the Attribute Code column value exactly.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "frontend_label",
+      "type": "string",
+      "format": null,
+      "description": "Frontend label (Attribute Label) to use as an additional filter. If not needed, pass empty string \"\".",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "scope_text",
+      "type": "string",
+      "format": null,
+      "description": "Visible scope option to select in the grid filter. Use exact visible text: 'Store View', 'Website' or 'Global'.",
+      "required": true,
+      "enum": [
+        "Store View",
+        "Website",
+        "Global"
+      ]
+    }
+  ]
+}

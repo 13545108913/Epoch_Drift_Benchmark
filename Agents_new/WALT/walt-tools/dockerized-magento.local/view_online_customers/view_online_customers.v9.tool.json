@@ -1,0 +1,341 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigated to the Magento Admin Online Customers page, logged in, closed an 'Incoming Message' popup, filled multiple filter inputs (ID range, name, email, type, last URL), applied Search, observed 'No records found', and used Reset Filter to clear inputs. Several stable selector templates were identified using the Magento admin grid structure (table.grid, thead tr.filter, td:nth-child(N)).\n\nTask Definition:\n- Provide a reusable, parameterized tool that navigates to the Online Customers admin grid (starting from an authenticated admin session), applies user-specified filters (ID range, name, email, IP, session/start/last activity ranges, Type, Last URL), extracts the filtered results, then demonstrates Reset Filter and captures the post-reset state. The tool must be deterministic, use stable selectors where possible, and handle an obstructing incoming-message popup.\n\nAction Plan:\n1. Navigate to the provided {admin_url} (Online Customers grid). 2. Wait briefly for page load. 3. Agent step to close any popup overlay (dynamic). 4. Fill each filter input (ID From/To, First/Middle/Last Name, Email, IP, date ranges, Type select, Last URL) using column-indexed, grid-scoped CSS selectors derived from Magento admin grid structure. 5. Optionally change per-page limiter. 6. Click the 'Search' button and wait for grid reload. 7. Extract filtered grid results into structured output. 8. Click 'Reset Filter', wait, and extract the post-reset state.\n\nVariable Identification (inputs required for reuse):\n- admin_url (required) \u2013 full URL to the Online Customers admin grid. \n- id_from, id_to \u2013 numeric range values.\n- first_name, middle_name, last_name \u2013 text filters.\n- email \u2013 text/email filter.\n- ip_address \u2013 text filter (may not be present in some grid templates; tool will still attempt to fill it). \n- session_start_from/to, last_activity_from/to \u2013 date/datetime strings. \n- type \u2013 select option: 'Customer' or 'Visitor'.\n- last_url \u2013 path or URL fragment to filter by.\n- per_page \u2013 per-page limiter option.\n\nStep Optimization:\n- Prefer scoped grid selectors (table.grid thead tr.filter td:nth-child(N) input/select) to avoid fragile id/name assumptions. \n- Use an agentic popup-closure step because the 'Incoming Message' overlay is dynamic and may obstruct inputs; deterministic selectors for that element were not stable across runs. \n- Use fixed short waits after navigation, popup closure, and after clicking 'Search' to allow the UI to stabilise (keeps the step sequence deterministic). \n- Avoid conditional branching in the step list; instead the tool writes empty strings where parameters are not supplied (inputs remain unchanged) and attempts selection where appropriate. \n- The tool always performs Reset Filter after extraction to demonstrate the clearing action (this matches the recorded demonstration). \n\nNotes and constraints:\n- The tool assumes an active authenticated admin session (do NOT include login). \n- The IP filter control may not exist on some Magento admin templates; the tool will attempt to fill it but it may be ignored. \n- If your Magento instance uses different grid markup or ids (e.g. '#customerGrid'), update the selectors to scope them to that container for improved reliability.\n",
+  "name": "magento_admin_online_customers_filter_tool",
+  "description": "Navigate to Magento Admin Online Customers grid, apply filters (ID range, name, email, IP, date ranges, Type, Last URL), extract filtered results, then reset filters. Assumes an authenticated admin session is already active.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Online Customers grid (assumes an authenticated admin session).",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Short wait for the page and grid to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.5
+    },
+    {
+      "description": "Some Magento installs show an 'Incoming Message' popup that blocks the filter row; this agentic step will close it if present.",
+      "output": null,
+      "type": "agent",
+      "task": "Detect and close any obstructing 'Incoming Message' or notification popup (click the popup's close link/button). Search for elements matching selectors like \"a[title='close']\", \"a.close\", \"//a[normalize-space()='close']\" and click until the overlay is gone or max attempts reached.",
+      "max_steps": 3
+    },
+    {
+      "description": "Short wait to allow popup close animation to finish.",
+      "output": null,
+      "type": "wait",
+      "seconds": 0.8
+    },
+    {
+      "description": "Enter ID range 'From' value into the ID filter cell (first input).",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(1) input:nth-of-type(1)",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{id_from}"
+    },
+    {
+      "description": "Enter ID range 'To' value into the ID filter cell (second input).",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(1) input:nth-of-type(2)",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{id_to}"
+    },
+    {
+      "description": "Enter First Name filter.",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(2) input",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{first_name}"
+    },
+    {
+      "description": "Enter Middle Name filter.",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(3) input",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{middle_name}"
+    },
+    {
+      "description": "Enter Last Name filter.",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(4) input",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_name}"
+    },
+    {
+      "description": "Enter Email filter.",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(5) input",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{email}"
+    },
+    {
+      "description": "Enter IP Address filter (if the input is present in this installation).",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(6) input",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{ip_address}"
+    },
+    {
+      "description": "Enter Session Start - From date/time (first input in that cell).",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(7) input:nth-of-type(1)",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{session_start_from}"
+    },
+    {
+      "description": "Enter Session Start - To date/time (second input in that cell).",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(7) input:nth-of-type(2)",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{session_start_to}"
+    },
+    {
+      "description": "Enter Last Activity - From date/time (first input in that cell).",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(8) input:nth-of-type(1)",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_activity_from}"
+    },
+    {
+      "description": "Enter Last Activity - To date/time (second input in that cell).",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(8) input:nth-of-type(2)",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_activity_to}"
+    },
+    {
+      "description": "Select Type filter option (Customer or Visitor). If {type} is empty, this step will attempt to select an empty value (does nothing).",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(9) select",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{type}"
+    },
+    {
+      "description": "Enter Last URL filter (partial or full path).",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter td:nth-child(10) input",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{last_url}"
+    },
+    {
+      "description": "Optionally change the per-page limiter (20/30/50/100/200). If {per_page} is empty this step will not change the existing limit.",
+      "output": null,
+      "cssSelector": "div.pager select[name*='limit'], div.toolbar select[name*='limit']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{per_page}"
+    },
+    {
+      "description": "Click the grid 'Search' (Apply Filters) button to reload the grid with the provided filters.",
+      "output": null,
+      "cssSelector": "button[title='Search'], input[type='button'][value='Search']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to reload and apply the filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture search results (may be empty).",
+      "output": "filtered_results",
+      "type": "extract_page_content",
+      "goal": "Extract filtered grid results: total records, and each matching row's columns (ID, First Name, Middle Name, Last Name, Email, IP Address, Session Start Time, Last Activity, Type, Last URL)."
+    },
+    {
+      "description": "Click 'Reset Filter' to clear filters and restore default grid state.",
+      "output": null,
+      "cssSelector": "button[title='Reset Filter'], input[type='button'][value='Reset Filter']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Short wait for the reset action to complete.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Return the grid state after resetting filters.",
+      "output": "post_reset_state",
+      "type": "extract_page_content",
+      "goal": "Capture post-reset filter state and grid contents (confirm filters cleared)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL to the Magento admin Online Customers page (e.g. 'http://dockerized-magento.local/index.php/admin/customer_online/'). Must point to the grid page and the session must already be authenticated.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "id_from",
+      "type": "string",
+      "format": null,
+      "description": "ID range start (From). Use numeric string (e.g. '100'). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "id_to",
+      "type": "string",
+      "format": null,
+      "description": "ID range end (To). Use numeric string (e.g. '200'). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "first_name",
+      "type": "string",
+      "format": null,
+      "description": "Customer First Name to filter by (partial match allowed).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "middle_name",
+      "type": "string",
+      "format": null,
+      "description": "Customer Middle Name to filter by (partial match allowed).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_name",
+      "type": "string",
+      "format": null,
+      "description": "Customer Last Name to filter by (partial match allowed).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": "user@domain.com",
+      "description": "Customer email address to filter by (partial or full).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "ip_address",
+      "type": "string",
+      "format": null,
+      "description": "IP address to filter by (e.g. '203.0.113.45'). If the IP filter input is not present in this grid, this value will be ignored.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "session_start_from",
+      "type": "string",
+      "format": null,
+      "description": "Session Start time - From. Use 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM' format depending on the site datepicker.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "session_start_to",
+      "type": "string",
+      "format": null,
+      "description": "Session Start time - To. Use 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_activity_from",
+      "type": "string",
+      "format": null,
+      "description": "Last Activity - From. Use 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_activity_to",
+      "type": "string",
+      "format": null,
+      "description": "Last Activity - To. Use 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "format": null,
+      "description": "Type filter. Choose 'Customer' or 'Visitor'. Leave empty to not change Type filter.",
+      "required": false,
+      "enum": [
+        "Customer",
+        "Visitor"
+      ]
+    },
+    {
+      "name": "last_url",
+      "type": "string",
+      "format": null,
+      "description": "Last URL path to filter by (e.g. '/checkout/cart/'). Partial match allowed.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "per_page",
+      "type": "string",
+      "format": null,
+      "description": "Set the per-page (limiter) option (one of '20','30','50','100','200'). Leave empty to keep current.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

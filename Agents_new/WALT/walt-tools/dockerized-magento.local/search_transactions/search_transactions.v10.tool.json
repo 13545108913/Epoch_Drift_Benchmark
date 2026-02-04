@@ -1,0 +1,196 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigates to the Magento admin Transactions grid, logs in (outside this tool), closes an overlay popup, fills the grid's filter row fields (Order ID, Transaction ID, Payment Method, Transaction Type, Is Closed, Created At range) and clicks the Search button. Recorded interactions include stable column-indexed selectors and element hashes for the exact elements used.\n\nTask Definition:\n- Create a reusable, deterministic tool that navigates to the Transactions page and applies the specified filter values, then returns the grid contents (or 'No records found'). It must use stable selectors (column-indexed CSS/XPath) and fall back to recorded elementHash selectors.\n\nAction Plan:\n1. Navigate to the provided transactions_url.\n2. Close any known overlay/popup (recorded close control) to ensure filters are interactable.\n3. Input text into Order ID and Transaction ID filter inputs using the recorded element hashes and column-index CSS selectors.\n4. Select Payment Method (if provided) from the payment-method select control.\n5. Select Transaction Type (if provided) from the transaction-type select control.\n6. Select Is Closed (if provided) from the is_closed select control.\n7. Input Created At From / To values into date inputs (if provided) using column-index selectors.\n8. Click the Search button (recorded element hash and text-based XPath fallback).\n9. Extract the grid area text to return search results (rows or 'No records found').\n\nVariable Identification (inputs needed):\n- transactions_url: required (target page URL).\n- order_id: optional text filter.\n- transaction_id: optional text filter.\n- payment_method: optional visible option text for payment-method dropdown.\n- transaction_type: optional (enum) visible option text.\n- is_closed: optional (enum Yes/No) visible option text.\n- created_from / created_to: optional date/text inputs for Created At range.\n\nStep Optimization:\n- Use navigation to the transactions_url rather than clicking through the admin menu.\n- Use column-indexed CSS selectors anchored to table.grid thead tr.filter th:nth-child(N) to deterministically select each filter control (these select exactly one element when column order is stable).\n- Where element hashes were recorded during the session, include them as the primary deterministic target (elementHash) and include the column-index CSS/XPath as readable selectors for fallback/clarity.\n- Avoid conditional branching: the tool always attempts to set each filter input with the provided parameter value (empty string is allowed to clear a field). The admin session must already be authenticated before calling this tool.\n- Final step extracts the grid text so the caller can assert results. The tool does not perform authentication (session must be present).",
+  "name": "magento_transactions_search_tool",
+  "description": "Search Magento Admin Transactions grid using the filter row: order id, transaction id, payment method, transaction type, is_closed, created at range. Uses stable column-index selectors and recorded element hashes as backups.",
+  "version": "2026-02-01-1",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Admin Transactions page provided by the caller.",
+      "output": null,
+      "type": "navigation",
+      "url": "{transactions_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for page resources and any overlays to appear or settle.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Close the incoming-message popup if present (recorded elementHash for 'close' control). If not present the click will fail harmlessly in typical automation flows.",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[6]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Enter Order ID into the filter input in the second column (Order ID). Use elementHash recorded in session as primary selector.",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_increment_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "2e1ab70e63",
+      "type": "input",
+      "value": "{order_id}"
+    },
+    {
+      "description": "Enter Transaction ID into the filter input in the third column (Transaction ID).",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_txn_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[3]/div/input",
+      "elementTag": "input",
+      "elementHash": "aa9671f0a9",
+      "type": "input",
+      "value": "{transaction_id}"
+    },
+    {
+      "description": "Select the Payment Method option by visible text from the Payment Method Name dropdown (5th column). Provide exact visible option text (optional).",
+      "output": null,
+      "cssSelector": "ul > li > a[href=\"http://dockerized-magento.local/index.php/admin/checkout_agreement/\"]",
+      "xpath": "html/body/div/div/div[3]/ul/li[2]/ul/li[8]/a",
+      "elementTag": "a",
+      "elementHash": "479ca37215",
+      "type": "select_change",
+      "selectedText": "{payment_method}"
+    },
+    {
+      "description": "Select Transaction Type by visible text (6th column). Use one of the known option texts (Order, Authorization, Capture, Void, Refund).",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_txn_type",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[6]/select",
+      "elementTag": "select",
+      "elementHash": "eaf63619c9",
+      "type": "select_change",
+      "selectedText": "{transaction_type}"
+    },
+    {
+      "description": "Select Is Closed by visible text ('Yes' or 'No') from the 7th column dropdown.",
+      "output": null,
+      "cssSelector": "#order_transactions_filter_is_closed",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div/div/table/thead/tr[2]/th[7]/select",
+      "elementTag": "select",
+      "elementHash": "de66e8a7e6",
+      "type": "select_change",
+      "selectedText": "{is_closed}"
+    },
+    {
+      "description": "Enter Created At 'From' date/text into the first input of the 8th column filter. Use the UI's date format.",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter th:nth-child(8) input:nth-of-type(1)",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_from}"
+    },
+    {
+      "description": "Enter Created At 'To' date/text into the second input of the 8th column filter. Use the UI's date format.",
+      "output": null,
+      "cssSelector": "table.grid thead tr.filter th:nth-child(8) input:nth-of-type(2)",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{created_to}"
+    },
+    {
+      "description": "Click the Search button to apply the filters. Uses the recorded button elementHash and a text-match XPath fallback.",
+      "output": null,
+      "cssSelector": "#id_3b441adb1e96095e50342e4ec4643e65",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[2]/button[2]",
+      "elementTag": "button",
+      "elementHash": "012cbba17e",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Return the visible grid area text so the caller can verify rows or an empty result state.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Extract the Transactions grid visible results and any 'No records found' message."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "transactions_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the Magento transactions admin page (example: 'http://dockerized-magento.local/index.php/admin/sales_transactions/'). Agent will navigate here first.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Order increment/id to filter by (text). Leave empty to not filter by order id.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "transaction_id",
+      "type": "string",
+      "format": null,
+      "description": "Transaction identifier to filter by (text). Leave empty to not filter by transaction id.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "payment_method",
+      "type": "string",
+      "format": null,
+      "description": "Visible payment method option text to select from the Payment Method Name dropdown (example: 'PayPal Express Checkout').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "transaction_type",
+      "type": "string",
+      "format": null,
+      "description": "Transaction Type visible option text to select (one of the enum values).",
+      "required": false,
+      "enum": [
+        "Order",
+        "Authorization",
+        "Capture",
+        "Void",
+        "Refund"
+      ]
+    },
+    {
+      "name": "is_closed",
+      "type": "string",
+      "format": null,
+      "description": "Filter by closed status visible option text: 'Yes' or 'No'.",
+      "required": false,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "created_from",
+      "type": "string",
+      "format": null,
+      "description": "Created At range start date as text. Use the page's expected format (commonly 'YYYY-MM-DD' or the UI locale format). Leave empty to not set.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "created_to",
+      "type": "string",
+      "format": null,
+      "description": "Created At range end date as text. Use the page's expected format (commonly 'YYYY-MM-DD' or the UI locale format). Leave empty to not set.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

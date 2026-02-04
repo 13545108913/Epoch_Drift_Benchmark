@@ -1,0 +1,107 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session shows a complete, deterministic sequence to (1) navigate to the Manage Attribute Sets page, (2) enter a Set Name filter, (3) click Search, (4) click the Edit link for the matching row. The session also demonstrates reliable selectors for the Add New Set and Add New Set form, but this tool focuses on locating and opening a set for editing.\n\nTask Definition:\n- Purpose: Given a Magento Manage Attribute Sets URL and an attribute set name, navigate to the grid, filter for the set name, apply Search, and open the Edit page for that attribute set. Return the edit page content. The tool assumes the automation context is already authenticated.\n\nAction Plan:\n1. Navigate to the given Manage Attribute Sets URL.\n2. Wait briefly to allow page/JS initialization.\n3. Locate the Set Name filter input using an XPath anchored to the header cell text 'Set Name' and enter {set_name}.\n4. Click the Search button (supports both <button> and <input value='Search'> variants).\n5. Wait for grid update.\n6. Extract page content to allow verification of search results.\n7. Click the Edit link whose visible text exactly matches {set_name} (scoped to Magento grid table and href containing 'catalog_product_set').\n8. Wait for Edit page load and extract that page's content.\n\nVariable Identification (inputs):\n- admin_catalog_product_set_url (required): direct URL to the attribute-sets grid. This avoids brittle left-menu navigation and respects the instruction to use deterministic navigation when possible.\n- set_name (required): exact visible name used to match row link text.\n- wait_seconds_after_nav (optional): tuning parameter for page load waits (default 2s used in steps).\n- wait_seconds_after_search (optional): tuning parameter after applying Search (default 2s used in steps).\n\nStep Optimization:\n- Navigation: The tool navigates directly to the Manage Attribute Sets URL instead of clicking through menus. This is deterministic and faster.\n- Deterministic Selectors: XPaths anchor to visible header text 'Set Name' and link text for the row. For Search button we accept both <button> and <input> forms. The Edit link XPath checks for catalog_product_set in href to avoid clicking other matching text elsewhere.\n- Waits: Fixed short waits are included to allow page updates. These are kept minimal (2s) and exposed as optional parameters so callers can tune them. If the caller's framework supports waiting for element presence or navigation completion, replace fixed waits with explicit wait-for-element steps in higher-level orchestration.\n\nExcluded/Removed Steps:\n- Authentication steps are intentionally omitted because the instruction/context indicates the agent will already be authenticated. The Add New Set creation flow is not included to keep the tool single-purpose and deterministic (the recorded session included creation, but that was a separate interaction).\n\nSelector Robustness & Notes:\n- The XPath //th[.//text()[normalize-space(.)='Set Name']]//input[1] targets the filter input regardless of varying id/name attributes.\n- The Search click uses a union XPath to handle both button and input implementations.\n- The Edit link XPath restricts matches to grid tables and prefers links whose href contains 'catalog_product_set', making it robust against duplicate visible text elsewhere.\n\nUsage:\n- Provide admin_catalog_product_set_url and set_name. The tool will navigate, filter, search, and open the edit page for the specified set, returning the edit page content under 'edit_page'.",
+  "name": "magento_open_attribute_set_for_edit",
+  "description": "Navigate to Magento Admin Manage Attribute Sets, filter by an attribute set name, apply Search, and open the Edit page for that attribute set. Returns the edit page content (title and URL) after opening it. Assumes the automation session is already authenticated to the admin area.",
+  "version": "2026-02-02",
+  "steps": [
+    {
+      "description": "Navigate directly to the Manage Attribute Sets admin URL.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_catalog_product_set_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Short pause to allow the page to render and for any admin JavaScript to initialize. Uses default 2s; callers may override with 'wait_seconds_after_nav' by replacing this step in a higher-level orchestration if supported.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Input the provided attribute set name into the 'Set Name' grid filter input. XPath scopes to the header cell labeled 'Set Name' and selects the filter input underneath.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//th[.//text()[normalize-space(.)='Set Name']]//input[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{set_name}"
+    },
+    {
+      "description": "Click the grid 'Search' button (applies the filter). Matches either a <button> or an <input> with value 'Search'.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//button[normalize-space(.)='Search'] | //input[@value='Search' and (@type='button' or @type='submit')])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to update after applying the filter. Default 2 seconds; adjust externally if needed.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract page content after filtering so caller can verify that the expected row is present before clicking Edit.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Confirm filter results and capture any visible link/href for the matching attribute set row."
+    },
+    {
+      "description": "Click the Edit link for the row whose link text exactly matches the provided {set_name}. The XPath scopes to standard Magento admin grids and prefers links that point to catalog_product_set edit paths.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//table[contains(@class,'grid') or contains(@class,'data')]//a[normalize-space(text())='{set_name}' and (contains(@href,'catalog_product_set/edit') or contains(@href,'catalog_product_set'))])[1]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for navigation to the Edit page to complete and for the page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Return the edit page content to confirm the attribute set edit page is open and to provide details (page title and URL).",
+      "output": "edit_page",
+      "type": "extract_page_content",
+      "goal": "Capture the opened edit page (title, URL, and any success/notification messages)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_catalog_product_set_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL for the Manage Attribute Sets admin page (example: 'http://dockerized-magento.local/index.php/admin/catalog_product_set/'). The tool will navigate directly to this URL.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "set_name",
+      "type": "string",
+      "format": null,
+      "description": "Exact visible attribute set name to locate and open for editing (e.g. 'Default' or 'My Attribute Set').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "wait_seconds_after_nav",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait after navigation before interacting (default 2). Helps pages and JS initialize.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_seconds_after_search",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait after applying the Search filter before attempting to click the Edit link (default 2).",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

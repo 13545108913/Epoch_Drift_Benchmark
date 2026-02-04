@@ -1,0 +1,136 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigated to a Magento admin order view and used the 'Add Order Comments' block to enter a comment, attempt to change order status, toggle notify/visible checkboxes, and submit. The session demonstrated that the comment and notification succeeded but the desired status option ('Closed') was not available in the dropdown.\n\nTask Definition:\n- Create a reusable, deterministic tool that: 1) navigates to the order view URL for a given order_id; 2) enters a comment; 3) optionally selects a status (by exact visible text); 4) optionally checks 'Notify Customer' and 'Visible on Frontend'; 5) submits the comment; 6) returns the top history entry for verification.\n\nAction Plan:\n1) Navigate to the order view URL constructed from order_id (direct URL navigation is deterministic).\n2) Wait for the page to load (small fixed wait; callers may override wait_seconds).\n3) Extract current Status dropdown options so callers can confirm available statuses before selecting.\n4) Fill the Comment textarea using a label-anchored XPath (robust across theme changes) and recorded elementHash as a backup.\n5) If a status is supplied, select the dropdown option by visible text using a label-anchored XPath and recorded elementHash backup.\n6) Toggle the Notify and Visible checkboxes using label-anchored XPaths (recorded elementHash backups present).\n7) Click the Submit Comment button using text/onclick-anchored selectors (elementHash fallback) to ensure JS handlers execute.\n8) Wait a short time for the UI update then extract the top comments history entry for verification.\n\nVariable Identification (inputs):\n- order_id (string, required): used in the URL path.\n- comment_text (string, required): text to add.\n- status (string, optional): exact visible dropdown option text to select; tool will attempt selection and will return status options for verification when needed.\n- notify_customer (bool, optional): whether to set the notify checkbox.\n- visible_on_front (bool, optional): whether to set the visible-on-frontend checkbox.\n- wait_seconds (number, optional): timing adjustments for stability.\n\nStep Optimization:\n- Navigation is direct to the order view URL (avoids clicking through menus).\n- Selection and input steps use label-anchored XPaths (//label[normalize-space(text())='...']/following::...) rather than brittle ids/classes \u2014 robust across Magento admin theme changes.\n- ElementHash values recorded in the session are included as deterministic fallbacks when the executor supports them.\n- The tool includes an explicit extraction of status options before attempting selection so automation can first verify availability of the desired status (this prevents silent failures when an option isn't present).\n- The Submit action uses button text or onclick content to ensure Magento's client-side JS handlers are invoked (important in Magento 1 admin which often binds JS to buttons).\n\nNotes/Constraints:\n- The tool assumes the agent is already authenticated in the admin session as recorded; it does not perform login steps.\n- The 'status' selection requires the exact visible option text; if the option is not present the select_change step will fail \u2014 callers should inspect the extracted 'status_options' before providing a status value.\n- Because checkboxes are toggled by click steps, callers should pass true only for options they want enabled. The executor should interpret the boolean inputs to decide whether to click those steps or skip them. If the execution environment cannot skip steps, implementors should wrap the click steps in conditional logic that checks the boolean inputs.\n\nOutcome:\n- A compact, deterministic set of steps that implements the required functionality while favoring resilient, label-anchored selectors and including recorded elementHash fallbacks recorded from a working session (textarea: fcc90341f4, select: a29f177603, notify: 6ff6db733b, visible: 394ae2565e, submit: 1c2a87153e).",
+  "name": "magento_add_order_comment",
+  "description": "Adds an order history comment to a Magento 1.x order view, optionally updates the order status (by visible option text) and toggles notify/visibility checkboxes. Uses label-anchored XPaths with CSS fallbacks and includes elementHash values recorded from a working session as backups.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate directly to the order view page for the provided order_id.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_order/view/order_id/{order_id}/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the page and the 'Add Order Comments' block to render (adjust with {wait_seconds} if needed).",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Read the Status dropdown options and return them so callers can verify available statuses before attempting a selection.",
+      "output": "status_options",
+      "type": "extract_page_content",
+      "goal": "Confirm presence of the 'Add Order Comments' block and capture current Status dropdown options (for verification)."
+    },
+    {
+      "description": "Enter the provided comment text into the Comment textarea. Uses a label-anchored XPath; falls back to recorded elementHash if available.",
+      "output": null,
+      "cssSelector": "#history_comment",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/span[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "fcc90341f4",
+      "type": "input",
+      "value": "{comment_text}"
+    },
+    {
+      "description": "Select the Status dropdown option whose visible text matches {status}. If {status} is empty or not present in the dropdown, this step will attempt selection and will surface an error \u2014 callers should inspect 'status_options' output first.",
+      "output": null,
+      "cssSelector": "#history_status",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/span/select",
+      "elementTag": "select",
+      "elementHash": "a29f177603",
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Click the 'Notify Customer by Email' checkbox. Set this action when {notify_customer}=true; the XPath is label-anchored and elementHash is provided as a fallback.",
+      "output": null,
+      "cssSelector": "#history_notify",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "6ff6db733b",
+      "type": "click"
+    },
+    {
+      "description": "Click the 'Visible on Frontend' checkbox. Set this action when {visible_on_front}=true; uses label-anchored XPath with recorded elementHash fallback.",
+      "output": null,
+      "cssSelector": "#history_visible",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/div[2]/input[2]",
+      "elementTag": "input",
+      "elementHash": "394ae2565e",
+      "type": "click"
+    },
+    {
+      "description": "Click the Submit Comment button to submit the Add Order Comments form. Uses button text/onclick anchored selectors; fallback elementHash included.",
+      "output": null,
+      "cssSelector": "button[title=\"Submit Comment\"][title=\"Submit Comment\"]",
+      "xpath": "html/body/div[2]/div[6]/div/div/div[2]/div/div[3]/div/div/div[16]/div/fieldset/div/div/div[3]/button",
+      "elementTag": "button",
+      "elementHash": "1c2a87153e",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the UI to process the submission and refresh the comments history.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "After submit, extract the top history entry to verify the action succeeded and to return the recorded values.",
+      "output": "latest_history_entry",
+      "type": "extract_page_content",
+      "goal": "Capture the top (most recent) comments history entry: timestamp, status, customer notified flag, and comment text for verification."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "order_id",
+      "type": "string",
+      "format": null,
+      "description": "Order internal id used in the admin order-view URL (e.g. '204'). This will be placed into the URL: /admin/sales_order/view/order_id/{order_id}/",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment_text",
+      "type": "string",
+      "format": null,
+      "description": "The free-text comment to append to the order history (plain text, may be multiline).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Exact visible text of the status option to select in the 'Status' dropdown (must match an option exactly, e.g. 'Closed'). If omitted, the status will not be changed.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "notify_customer",
+      "type": "bool",
+      "format": null,
+      "description": "Whether to check 'Notify Customer by Email' before submitting. Default: false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "visible_on_front",
+      "type": "bool",
+      "format": null,
+      "description": "Whether to check 'Visible on Frontend' before submitting. Default: false.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait after navigation and after submit to allow the admin UI to render / process. Default recommended: 2-3 seconds.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

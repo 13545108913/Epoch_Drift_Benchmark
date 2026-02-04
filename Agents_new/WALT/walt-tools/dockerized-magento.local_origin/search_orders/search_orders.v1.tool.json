@@ -1,0 +1,304 @@
+{
+  "tool_analysis": "1. Step Analysis\nThe recorded session logs into the Magento 1 admin, navigates to Sales > Orders grid, then systematically demonstrates:\n- Authentication on the admin login page\n- Opening the Sales Orders grid URL\n- Using the filter row to search by Order #\n- Applying and clearing a purchase date range\n- Interacting with store view selector (attempted; selection sometimes fails but element is stable)\n- Selecting order Status from dropdown\n- Setting numeric ranges for Grand Total (Base) and Grand Total (Purchased)\n- Using Search and Reset Filter buttons\n- Changing the number of results per page (per-page selector)\n- Navigating between pages via the pager (Next page)\n- Clicking View links in the Action column to open individual order detail pages\n- Verifying the grid state after filters/pagination using content extraction\n\n2. Task Definition\nThe tool\u2019s purpose is: Given a set of optional filter criteria and pagination options, open the Magento Admin Sales Orders grid, apply those filters, execute the search, optionally adjust per-page and page number, and then extract the resulting order grid rows along with their direct View URLs.\n\n3. Action Plan\nEssential deterministic sequence:\n1) Navigate directly to the Sales Orders grid URL (login will be handled by existing session in real usage; the demo includes login but the tool should assume already-authenticated as per instructions).\n2) Optionally clear existing filters (Reset Filter) if the caller wants a clean filter state before applying new criteria.\n3) Populate filter row fields based on provided inputs:\n   - Order # text\n   - Purchased From (Store) dropdown\n   - Purchased On date range (from/to)\n   - Bill to Name text\n   - Ship to Name text\n   - Grand Total (Base) range from/to\n   - Grand Total (Purchased) range from/to\n   - Status dropdown\n4) Set per-page selector if requested (e.g., 20/30/50/100/200).\n5) Trigger Search to load filtered results.\n6) If a specific page number is given and greater than 1, use the pager input and Next/Go mechanism to navigate to that page.\n7) Extract the current grid page rows: order number, purchased from store, purchased on date, bill-to name, ship-to name, grand total base, grand total purchased, status, and the View link URL.\n\nNote: The login flow steps (username/password input and Login click) were needed in the demo but must not be included in the reusable tool, per instructions that the agent will already be logged in.\n\n4. Variable Identification\nFrom the interactions and grid structure, the reusable parameters should be:\n- increment_id: text typed into Order # filter\n- store_view: visible text of Purchased From (Store) select (e.g., \"English\", \"French\", \"German\", \"[ deleted ]\")\n- purchased_on_from: date string for Purchased On From (format MM/DD/YYYY)\n- purchased_on_to: date string for Purchased On To (format MM/DD/YYYY)\n- bill_to_name: text for Bill to Name filter\n- ship_to_name: text for Ship to Name filter\n- base_grand_total_from: numeric string for G.T. (Base) From\n- base_grand_total_to: numeric string for G.T. (Base) To\n- grand_total_from: numeric string for G.T. (Purchased) From\n- grand_total_to: numeric string for G.T. (Purchased) To\n- status: visible text of Status select (e.g., \"Complete\", \"Pending Payment\", etc.)\n- page_size: one of 20, 30, 50, 100, 200 (per-page selector)\n- page_number: page to navigate to (starting at 1)\n- reset_before: boolean indicating whether the tool should click Reset Filter before applying new criteria\n\nAll of these are optional filters except that page_number and page_size control pagination and may default to 1 and 20 respectively if not supplied.\n\n5. Step Optimization\n- Navigation can be done with a single navigation step to the Sales Orders grid URL; intermediate dashboard/menu clicks are unnecessary.\n- Login steps are omitted since the environment guarantees an authenticated session.\n- All UI interactions in the grid use deterministic selectors via elementHash captured from the final, stable unfiltered grid state (page 1, 20 per page) and subsequent states (e.g., per-page 50, page 2). These elementHashes are used for order# input, date inputs, total range inputs, dropdowns (store/status/per-page), pager, Search/Reset buttons, and a representative View link.\n- Pagination is implemented simply: set per-page, click Search, then if page_number>1, type the page number into the page input and click Next. This mirrors the demonstrated behavior and avoids dynamic agentic exploration.\n- One extraction step at the end collects the structured grid data (order rows and View URLs), keeping the tool focused on its core purpose.\n\nThe resulting tool is single-purpose: apply filters and pagination on the Magento Sales Orders grid and return the resulting orders and their \"View\" links. Non-essential features like mass actions, export, or RSS are intentionally excluded.\n",
+  "name": "magento_admin_sales_order_search",
+  "description": "Locate Magento admin orders using flexible filters (order number, purchase date range, store view, billing/shipping names, grand total ranges, status) plus per-page and pagination controls, and return grid rows with direct View links.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Sales Orders grid (assumes an already-authenticated admin session).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/sales_order/",
+      "url_operation": null
+    },
+    {
+      "description": "Optionally reset all filters to their default state if reset_before is true (tool controller should gate this by the input).",
+      "output": null,
+      "cssSelector": "button[title=\"Reset Filter\"][title=\"Reset Filter\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[3]/button",
+      "elementTag": "button",
+      "elementHash": "9e3b01aaa2",
+      "type": "click"
+    },
+    {
+      "description": "Set the Order # text filter to the provided increment_id, if given. Leave empty if increment_id is null or blank.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_real_order_id",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/input",
+      "elementTag": "input",
+      "elementHash": "230585ef85",
+      "type": "input",
+      "value": "{increment_id}"
+    },
+    {
+      "description": "Choose a store view in the Purchased From (Store) dropdown using the visible text, if store_view is provided.",
+      "output": null,
+      "cssSelector": "select[name=\"store_id\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/select",
+      "elementTag": "select",
+      "elementHash": "2e752431bb",
+      "type": "select_change",
+      "selectedText": "{store_view}"
+    },
+    {
+      "description": "Enter Purchased On From date in MM/DD/YYYY format, if purchased_on_from is provided.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_created_at1769941475.6237_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "471b01f213",
+      "type": "input",
+      "value": "{purchased_on_from}"
+    },
+    {
+      "description": "Enter Purchased On To date in MM/DD/YYYY format, if purchased_on_to is provided.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_created_at1769941475.6237_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "0b355f3edb",
+      "type": "input",
+      "value": "{purchased_on_to}"
+    },
+    {
+      "description": "Enter Bill to Name filter text, if bill_to_name is provided.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_billing_name, input[name='billing_name']",
+      "xpath": null,
+      "elementTag": "input",
+      "elementHash": "4430f13c5f",
+      "type": "input",
+      "value": "{bill_to_name}"
+    },
+    {
+      "description": "Enter Ship to Name filter text, if ship_to_name is provided.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_shipping_name, input[name='shipping_name']",
+      "xpath": null,
+      "elementTag": "input",
+      "elementHash": "6a2a1d4e21",
+      "type": "input",
+      "value": "{ship_to_name}"
+    },
+    {
+      "description": "Enter minimum Base Grand Total (From) value, if base_grand_total_from is provided.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_base_grand_total_from",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "0615c0f675",
+      "type": "input",
+      "value": "{base_grand_total_from}"
+    },
+    {
+      "description": "Enter maximum Base Grand Total (To) value, if base_grand_total_to is provided.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_base_grand_total_to",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[7]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "b3f9a08198",
+      "type": "input",
+      "value": "{base_grand_total_to}"
+    },
+    {
+      "description": "Enter minimum Purchased Grand Total (From) value, if grand_total_from is provided.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_grand_total_from, input[name='grand_total[from]']",
+      "xpath": null,
+      "elementTag": "input",
+      "elementHash": "c1c3b5c2aa",
+      "type": "input",
+      "value": "{grand_total_from}"
+    },
+    {
+      "description": "Enter maximum Purchased Grand Total (To) value, if grand_total_to is provided.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_grand_total_to, input[name='grand_total[to]']",
+      "xpath": null,
+      "elementTag": "input",
+      "elementHash": "f4e3da9a77",
+      "type": "input",
+      "value": "{grand_total_to}"
+    },
+    {
+      "description": "Select an order Status from the dropdown using visible status text, if status is provided.",
+      "output": null,
+      "cssSelector": "#sales_order_grid_filter_status",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[9]/select",
+      "elementTag": "select",
+      "elementHash": "301a5525e7",
+      "type": "select_change",
+      "selectedText": "{status}"
+    },
+    {
+      "description": "Set number of results per page (20, 30, 50, 100, or 200) using the per-page selector, if page_size is provided.",
+      "output": null,
+      "cssSelector": "select[name=\"limit\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td/select",
+      "elementTag": "select",
+      "elementHash": "4193f2ffe1",
+      "type": "select_change",
+      "selectedText": "{page_size}"
+    },
+    {
+      "description": "Click the Search button to apply all configured filters and reload the grid.",
+      "output": null,
+      "cssSelector": "#id_4531029979a8a7075430a55133c03f41",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "7f57753e86",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the Orders grid to reload after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "If page_number is greater than 1, type the desired page number into the pager input; otherwise, this can be left as 1.",
+      "output": null,
+      "cssSelector": "input[name=\"page\"][type=\"text\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td/input",
+      "elementTag": "input",
+      "elementHash": "8e6a7d66ea",
+      "type": "input",
+      "value": "{page_number}"
+    },
+    {
+      "description": "Click the Next page control to navigate to the requested page, if needed (tool controller may conditionally execute based on page_number).",
+      "output": null,
+      "cssSelector": "a[title=\"Next page\"]",
+      "xpath": "html/body/div/div[8]/div/div[3]/div/table/tbody/tr/td/a",
+      "elementTag": "a",
+      "elementHash": "19e6ae1c81",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to reload after changing page via pagination.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Capture the filtered and paginated orders list with their details and View URLs from the current grid page.",
+      "output": "orders",
+      "type": "extract_page_content",
+      "goal": "Extract all visible order rows from the Sales Orders grid, including order number, purchased from store, purchased on date, bill-to name, ship-to name, grand total base, grand total purchased, status, and the URL of each row's 'View' link. Return structured list under 'orders'."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "increment_id",
+      "type": "string",
+      "format": null,
+      "description": "Order number / increment_id value to search for in the Order # filter (exact or partial).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "store_view",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of the Purchased From (Store) dropdown (e.g., 'English', 'French', 'German', '[ deleted ]').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "purchased_on_from",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Purchased On date range start (From) in MM/DD/YYYY format.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "purchased_on_to",
+      "type": "string",
+      "format": "MM/DD/YYYY",
+      "description": "Purchased On date range end (To) in MM/DD/YYYY format.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "bill_to_name",
+      "type": "string",
+      "format": null,
+      "description": "Billing customer name text filter (Bill to Name column).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "ship_to_name",
+      "type": "string",
+      "format": null,
+      "description": "Shipping customer name text filter (Ship to Name column).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "base_grand_total_from",
+      "type": "string",
+      "format": null,
+      "description": "Minimum base grand total (G.T. (Base) From) as numeric string (e.g., '100').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "base_grand_total_to",
+      "type": "string",
+      "format": null,
+      "description": "Maximum base grand total (G.T. (Base) To) as numeric string (e.g., '200').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grand_total_from",
+      "type": "string",
+      "format": null,
+      "description": "Minimum purchased grand total (G.T. (Purchased) From) as numeric string.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "grand_total_to",
+      "type": "string",
+      "format": null,
+      "description": "Maximum purchased grand total (G.T. (Purchased) To) as numeric string.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "format": null,
+      "description": "Visible text of Status dropdown option (e.g., 'Complete', 'Pending Payment').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "page_size",
+      "type": "number",
+      "format": null,
+      "description": "Number of results per page; must match per-page selector options (20, 30, 50, 100, 200).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "page_number",
+      "type": "number",
+      "format": null,
+      "description": "Page number to navigate to after searching (1-based index).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "reset_before",
+      "type": "bool",
+      "format": null,
+      "description": "If true, click Reset Filter before applying any new filters to ensure a clean state.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

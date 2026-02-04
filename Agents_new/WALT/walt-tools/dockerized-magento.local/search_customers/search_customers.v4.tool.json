@@ -1,0 +1,374 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session demonstrates a complete Manage Customers admin flow: login, open Manage Customers, apply column filters (ID range, Name, Email, Telephone, Group, Website), Search, Export to CSV, mass-action (Subscribe to Newsletter), open Edit for a specific customer (id 208), edit fields (First Name and address Telephone) and Save. The session captured stable element hashes for many controls which we reuse.\n\nTask Definition:\n- This tool automates: navigate to the Magento Admin Manage Customers page, apply provided grid filters, optionally export results, optionally apply a mass-action to a selected customer row, open the Edit page for a specified customer id, edit account/address fields (First Name and telephone), save and extract the result.\n\nAction Plan (detailed steps the tool will run):\n1. Navigate to the Manage Customers URL.\n2. Wait for page load.\n3. Fill grid filters (entity id from/to, name, email, telephone, group, website) using recorded stable selectors (elementHash) or XPath fallbacks.\n4. Click Search and wait for grid refresh.\n5. If export_format provided select it and click Export.\n6. Select a row by customer id (XPath matching the id cell) and pick a mass-action (if provided) and submit it.\n7. Click the Edit link for the provided customer id and wait for the edit form to load.\n8. Click the Addresses tab so address fields are visible.\n9. Update account-level First Name and the chosen address telephone (if values provided).\n10. Click Save and wait for server response.\n11. Extract page content to verify success and capture updated values.\n\nVariable Identification (tool inputs derived from observed form fields and UI):\n- base_admin_customers_url: starting URL for the Manage Customers page (required).\n- filter_entity_id_from, filter_entity_id_to, filter_name, filter_email, filter_telephone: direct mappings to the grid filter inputs (optional).\n- filter_group, filter_website: dropdowns in the grid filter row; choose by visible label at runtime.\n- export_format: export select visible options (CSV, Excel, XML).\n- mass_action, massaction_group: visible mass-action choice and its parameter when assigning a group.\n- select_customer_id_to_edit: numeric customer id to select/apply mass-action and to open the edit page.\n- edit_firstname, edit_address_index (1-based), edit_address_telephone: fields to update on the Edit page.\n- wait_after_actions_seconds: tune waits for slow environments.\n\nStep Optimization and Determinism:\n- Prefer elementHash where available (these were recorded during a successful session and point to the exact controls used). These ensure the tool interacts with the same DOM nodes that were captured.\n- Where elementHash is not appropriate (row-specific elements that vary by id), use XPath that identifies the row by its ID text cell and then picks the checkbox or Edit link in that row. These XPaths are deterministic for the same DOM structure.\n- Minimized UI clicks: navigation uses direct URL; Add New and Manage Customers navigation were found in session and the direct URL is used when possible.\n- No unnecessary exploratory steps included: only actions necessary to accomplish the task are present (navigate, filter, export, mass-action, open/edit/save, verify).\n\nNotes on robustness and limitations:\n- The tool assumes the admin session is already authenticated (the recording used admin login earlier); if the session is not authenticated, the navigation may land on the login screen. The recorded elementHashes are specific to the tested theme and version (Magento 1.9.3.8); if the environment differs, fallbacks (XPath or name-based selectors) help but should be validated at runtime.\n- For address telephone fields the tool uses a 1-based index for selection because XPath indexing is 1-based.\n- The tool intentionally avoids branching logic in steps, so optional parameters are tolerated but the execution will still run the corresponding steps; if optional parameters are empty they should have no effect or simply not match elements (implementer should handle empty values in their runner).",
+  "name": "magento_admin_customer_find_and_edit",
+  "description": "Automate searching customers in Magento Admin (Manage Customers grid), optionally export results, apply a mass-action to selected customer(s), and open + edit a customer's account/address fields. Uses stable element hashes (recorded during a successful session) and robust XPath fallbacks where appropriate.",
+  "version": "2026-02-01-1",
+  "steps": [
+    {
+      "description": "Open the Magento Admin Manage Customers page (starting point).",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_admin_customers_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the Manage Customers grid to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Fill ID 'From' filter input (if provided). Uses recorded elementHash for the grid ID 'From' input.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_entity_id_from",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div/input",
+      "elementTag": "input",
+      "elementHash": "99d940d9fc",
+      "type": "input",
+      "value": "{filter_entity_id_from}"
+    },
+    {
+      "description": "Fill ID 'To' filter input (if provided). Uses recorded elementHash for the grid ID 'To' input.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_entity_id_to",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[2]/div/div[2]/input",
+      "elementTag": "input",
+      "elementHash": "c069a1390d",
+      "type": "input",
+      "value": "{filter_entity_id_to}"
+    },
+    {
+      "description": "Fill Name filter input (if provided).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_name",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[3]/div/input",
+      "elementTag": "input",
+      "elementHash": "958237192c",
+      "type": "input",
+      "value": "{filter_name}"
+    },
+    {
+      "description": "Fill Email filter input (if provided).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_email",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[4]/div/input",
+      "elementTag": "input",
+      "elementHash": "56a5f4823b",
+      "type": "input",
+      "value": "{filter_email}"
+    },
+    {
+      "description": "Select a Group in the Group filter dropdown by visible text (if provided). Uses recorded elementHash for the Group filter select.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_group",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[5]/select",
+      "elementTag": "select",
+      "elementHash": "547d16e240",
+      "type": "select_change",
+      "selectedText": "{filter_group}"
+    },
+    {
+      "description": "Fill Telephone filter input (if provided).",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_Telephone",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[6]/div/input",
+      "elementTag": "input",
+      "elementHash": "3cf635d2df",
+      "type": "input",
+      "value": "{filter_telephone}"
+    },
+    {
+      "description": "Select a Website in the Website filter dropdown by visible text (if provided). Uses recorded elementHash for the Website filter select.",
+      "output": null,
+      "cssSelector": "#customerGrid_filter_website_id",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div[2]/div/table/thead/tr[2]/th[11]/select",
+      "elementTag": "select",
+      "elementHash": "4a2f7e5061",
+      "type": "select_change",
+      "selectedText": "{filter_website}"
+    },
+    {
+      "description": "Click the grid 'Search' button to apply filters.",
+      "output": null,
+      "cssSelector": "button[title=\"Search\"][title=\"Search\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[3]/button[2]",
+      "elementTag": "button",
+      "elementHash": "90708cd5ce",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the grid to refresh after applying filters.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "If export_format provided, choose the export format in the 'Export to' select (CSV/Excel/XML) using the recorded elementHash.",
+      "output": null,
+      "cssSelector": "#customerGrid_export",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "e2c204011f",
+      "type": "select_change",
+      "selectedText": "{export_format}"
+    },
+    {
+      "description": "Click the Export button to download the selected export format (if export_format was selected).",
+      "output": null,
+      "cssSelector": "#id_0c1fd3880123456e73fd15467c7dab8c",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/table/tbody/tr/td[2]/button",
+      "elementTag": "button",
+      "elementHash": "f56bc4d0fc",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for export to trigger / grid stability.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Select the checkbox in the row that matches the supplied customer id ({select_customer_id_to_edit}). This selects the row for mass-action. If select_customer_id_to_edit is not provided or not present, this XPath resolves to nothing.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//tr[td[normalize-space(.)='{select_customer_id_to_edit}']]//input[@type='checkbox']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Choose the mass-action in the Actions dropdown (visible text). Uses the recorded massaction select element hash.",
+      "output": null,
+      "cssSelector": "#customerGrid_massaction-select",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span/select",
+      "elementTag": "select",
+      "elementHash": "b202e94e0d",
+      "type": "select_change",
+      "selectedText": "{mass_action}"
+    },
+    {
+      "description": "If assigning a group as part of a mass action, choose the target group by visible text. This XPath targets the mass-action parameter select (fallback when a stable elementHash isn't present).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//select[contains(@name,'group') or contains(@id,'massaction') or contains(@id,'group')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{massaction_group}"
+    },
+    {
+      "description": "Click the mass-action Submit button to apply the chosen action to selected rows (uses recorded elementHash).",
+      "output": null,
+      "cssSelector": "button[title=\"Submit\"][title=\"Submit\"]",
+      "xpath": "html/body/div/div[6]/div/div[3]/div/div/table/tbody/tr/td[2]/div/div/form/fieldset/span[4]/button",
+      "elementTag": "button",
+      "elementHash": "e5da8d6705",
+      "type": "click"
+    },
+    {
+      "description": "Wait for mass-action to complete (server-side operation may take time).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Open the Edit page for the requested customer id by clicking the row's Edit link (href contains the id).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//a[contains(@href,'/admin/customer/edit/id/{select_customer_id_to_edit}/')]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for the Edit Customer page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Click the 'Addresses' tab to ensure address input blocks are visible (uses recorded elementHash).",
+      "output": null,
+      "cssSelector": "#customer_info_tabs_addresses",
+      "xpath": "html/body/div/div[6]/div/div/div/ul/li[3]/a",
+      "elementTag": "a",
+      "elementHash": "e10247917d",
+      "type": "click"
+    },
+    {
+      "description": "Set the customer's Account First Name on the Edit page (if edit_firstname provided).",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "//input[@id='customer_firstname' or @name='customer[firstname]' or @name='firstname']",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{edit_firstname}"
+    },
+    {
+      "description": "Set the telephone in the Nth address block (1-based index). Provide edit_address_index and edit_address_telephone to use this action.",
+      "output": null,
+      "cssSelector": null,
+      "xpath": "(//input[contains(@name,'[telephone]') or contains(@id,'_telephone')])[{edit_address_index}]",
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{edit_address_telephone}"
+    },
+    {
+      "description": "Click the Save button on the Edit page to persist changes (uses recorded elementHash for the Save control).",
+      "output": null,
+      "cssSelector": "#id_ae12da995052fd302d77093a219db62c",
+      "xpath": "html/body/div/div[6]/div/div/div[2]/div/div[2]/p/button[5]",
+      "elementTag": "button",
+      "elementHash": "6201e8abdf",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the save operation to complete and for admin messages to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Extract the page content that confirms whether the save succeeded and capture updated values to verify the change.",
+      "output": "save_result",
+      "type": "extract_page_content",
+      "goal": "Capture admin success/error messages and the updated customer summary (First Name and Telephone) after save"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_admin_customers_url",
+      "type": "string",
+      "format": null,
+      "description": "Exact URL of the Magento Admin Manage Customers page (example: 'http://dockerized-magento.local/index.php/admin/customer/'). The tool will navigate here first.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "filter_entity_id_from",
+      "type": "string",
+      "format": null,
+      "description": "ID range - 'From' value to filter by customer id (numeric string). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_entity_id_to",
+      "type": "string",
+      "format": null,
+      "description": "ID range - 'To' value to filter by customer id (numeric string). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_name",
+      "type": "string",
+      "format": null,
+      "description": "Customer name filter (visible text). Matches grid 'Name' filter input.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_email",
+      "type": "string",
+      "format": null,
+      "description": "Customer email filter (visible text). Matches grid 'Email' filter input.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_telephone",
+      "type": "string",
+      "format": null,
+      "description": "Telephone filter (visible text). Matches grid 'Telephone' filter input.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_group",
+      "type": "string",
+      "format": null,
+      "description": "Customer Group filter - select by visible label (example: 'Wholesale'). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "filter_website",
+      "type": "string",
+      "format": null,
+      "description": "Website filter - select by visible label (example: 'Main Website'). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "export_format",
+      "type": "string",
+      "format": null,
+      "description": "Optional: if provided, the tool will pick this export format in the 'Export to' control and click Export.",
+      "required": false,
+      "enum": [
+        "CSV",
+        "Excel",
+        "XML"
+      ]
+    },
+    {
+      "name": "mass_action",
+      "type": "string",
+      "format": null,
+      "description": "Optional: visible text of the mass-action to apply (example: 'Subscribe to Newsletter', 'Unsubscribe from Newsletter', 'Delete', 'Assign a Customer Group'). Leave empty to skip mass-action step.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "massaction_group",
+      "type": "string",
+      "format": null,
+      "description": "When mass_action is 'Assign a Customer Group', choose the target group by visible label (example: 'Wholesale'). Leave empty otherwise.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "select_customer_id_to_edit",
+      "type": "string",
+      "format": null,
+      "description": "Customer numeric id to select for mass-action and/or to open the Edit page. Example: '208'. If empty, the tool will not check row-specific controls (mass-action and edit) \u2014 but filters/export will still run.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "edit_firstname",
+      "type": "string",
+      "format": null,
+      "description": "If provided, the tool will set this value into the customer's account First Name field on the Edit page.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "edit_address_index",
+      "type": "string",
+      "format": null,
+      "description": "1-based index of the address telephone input to edit on the Edit page (1 = first address block). Use 1 when there is a single address. Leave empty to skip telephone edit.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "edit_address_telephone",
+      "type": "string",
+      "format": null,
+      "description": "Telephone value to write into the chosen address telephone input. Requires edit_address_index to be provided.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_after_actions_seconds",
+      "type": "string",
+      "format": null,
+      "description": "Number of seconds to wait after page-changing actions (search/export/save). Default behavior uses short waits; set a larger number if the target environment is slow.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

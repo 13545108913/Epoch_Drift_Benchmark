@@ -1,0 +1,230 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session shows the Magento admin Categories page (Magento CE 1.9.x). The demo flow: login (handled outside tool), close an 'Incoming Message' popup, select category nodes from the left tree, click 'Add Root Category' or 'Add Subcategory', fill General Information fields (Name, URL Key, Is Active, Include in Navigation Menu, Page Title/Meta fields), click 'Save Category', and verify the success message.\n\nTask Definition:\n- Create a reusable tool that navigates to the Categories admin page, closes the blocking popup, then (based on parameters) either:\n  - create a new root category, or\n  - create a new subcategory under a named parent, or\n  - select an existing category to update its fields.\n- After the form is filled, click Save and verify the \"The category has been saved.\" confirmation.\n\nAction Plan (detailed to-do list):\n1. Navigate to admin categories URL (deterministic URL recorded).\n2. Close the 'Incoming Message' popup using the stable selector (a[title=\"close\"]) or elementHash fallback.\n3. Wait briefly for DOM to update.\n4. Decide which operation to perform (create_root / create_sub / update). This decision requires dynamic logic - implement as an agent step that executes one deterministic sequence based on the provided {operation}, using XPath to select category nodes by visible name when needed.\n5. Perform the chosen navigation/clicks to open the correct category form (Add Root, Add Subcategory, or select existing category).\n6. Fill the General Information fields using stable selectors:\n   - input[name='name'] (Name)\n   - input[name='url_key'] (URL Key)\n   - select[name='is_active'] (Is Active) - select by visible text 'Yes'/'No'\n   - select[name='include_in_menu'] (Include in Navigation Menu) - select by visible text 'Yes'/'No'\n   - input[name='meta_title'] or input[id*='meta_title'] (Page Title / Meta Title)\n   - input[name='meta_keywords'], textarea[name='meta_description'] if provided\n7. Click Save using robust button selector (text-based XPath or class 'scalable save').\n8. Wait for the server response and verify success by extracting page content and searching for 'The category has been saved.'\n\nVariable Identification (input parameters):\n- operation (string, enum): 'create_root'|'create_sub'|'update' (required) - which flow to run.\n- parent_category (string): Name of parent category for create_sub (required when operation=create_sub; agent step will attempt it regardless but user should supply it).\n- target_category (string): Name of category to select when updating (required for operation=update).\n- name (string): Category Name to write (required). Maps to input[name='name'].\n- url_key (string): URL Key to set (optional). Maps to input[name='url_key'].\n- is_active (string, enum): 'Yes'|'No' (required). Maps to select[name='is_active'].\n- include_in_menu (string, enum): 'Yes'|'No' (required). Maps to select[name='include_in_menu'].\n- meta_title (string): Page Title / Meta Title (optional). Maps to input[name='meta_title'].\n- meta_keywords (string): Meta Keywords (optional).\n- meta_description (string): Meta Description (optional).\n- store_view (string): Optional store view text (e.g. 'All Store Views', 'English') - provided but not used by default. If the user needs store-scoped edits, the agent step could set store view first.\n\nStep Optimization / Selector Choices:\n- Prefer CSS and name-based selectors when available (input[name='name'], input[name='url_key'], select[name='is_active'], select[name='include_in_menu']). These exist in standard Magento 1.9 installs and were present in the recorded session.\n- Use XPath by visible text to select category nodes. Use starts-with(normalize-space(.), '{category_name}') to ignore trailing counts in parentheses (e.g. 'Women (51)').\n- Use a short agent step to centralize the operation decision (create_root/create_sub/update). This avoids brittle branching encoded in static steps while keeping the rest deterministic.\n- Use recorded elementHashes as fallbacks for popup close and Save button if present in the session. Primary selectors are semantic (CSS/XPath). \n\nAssumptions and Safety Notes:\n- The tool assumes the session is already authenticated to the Magento admin (do not include login steps).\n- File uploads (images/thumbnail) are not included in this tool to keep it deterministic; add as a separate capability if required.\n- The tool will write values provided by the caller; if empty strings are passed, fields may be cleared.\n- If the admin UI is localized the text-based XPaths should be adapted; attribute-based selectors are prioritized.\n\nEssential steps only: navigation, popup close, operation dispatch (agent), form fills (name/url_key/is_active/include_in_menu/meta_title/meta fields), click Save, verify success. No extra filtering/sorting/pagination steps are included.\n",
+  "name": "magento_admin_category_create_update",
+  "description": "Automates selecting, creating (root/sub), and updating Magento admin categories in the Catalog -> Categories page. Uses stable selectors and recorded element hashes/XPaths as fallbacks. Assumes the browser session is already authenticated in the Magento admin.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the Magento Admin - Categories page (deterministic URL).",
+      "output": null,
+      "type": "navigation",
+      "url": "http://dockerized-magento.local/index.php/admin/catalog_category/",
+      "url_operation": null
+    },
+    {
+      "description": "Close the 'Incoming Message' popup using the visible close link. Uses recorded elementHash fallback and an attribute-based selector.",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[7]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for the popup to be removed and DOM to stabilise.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Agentic step to select the correct category form (create root/sub or open existing category). This handles the operation branching robustly and confirms the target form is displayed.",
+      "output": "operation_navigation_result",
+      "type": "agent",
+      "task": "Dispatch operation based on {operation}: \n- If operation == 'update': click the category node whose visible text starts with {target_category} (XPath: //a[starts-with(normalize-space(.), '{target_category}')]).\n- If operation == 'create_root': click the 'Add Root Category' control (XPath: //a[normalize-space(.)='Add Root Category'] | //button[normalize-space(.)='Add Root Category']).\n- If operation == 'create_sub': click the parent category node (XPath: //a[starts-with(normalize-space(.), '{parent_category}')]) then click the 'Add Subcategory' control (XPath: //a[normalize-space(.)='Add Subcategory'] | //button[normalize-space(.)='Add Subcategory']).\nThis agent must verify the correct form (New Root Category / New Subcategory / existing category edit) is visible before returning.",
+      "max_steps": 6
+    },
+    {
+      "description": "Wait for the category form to render after opening/selection.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Set the category Name (maps to input[name='name']). Uses recorded elementHash fallback.",
+      "output": null,
+      "cssSelector": "#group_4name",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[2]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "a075ffff62",
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Set the URL Key (if provided). If {url_key} is empty the field will be set empty/cleared.",
+      "output": null,
+      "cssSelector": "#group_4url_key",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[4]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "1914e4f18c",
+      "type": "input",
+      "value": "{url_key}"
+    },
+    {
+      "description": "Set 'Is Active' select to the visible option {is_active} ('Yes' or 'No').",
+      "output": null,
+      "cssSelector": "#group_4is_active",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[3]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "5208d8669b",
+      "type": "select_change",
+      "selectedText": "{is_active}"
+    },
+    {
+      "description": "Set 'Include in Navigation Menu' select to {include_in_menu} ('Yes' or 'No').",
+      "output": null,
+      "cssSelector": "#group_4include_in_menu",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[10]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "4f4efee99b",
+      "type": "select_change",
+      "selectedText": "{include_in_menu}"
+    },
+    {
+      "description": "Set Page Title / Meta Title if provided.",
+      "output": null,
+      "cssSelector": "#group_4meta_title",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[7]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "c6fa893f4b",
+      "type": "input",
+      "value": "{meta_title}"
+    },
+    {
+      "description": "Set Meta Keywords (optional).",
+      "output": null,
+      "cssSelector": "textarea[name='meta_keywords'], textarea[id*='meta_keywords']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{meta_keywords}"
+    },
+    {
+      "description": "Set Meta Description (optional).",
+      "output": null,
+      "cssSelector": "textarea[name='meta_description'], textarea[id*='meta_description']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{meta_description}"
+    },
+    {
+      "description": "Click the 'Save Category' control. Primary selector matches common Magento save button variants; elementHash is recorded fallback.",
+      "output": null,
+      "cssSelector": "#id_0abb8700bc119b0d76e0865227f46aef",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/div/div/p/button[2]",
+      "elementTag": "button",
+      "elementHash": "af8cb45829",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the save response and page update to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Confirm the success message appears after saving the category.",
+      "output": "save_verification",
+      "type": "extract_page_content",
+      "goal": "Verify save result: extract page header/notifications and search for the text 'The category has been saved.'; output as 'save_verification'."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "operation",
+      "type": "string",
+      "format": null,
+      "description": "Operation to perform: 'create_root' to create a new root category, 'create_sub' to create a subcategory under parent_category, 'update' to select and update an existing category",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "parent_category",
+      "type": "string",
+      "format": null,
+      "description": "Parent category name to use when operation='create_sub' (e.g. 'Bot Root Category'). Use exact visible name (ignore counts).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "target_category",
+      "type": "string",
+      "format": null,
+      "description": "Existing category name to select when operation='update' (e.g. 'Women'). Use exact visible name (ignore counts).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Category Name to set (maps to input[name='name']).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "url_key",
+      "type": "string",
+      "format": null,
+      "description": "URL Key (slug) for the category (maps to input[name='url_key']). If empty, the field will be left blank/cleared.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_active",
+      "type": "string",
+      "format": null,
+      "description": "Set whether the category is active. Use 'Yes' or 'No'.",
+      "required": true,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "include_in_menu",
+      "type": "string",
+      "format": null,
+      "description": "Set whether the category is included in the navigation menu. Use 'Yes' or 'No'.",
+      "required": true,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "meta_title",
+      "type": "string",
+      "format": null,
+      "description": "Page Title / Meta Title (maps to input[name='meta_title']).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "meta_keywords",
+      "type": "string",
+      "format": null,
+      "description": "Meta Keywords (maps to textarea[name='meta_keywords']).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "meta_description",
+      "type": "string",
+      "format": null,
+      "description": "Meta Description (maps to textarea[name='meta_description']).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "store_view",
+      "type": "string",
+      "format": null,
+      "description": "Optional Store View text to select before editing (e.g. 'All Store Views', 'English'). If omitted, current store scope is used.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

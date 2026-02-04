@@ -1,0 +1,176 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session logs show: navigation to the Magento admin Online Customers grid, login, a notification overlay that blocks filter inputs, identification of the grid and filter row, attempts to fill filter inputs (ID range, name, email, last URL), selection of Type, clicking Search, and reading results. The IP filter sometimes is not present and requires using grid AJAX/export endpoints as a fallback.\n\nTask Definition:\n- Build a reusable tool that, given a base Magento admin URL and optional filter values (ID range, names, email, IP, date ranges, Type, last URL), will: navigate to the Online Customers admin page, handle overlays/loading masks, discover robust selectors for each filter control, apply the given filters (or use the grid AJAX/export fallback when IP control is absent), click Search, wait for completion, and return the filtered grid rows and the concrete selectors used.\n\nAction Plan:\n1) Open Online Customers page (deterministic navigation).\n2) Ensure page readiness: close notification overlays and wait for loading masks to disappear (agentic step because overlay presence and markup may vary).\n3) Discover the filter row and compute unique selectors for each control using header-text-driven lookup (agentic discovery step to produce one-to-one selectors).\n4) Apply filter values: for each provided parameter, set the control value (input or select). For IP parameter, if no visible control, use AJAX/export fallback to query the grid endpoint with the admin session and form_key.\n5) Click Search and wait for grid refresh; extract grid rows or 'No records found'.\n6) Return the extracted rows and the exact selectors used so automation can be deterministic in future runs.\n\nVariable Identification (inputs):\n- base_url (required): base site\n- id_from,id_to,first_name,middle_name,last_name,email,ip,session_start_from,session_start_to,last_activity_from,last_activity_to,type,last_url: optional filter values used to set controls\n- form_key (optional): used when calling grid/export endpoints directly\n- timeout_seconds (optional): waiting timeout for overlays/loaders\n\nStep Optimization:\n- Navigation is done by direct URL to skip extra clicks.\n- Overlay/loader handling is agentic because selectors for close buttons and loading masks vary and may be absent; this avoids brittle per-element click steps.\n- Filter control discovery is done via header-text-based XPath/CSS to ensure mapping remains valid even if column positions change; agentic discovery returns concrete selectors to be used for deterministic input steps.\n- All UI interactions that are likely to be dynamic (close overlay, detect selectors, apply filters, wait for AJAX) are consolidated into agent steps to ensure robustness. When a visible IP filter is missing, the tool uses the grid AJAX/export endpoints as a deterministic fallback (requires the authenticated session and form_key). This avoids adding many conditional UI-only steps in the static tool.\n\nNotes and constraints:\n- The environment running this tool must provide an authenticated admin session (no login step is included). If the session expires the agent steps may fail when calling AJAX/export endpoints.\n- The tool returns both the data rows and the concrete selectors used so the caller can log or persist the selectors for future deterministic interactions.\n\n",
+  "name": "magento_online_customers_filter_tool",
+  "description": "Automate the Magento Admin 'Online Customers' grid: open the page, close notification overlays, apply filters (ID range, first/middle/last name, email, IP, session start/last activity ranges, Type, Last URL), click Search, and return the filtered grid rows and stable selectors. If the IP filter control is absent the tool will try the grid AJAX/export endpoints (authenticated session required) to retrieve rows and filter by IP. Assumes an authenticated admin session is already available in the browser environment.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Admin 'Online Customers' grid page.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/index.php/admin/customer_online/",
+      "url_operation": null
+    },
+    {
+      "description": "Short pause to allow page static content and any immediate scripts to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Dynamic check-and-fix for overlays/loading masks and discovery of form_key/grid endpoints before interacting with filters.",
+      "output": "prechecks",
+      "type": "agent",
+      "task": "Ensure overlays are closed and page ready: detect and close the 'Incoming Message' overlay (close anchor with title/text 'close' or any message close button). Detect a global loading mask (#loading-mask, .loading-mask, .blockOverlay) or inline ajax loaders (img[src*='ajax-loader']) and wait until they are not visible. Verify the grid filter row (thead tr.filter) is present and visible. Extract form_key from the page if present. Return a JSON mapping with keys: overlay_closed (true/false), loading_mask_present (true/false), filter_row_found (true/false), form_key (string|null), and grid_ajax_candidates array (URLs discovered on page that look like grid/export endpoints).",
+      "max_steps": 6
+    },
+    {
+      "description": "Discover stable selectors for input/select elements and action buttons at runtime (robust header-driven lookup).",
+      "output": "selectors",
+      "type": "agent",
+      "task": "Locate unique selectors for each filter control in the grid filter row. Use header-text-based lookup to compute the column index for these headers: ID, First Name, Middle Name, Last Name, Email, IP Address, Session Start Time, Last Activity, Type, Last URL. For each column find the filter control inside the filter row (input/select). Return a mapping of controls to unique CSS or XPath selectors that select exactly one element (use id or name if present, otherwise use scoped XPath like //table[contains(@class,'grid')]//thead//tr[contains(@class,'filter')]/td[N]//input). Also return prioritized candidate selectors for Reset and Search buttons. Output JSON under key 'selectors'.",
+      "max_steps": 8
+    },
+    {
+      "description": "Execute the filter application and capture filtered grid results. This agent step must handle the dynamic interactions, AJAX waits, and fallback endpoints for IP filtering.",
+      "output": "filter_results",
+      "type": "agent",
+      "task": "Apply filters and extract results: Using the selectors discovered under 'selectors', perform the following in order: (1) for each provided input parameter (id_from,id_to,first_name,middle_name,last_name,email,ip,session_start_from,session_start_to,last_activity_from,last_activity_to,type,last_url) if the parameter is provided and a selector exists, clear the field and type/select the provided value; (2) if the IP parameter is provided but no visible IP filter selector exists, call the grid AJAX endpoint or exportCsv/exportXml endpoint discovered earlier using the authenticated session cookie and form_key (include form_key if provided or the one found earlier) to fetch rows filtered by IP (use the parameter name guessed for IP: remote_addr or ip; try both); (3) Click the Search button (use prioritized selectors) and wait for loading mask to appear and disappear; (4) After grid refresh, extract: total_records_text, visible_rows (array of row objects with columns: id, first_name, middle_name, last_name, email, ip_address, session_start_time, last_activity, type, last_url), and if zero rows return the 'No records found' message selector. Return a JSON object with keys: action_result ('applied' or 'ajax_fallback_used'), rows (array), total (int), selectors_used (the concrete selectors used for each control), and any errors encountered.",
+      "max_steps": 12
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base site URL, e.g. 'http://dockerized-magento.local' (tool will navigate to /index.php/admin/customer_online/)",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "id_from",
+      "type": "string",
+      "format": null,
+      "description": "Lower bound for ID range filter (numeric string). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "id_to",
+      "type": "string",
+      "format": null,
+      "description": "Upper bound for ID range filter (numeric string). Leave empty to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "first_name",
+      "type": "string",
+      "format": null,
+      "description": "Customer first name filter text. Partial matches allowed by Magento grid.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "middle_name",
+      "type": "string",
+      "format": null,
+      "description": "Customer middle name filter text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_name",
+      "type": "string",
+      "format": null,
+      "description": "Customer last name filter text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": null,
+      "description": "Customer email address filter text.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "ip",
+      "type": "string",
+      "format": null,
+      "description": "IP address to filter by (IPv4 or IPv6). If the visible IP filter control is absent the tool will attempt the grid AJAX/export fallback using the authenticated session and form_key if provided.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "session_start_from",
+      "type": "string",
+      "format": null,
+      "description": "Session Start 'From' value (date/time string in the format accepted by the grid input).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "session_start_to",
+      "type": "string",
+      "format": null,
+      "description": "Session Start 'To' value (date/time string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_activity_from",
+      "type": "string",
+      "format": null,
+      "description": "Last Activity 'From' value (date/time string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "last_activity_to",
+      "type": "string",
+      "format": null,
+      "description": "Last Activity 'To' value (date/time string).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "format": null,
+      "description": "Filter by Type. Use exact visible option text (Customer, Visitor) or 'All' to clear type filter.",
+      "required": false,
+      "enum": [
+        "All",
+        "Customer",
+        "Visitor"
+      ]
+    },
+    {
+      "name": "last_url",
+      "type": "string",
+      "format": null,
+      "description": "Filter by last visited URL (partial path).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "form_key",
+      "type": "string",
+      "format": null,
+      "description": "Optional admin form_key token to use when calling grid/export endpoints directly (AJAX/export fallback). If omitted the tool will try to read form_key from the page at runtime.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "timeout_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Timeout in seconds to wait for overlays/loading masks to disappear (default 30).",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

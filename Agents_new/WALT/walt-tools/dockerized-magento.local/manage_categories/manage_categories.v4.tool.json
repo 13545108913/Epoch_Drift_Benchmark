@@ -1,0 +1,227 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session demonstrates logging into Magento Admin, navigating to Catalog > Categories, dismissing a notification, selecting a category in the left tree, clicking Add Subcategory or Add Root Category, filling form fields (Name, URL Key, Is Active, Display Settings), saving the category, waiting for Magento's loading overlay to disappear, and verifying success and presence of the new node in the tree.\n\nTask Definition:\n- This tool performs one specific task: create a category (either a root category or a subcategory) in the Magento 1.x Admin UI and set common attributes (name, url_key, active state, display settings). It encapsulates the recorded interactions and the robust wait/verification logic required for reliable automation.\n\nAction Plan (detailed to-do list):\n1) Navigate to the admin categories URL provided as {admin_url}.\n2) Ensure no blocking loading overlay is present before starting.\n3) Dismiss the incoming notification panel if present (recorded close link elementHash used).  \n4) Open the appropriate form: if create_type='subcategory', select the parent category '{parent_category}' in the tree then click the Add Subcategory control; if create_type='root', click Add Root Category. (Agent step used to choose correct action.)\n5) Wait for Magento's loading overlay to finish and ensure the form is interactive.\n6) Fill the Name (#name) and URL Key (#url_key) fields.\n7) Set Is Active, Display Mode, Landing Page and Is Anchor as requested (selects by visible option text).  \n8) Click Save Category and wait for the loading overlay to disappear.\n9) Verify the save by locating a success message (ul.messages li.success-msg) and locating the new tree node by its visible label (\"{name}\").\n\nVariable Identification (inputs required):\n- admin_url (string): starting URL for the admin Categories page (explicit from session). Required.\n- create_type (string enum 'root'|'subcategory'): whether to create a root or subcategory. Required.\n- parent_category (string): visible parent category label for subcategory creation (optional for root). Use exact visible text from the tree (e.g., 'Men (70)').\n- name (string): Category name (required by the admin form).\n- url_key (string): URL key (optional).\n- is_active (string): 'Yes'/'No' (or '1'/'0') to set the category active state (optional).\n- display_mode (string): visible Display Mode option text (optional).\n- landing_page (string): visible CMS block label to use as landing page (optional).\n- is_anchor (string): 'Yes'/'No' to set Is Anchor (optional).\n- save_wait_timeout (number): wait timeout for loading overlay disappearance (optional).\n\nStep Optimization and Robustness Notes:\n- Prefers id-based selectors when available (e.g., #name, #url_key, #display_mode, #landing_page, #is_anchor) because Magento 1.x admin uses predictable ids. Where the control may render as a button or anchor the tool uses an XPath fallback matching the visible text (normalize-space()).\n- Uses elementHash values captured during the recorded session as deterministic fallbacks for fragile UI elements (notification close link: df76c6ce85; Add Subcategory: 7616450bf1; Add Root Category: ad8add94ec; Save button: 9982095afd; is_active select: 5208d8669b; name input: a075ffff62). Prefer semantic selectors first, elementHash as backup.\n- Implements explicit waits for Magento's '#loading-mask' overlay (text 'Please wait...' and ajax-loader images). The tool will wait for the overlay to appear and then disappear after actions that trigger server processing. Recommended disappearance timeout 30s (configurable via {save_wait_timeout}).\n- Notification and incoming messages can overlap the form; the tool deterministically clicks the recorded close control to ensure the UI is unobstructed. If your installation uses a different notification element, update the selector accordingly.\n\nDeterministic vs agentic decisions:\n- Most interactions are deterministic (navigation, inputs, selects, clicks using ids/XPath). The only agentic step decides which 'Add' control to click and whether to click a parent node first (dependent on create_type and the presence/format of parent_category). This keeps the main field-setting steps deterministic while allowing a simple decision at form-open time.\n\nWhy no authentication step:\n- The recorded session included login steps, but per automation guidelines the environment running the tool is assumed to already have an authenticated admin session. If you need the tool to perform a login first, add a navigation+input+click sequence using the standard login selectors (input[name='login[username]'], input[name='login[password]'], button[type='submit']).\n\nEdge cases & recommendations:\n- If the admin theme or a third-party module changes visible labels or removes conventional ids, update the inputs to pass the exact visible option text for selects (display_mode, landing_page, is_active, is_anchor) and/or adjust the XPath anchor used for parent_category.  \n- If your runner does not support elementHash targeting, the CSS/XPath fallbacks included in the steps are the primary selectors; elementHash fields are for tool frameworks that can use recorded element pointers.\n\nThis tool strictly follows the recorded, essential interactions: open form, fill fields, save, wait for overlay, verify success. It does not include exploration, optional filtering, or extra UI manipulations beyond what is needed for the single task (create category).",
+  "name": "magento_admin_category_create_or_edit",
+  "description": "Create a new Magento admin category (root or subcategory) and set common fields (name, url_key, active, display settings). Uses stable id/XPath selectors discovered during a recorded session and includes robust wait rules for Magento's loading overlay and success-message verification.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the Magento Admin Categories starting page.",
+      "output": null,
+      "type": "navigation",
+      "url": "{admin_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Check for the Magento loading overlay and visible blockers before taking actions.",
+      "output": "initial_loading_check",
+      "type": "extract_page_content",
+      "goal": "Ensure page loaded and no blocking overlay (#loading-mask / 'Please wait...') is visible before interacting."
+    },
+    {
+      "description": "Dismiss the 'Incoming Message' / notification panel if present (recorded session used this close link). This step uses the recorded elementHash as a deterministic target and a text-based fallback selector.",
+      "output": null,
+      "cssSelector": "a[title=\"close\"]",
+      "xpath": "html/body/div/div[7]/div/a",
+      "elementTag": "a",
+      "elementHash": "df76c6ce85",
+      "type": "click"
+    },
+    {
+      "description": "Short pause to let the UI update after closing the notification panel.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Choose which 'Add' control to click based on {create_type} and, for subcategories, first select the parent category. Wait for the new form to be ready.",
+      "output": "form_opened",
+      "type": "agent",
+      "task": "Open the new-category form required for the requested create_type. If create_type == 'subcategory' then: 1) click the parent category matching the exact visible text '{parent_category}' using XPath //a[normalize-space(.)='{parent_category}'] to select it in the tree; 2) click the 'Add Subcategory' control (XPath //a[normalize-space()='Add Subcategory' or //button[normalize-space()='Add Subcategory']). If create_type == 'root' then click the 'Add Root Category' control (XPath //a[normalize-space()='Add Root Category' or //button[normalize-space()='Add Root Category']). After opening the form, wait for the loading overlay to appear and then disappear (use //div[@id='loading-mask'] or text 'Please wait...' as indicators).",
+      "max_steps": 6
+    },
+    {
+      "description": "Ensure the category edit form is interactive before filling fields. Use a timeout governed by {save_wait_timeout} (recommended 30s).",
+      "output": "post_open_loading_check",
+      "type": "extract_page_content",
+      "goal": "Wait until the Magento loading overlay (#loading-mask) is no longer visible (or 'Please wait...' is not present)."
+    },
+    {
+      "description": "Enter the category name into the Name field (id='name').",
+      "output": null,
+      "cssSelector": "#group_4name",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[2]/td[2]/input",
+      "elementTag": "input",
+      "elementHash": "a075ffff62",
+      "type": "input",
+      "value": "{name}"
+    },
+    {
+      "description": "Enter the URL Key into input#url_key. If empty the admin may auto-generate it; the field is provided as a best-effort set.",
+      "output": null,
+      "cssSelector": "#url_key",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "input",
+      "value": "{url_key}"
+    },
+    {
+      "description": "Set 'Is Active' to the visible option matching {is_active} (e.g., 'Yes' or 'No'). If {is_active} is not provided this step attempts to select nothing and has no effect.",
+      "output": null,
+      "cssSelector": "#group_4is_active",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/form/div[2]/div/div/div[2]/div/table/tbody/tr[3]/td[2]/select",
+      "elementTag": "select",
+      "elementHash": "5208d8669b",
+      "type": "select_change",
+      "selectedText": "{is_active}"
+    },
+    {
+      "description": "Set the Display Mode to the visible option matching {display_mode} (use exact visible text like 'Products only'). If {display_mode} is empty this selection will be skipped (no change).",
+      "output": null,
+      "cssSelector": "select#display_mode, select[name='display_mode']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{display_mode}"
+    },
+    {
+      "description": "If provided, select the CMS Block (landing page) by visible label {landing_page}.",
+      "output": null,
+      "cssSelector": "select#landing_page, select[name='landing_page']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{landing_page}"
+    },
+    {
+      "description": "Set 'Is Anchor' to 'Yes' or 'No' if provided.",
+      "output": null,
+      "cssSelector": "select#is_anchor, select[name='is_anchor']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "select_change",
+      "selectedText": "{is_anchor}"
+    },
+    {
+      "description": "Click the Save Category control to submit the form. Uses XPath fallback and recorded elementHash for reliability.",
+      "output": null,
+      "cssSelector": "button[title=\"Save Category\"][title=\"Save Category\"]",
+      "xpath": "html/body/div/div[9]/div/div/div[2]/div/div[2]/div/div/p/button[2]",
+      "elementTag": "button",
+      "elementHash": "9982095afd",
+      "type": "click"
+    },
+    {
+      "description": "Short pause allowing the save request to start and the loading overlay to appear.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Detect success via standard Magento success selectors and locate the new category node by exact visible text. This step returns both the success message content and an XPath that locates the new tree node.",
+      "output": "save_verification",
+      "type": "extract_page_content",
+      "goal": "Wait until the save operation finishes: ensure loading overlay (//div[@id='loading-mask'] or text 'Please wait...') has disappeared and capture any success message (ul.messages li.success-msg) and the new/edited category node named '{name}' in the category tree."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "admin_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL to the Magento Admin Categories page (examples: 'http://dockerized-magento.local/index.php/admin/catalog_category/'). The recorded session used this URL as the category management starting point.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "create_type",
+      "type": "string",
+      "format": null,
+      "description": "Type of category to create. Use 'root' to create a new root category, or 'subcategory' to create a child under an existing category.",
+      "required": true,
+      "enum": [
+        "root",
+        "subcategory"
+      ]
+    },
+    {
+      "name": "parent_category",
+      "type": "string",
+      "format": null,
+      "description": "When create_type='subcategory', the visible parent category label to click in the tree (exact visible text, e.g. 'Men (70)') or a unique XPath fragment that identifies the parent. Not required for create_type='root'.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "format": null,
+      "description": "Category Name (the text to enter into the Name field). This field is required by the admin form.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "url_key",
+      "type": "string",
+      "format": null,
+      "description": "URL Key (slug) for the category. If omitted the admin may auto-generate it based on the name.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_active",
+      "type": "string",
+      "format": null,
+      "description": "Set whether the category is active. Provide 'Yes' or 'No' (or '1'/'0'). The tool will select the visible option matching this string.",
+      "required": false,
+      "enum": [
+        "Yes",
+        "No",
+        "1",
+        "0"
+      ]
+    },
+    {
+      "name": "display_mode",
+      "type": "string",
+      "format": null,
+      "description": "Display Mode visible option to set in the Display Settings tab. Use exact visible text as shown in the admin UI.",
+      "required": false,
+      "enum": [
+        "Products only",
+        "Static block only",
+        "Static block and products"
+      ]
+    },
+    {
+      "name": "landing_page",
+      "type": "string",
+      "format": null,
+      "description": "If display_mode includes a static block, provide the visible CMS block label to select (e.g. 'Category Landing Page Men').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "is_anchor",
+      "type": "string",
+      "format": null,
+      "description": "Set 'Is Anchor' (Yes/No) in Display Settings. Provide the visible option text.",
+      "required": false,
+      "enum": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "name": "save_wait_timeout",
+      "type": "number",
+      "format": null,
+      "description": "Timeout in seconds to wait for the loading overlay to disappear after actions that trigger server operations (default tool recommendation: 30).",
+      "required": false,
+      "enum": null
+    }
+  ]
+}
