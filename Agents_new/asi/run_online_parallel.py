@@ -141,7 +141,7 @@ def process_single_task_fast(tid, args, lock):
         "python", "run_demo.py",
         "--task_name", f"myBenchmark.{tid}",
         "--websites", args.website,
-        "--memory_path", f"workflows/{args.website}.txt",
+        # "--memory_path", f"workflows/{args.website}.txt",
         "--rename_to", f"myBenchmark.{tid}",
         "--headless"
     ]
@@ -247,7 +247,7 @@ def main():
     else:
         # 如果你有 --awm 参数需求，可以在这里加判断切换到 process_single_task_awm
         print("Mode: FULL (Steps 1-4)")
-        target_func = process_single_task_awm
+        target_func = process_single_task
 
     # M1 芯片使用 spawn 方式通常更稳定，但 Python 3.8+ 在 macOS 默认已经是 spawn
     # 如果遇到 pickling 错误，可以显式开启下面这行：
