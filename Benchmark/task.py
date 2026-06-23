@@ -154,7 +154,7 @@ class GenericMyBenchmarkTask(AbstractBrowserTask):
             )
             # 挂载干扰逻辑
             page.route("**/*", controller.route_handler)
-            page.goto("http://localhost:7780/admin/?logging=StartingRun1", timeout=60000) 
+            page.goto("http://172.26.116.102:8080/?logging=StartingRun1", timeout=60000) 
 
         if (self.with_drift):
             # 1. 生成漂移脚本 (此时还没加载页面)
