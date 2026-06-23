@@ -466,6 +466,9 @@ PROPOSE_ADMIN_PROMPT = r"""You are an expert browser automation agent designer. 
   - SKIP customer-facing shopping features, cart functionality, customer registration, product browsing for purchase
 
 Exploration Guidelines:
+- **If the site requires login, use the following credentials:**
+  - **Username/Account: admin**
+  - **Password: password123**
 - You are already logged in with full admin access to the site.
 - Only document tools that actually exist and function on the site.
 - Aim to explore atleast 10-20 **diverse** tools covering comprehensive admin functionality

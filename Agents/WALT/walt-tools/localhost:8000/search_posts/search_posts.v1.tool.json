@@ -1,0 +1,74 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser interactions inspected a WordPress search-results page and identified the sidebar search input (name='s'), submit control, and four post result links with hrefs '?p=8', '?p=236', '?p=222', '?p=234'. Multiple reloads and back navigations occurred; the final state preserves selectors.\n\nTask Definition:\n- Provide a reusable tool that performs a site search by entering a query (or using direct URL query) and opens a matching result by title or href substring.\n\nAction Plan:\n1. Load the site base URL to ensure session stability.\n2. Navigate directly to the search-results URL with ?s={s} to perform the search deterministically (optimized over filling the input and clicking the submit button).\n3. Wait for page render.\n4. Extract all candidate result anchors from article title selectors.\n5. Use an agentic selection step to pick the result matching either 'post_href_contains' or 'post_title_exact', or fallback to first result.\n6. Navigate to the chosen result href to open the post.\n\nVariable Identification:\n- s (required): search query.\n- post_href_contains (optional): substring to match in href.\n- post_title_exact (optional): exact title match.\n\nStep Optimization:\n- Replace UI typing and click sequence with a direct navigation to '?s={s}' (PASS 2 optimization): this is deterministic for WordPress sites and avoids brittle element interactions.\n- Extraction step collects titles and hrefs to allow reliable selection.\n- Agentic selection is used only to compare strings and choose an index (acceptable for dynamic content).",
+  "name": "search_wordpress_posts",
+  "description": "Search the site using the sidebar search box and open a matching post from results by title or post id pattern. Designed from recorded interactions on a WordPress search-results page (http://localhost:8000/). The agent is already logged in when necessary; no auth steps included. The tool inputs map directly to HTML form fields and selectors used in the recording.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Load the site's home page to ensure the search form is available.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://localhost:8000/",
+      "url_operation": null
+    },
+    {
+      "description": "Directly navigate to the search-results URL using the query parameter to perform the search quickly and deterministically.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://localhost:8000/?s={s}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the search results page to render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Find anchors under common post title selectors (e.g., 'article .entry-title a', 'h2.entry-title a', or 'main .post-title a') and return their text and hrefs.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Extract list of result anchors (title and href) from the search results area"
+    },
+    {
+      "description": "Select which search result to open based on input parameters; fall back to the first result when no explicit match input is given.",
+      "output": null,
+      "type": "agent",
+      "task": "From the extracted 'search_results', choose the first result where 'href' contains '{post_href_contains}' if provided, else where 'title' equals '{post_title_exact}' if provided, else choose the first result. Output the chosen result's href and title.",
+      "max_steps": 3
+    },
+    {
+      "description": "Open the selected post by navigating to its href. (If 'chosen_result_href' is not set by selection, this step fails.)",
+      "output": null,
+      "type": "navigation",
+      "url": "{chosen_result_href}",
+      "url_operation": null
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "s",
+      "type": "string",
+      "format": null,
+      "description": "Search query string to enter into the site's search box (maps to input name='s'). Use plain text, e.g., 'Microsoft Planner'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "post_href_contains",
+      "type": "string",
+      "format": null,
+      "description": "Substring to match in the result link href (e.g., '?p=8' or 'p=236'). If provided, the tool will click the first result whose href contains this substring.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "post_title_exact",
+      "type": "string",
+      "format": null,
+      "description": "Exact post title to match in search results. If provided, the tool will click the first result whose visible anchor text equals this value.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

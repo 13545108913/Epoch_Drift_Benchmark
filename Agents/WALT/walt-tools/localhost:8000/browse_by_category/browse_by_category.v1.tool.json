@@ -1,0 +1,126 @@
+{
+  "tool_analysis": null,
+  "name": "browse_category_and_open_post",
+  "description": "Navigate a WordPress category archive, select a sidebar category by category id, open a post by title or index, and click its 'Continue Reading' link. Uses recorded stable selectors and prefers href-based selection. Assumes the session is already authenticated if needed.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate directly to the requested category page using the category query parameter.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/?cat={category_id}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the category page to load and render.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture the visible post titles and links and the sidebar categories for verification.",
+      "output": "category_snapshot",
+      "type": "extract_page_content",
+      "goal": "Extract list of posts (title and href) and confirm presence of sidebar category link 'cat={category_id}'"
+    },
+    {
+      "description": "Use deterministic href-based selection first; fall back to XPath by link text scoped to the categories widget if necessary.",
+      "output": "click_result",
+      "type": "agent",
+      "task": "Locate the sidebar category link with href containing '?cat={category_id}' and click it if found",
+      "max_steps": 1
+    },
+    {
+      "description": "Wait briefly after clicking to allow navigation.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Validate that URL or heading contains the category id or name; extract titles and hrefs.",
+      "output": "post_list_after_category_click",
+      "type": "extract_page_content",
+      "goal": "Verify the page is now the requested category and extract updated post list"
+    },
+    {
+      "description": "Prefer exact text match using XPath; fallback to post link href by '?p=' IDs captured earlier.",
+      "output": "post_open_result",
+      "type": "agent",
+      "task": "Open the post. If post_title provided find anchor whose visible text equals '{post_title}' and click it. Otherwise use the {post_index}-th post title link from the extracted list and click it.",
+      "max_steps": 1
+    },
+    {
+      "description": "Wait for the post page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture the post title and permalink for verification.",
+      "output": "post_page_snapshot",
+      "type": "extract_page_content",
+      "goal": "Confirm post page loaded and extract main post title and permalink"
+    },
+    {
+      "description": "Attempt to click the post's 'Continue Reading' link to open the full post. If not found, click the post title link instead.",
+      "output": "continue_click_result",
+      "type": "agent",
+      "task": "Click the 'Continue Reading' link on the post listing if present. Use selectors a.more-link, a.read-more, or article a[href*='?p='] falling back to XPath //a[contains(normalize-space(.),'Continue Reading')].",
+      "max_steps": 1
+    },
+    {
+      "description": "Wait for navigation after Continue Reading click.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Return the post URL, title, and success status.",
+      "output": "final_post_data",
+      "type": "extract_page_content",
+      "goal": "Final verification: extract and return the full post URL and title"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base site URL including scheme and host (e.g., http://localhost:8000). Tool will navigate category and post URLs relative to this base.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "category_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric category id to open from the sidebar (e.g., '16' for technology). This is used in href queries like '?cat={category_id}'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "post_title",
+      "type": "string",
+      "format": null,
+      "description": "Exact post title to open from the category listing. If provided the tool will find the title link matching this text; exact match preferred. If omitted, the first post (index 1) will be used.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "post_index",
+      "type": "number",
+      "format": null,
+      "description": "1-based index of the post to open from the listing when post_title is not provided. Defaults to 1.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wait_seconds",
+      "type": "number",
+      "format": null,
+      "description": "Seconds to wait after navigation or clicks for pages to load. Defaults to 2.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

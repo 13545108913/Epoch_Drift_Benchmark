@@ -1,0 +1,89 @@
+{
+  "tool_analysis": "Step Analysis: The recorded session demonstrates searching the WordPress site and opening the top matching post. It typed into input[name=\\'s\\'] (elementHash 0723c9d675) and clicked a submit button (elementHash 341036eef5), then clicked the first result link (elementHash 910bb6d488) leading to http://localhost:8000/?p=236. Task Definition: Create a reusable tool that takes a search string, submits it to the site's search form, returns the list of results and optionally opens the top result and extracts its content. Action Plan: 1) Navigate to site homepage to ensure search form exists; 2) Input search query into input[name='s']; 3) Submit search using button[type='submit'] or .wp-block-search__button; 4) Wait for results; 5) Extract titles and URLs from results; 6) Optionally click/open first result and extract article. Variable Identification: Inputs s (required) and open_first (optional). Step Optimization: Use stable selectors from recording (elementHash values) for deterministic input and click. Added waits to prevent timing issues. Replaced UI-only sequence for canonical URL with a url_operation to ensure query parameters are consistent. Agent step kept for opening the top result since the top link may vary and needs dynamic selection; however, the elementHash 910bb6d488 could be used if top result is consistently the same CSS path. Rationale: This tool closely models the recorded interactions, uses the same selectors to be robust, and offers optional opening of the first result.",
+  "name": "search_wordpress_posts",
+  "description": "Performs a site search on the WordPress site and opens the first matching post result. Inputs map directly to site form fields and URL parameters. The site in recording is already authenticated when needed (no auth steps in tool).",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to the site's homepage to ensure the search form is available.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://localhost:8000/",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for page assets to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Type the search query into the search input (deterministic selector from recording).",
+      "output": null,
+      "cssSelector": "#wp-block-search__input-1",
+      "xpath": "html/body/div/div/div/div/aside/div/section/form/div/input",
+      "elementTag": "input",
+      "elementHash": "0723c9d675",
+      "type": "input",
+      "value": "{s}"
+    },
+    {
+      "description": "Click the search submit button to run the query.",
+      "output": null,
+      "cssSelector": "button[aria-label=\"Search\"][aria-label=\"Search\"]",
+      "xpath": "html/body/div/div/div/div/aside/div/section/form/div/button",
+      "elementTag": "button",
+      "elementHash": "341036eef5",
+      "type": "click"
+    },
+    {
+      "description": "Wait for search results to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Scrape the visible search results on the page (post titles, URLs, excerpts).",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Extract list of search results with titles and URLs"
+    },
+    {
+      "description": "Canonicalize the results URL so downstream steps can link directly to results via query string.",
+      "output": null,
+      "type": "navigation",
+      "url": null,
+      "url_operation": {
+        "base": "{context.current_url}",
+        "replace": {
+          "s": "{s}"
+        }
+      }
+    },
+    {
+      "description": "Click first result's title link; dynamic content requires agentic selection to ensure the top result is opened reliably.",
+      "output": "article_page",
+      "type": "agent",
+      "task": "Open the first search result link (the top result) and extract full article content",
+      "max_steps": 5
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "s",
+      "type": "string",
+      "format": null,
+      "description": "Search query string to send to the site's search form (maps to input[name='s']).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "open_first",
+      "type": "string",
+      "format": null,
+      "description": "If 'true', open the first search result after search. Use 'true' or 'false'. Default: 'true'.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

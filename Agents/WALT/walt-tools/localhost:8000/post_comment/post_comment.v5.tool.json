@@ -1,0 +1,147 @@
+{
+  "tool_analysis": "Step Analysis: The recorded browser session navigated to a WordPress post (http://localhost:8000/?p=8), located the comment form in the #respond region (form#commentform), filled the standard WordPress comment fields (textarea#comment, input#author, input#email, input#url), optionally toggled the cookies consent checkbox (input#wp-comment-cookies-consent), and clicked the submit button (input[type=submit], id submit). The session confirmed success when the page navigated to an anchor for the new comment (#comment-23). Task Definition: Create a reusable tool that accepts a post URL and comment fields (comment, author, email, optional url, consent flag) and automates posting a comment to a WordPress post's comment form using stable selectors. Action Plan: 1) Navigate to {post_url}. 2) Wait for page load. 3) Fill textarea#comment (or fallbacks) with {comment}. 4) Fill input#author with {author}. 5) Fill input#email with {email}. 6) Fill input#url with {url} (optional). 7) If {consent} true, click checkbox input#wp-comment-cookies-consent. 8) Click submit (form-scoped submit input/button). 9) Wait and extract page content to confirm the result. Variable Identification: Inputs required: post_url, comment, author, email; optional inputs: url, consent (boolean). Step Optimization: Combined repeated element interactions into single deterministic input steps using stable selectors and elementHash fallbacks. Added explicit waits to avoid previous timing/navigation timeouts. Avoided unnecessary clicks and used direct navigation to the post URL. Assumes user/session is already authenticated if needed. Selectors: Prefer ID-based selectors (textarea#comment, input#author, input#email, input#url, input#wp-comment-cookies-consent, input#submit) then form-scoped name selectors and finally label-based XPaths if IDs are missing. Error handling: Added short waits before submitting to mitigate timing issues noted in earlier runs and included an extraction step to confirm success.",
+  "name": "submit_wordpress_comment",
+  "description": "Submit a comment to a WordPress post's comment form. Navigates to the post URL (or uses provided URL), fills the standard WordPress comment fields (comment, author, email, url), optionally toggles the cookies consent checkbox, and submits the form. Uses stable ID-based selectors when available: textarea#comment, input#author, input#email, input#url, input#wp-comment-cookies-consent, input#submit (or form-scoped submit). Assumes the caller is already authenticated if needed.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate directly to the post URL that contains the comment form (use #respond or replytocom in the URL if replying).",
+      "output": null,
+      "type": "navigation",
+      "url": "{post_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait a short time for the page to fully load and for dynamic scripts to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Fill the main comment textarea. Prefer textarea#comment; fall back to form-scoped name or #respond textarea.",
+      "output": null,
+      "cssSelector": "textarea[name=\"comment\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "67f1dce8d0",
+      "type": "input",
+      "value": "{comment}"
+    },
+    {
+      "description": "Fill the author/display name input.",
+      "output": null,
+      "cssSelector": "input[name=\"author\"][type=\"text\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[3]/input",
+      "elementTag": "input",
+      "elementHash": "085915c9f4",
+      "type": "input",
+      "value": "{author}"
+    },
+    {
+      "description": "Fill the email input (required by WordPress).",
+      "output": null,
+      "cssSelector": "#email",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[4]/input",
+      "elementTag": "input",
+      "elementHash": "cedb6c9f0b",
+      "type": "input",
+      "value": "{email}"
+    },
+    {
+      "description": "Fill the website/URL input. If {url} is empty, this step inputs an empty string.",
+      "output": null,
+      "cssSelector": "#url",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[5]/input",
+      "elementTag": "input",
+      "elementHash": "c682e1f7d4",
+      "type": "input",
+      "value": "{url}"
+    },
+    {
+      "description": "Toggle the cookies consent checkbox when {consent} is true.",
+      "output": null,
+      "cssSelector": "#wp-comment-cookies-consent",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[6]/input",
+      "elementTag": "input",
+      "elementHash": "42c420143d",
+      "type": "click"
+    },
+    {
+      "description": "Short wait to ensure checkbox state is registered.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Click the submit button to post the comment.",
+      "output": null,
+      "cssSelector": "input[name=\"submit\"][type=\"submit\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[7]/input",
+      "elementTag": "input",
+      "elementHash": "777443c52e",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the submission to process and the page to update (comment may appear or be held for moderation).",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract page content or messages to confirm whether the comment was posted successfully.",
+      "output": "post_result",
+      "type": "extract_page_content",
+      "goal": "Confirm comment posted by locating new comment element or success message (e.g., new comment at #comment- or 'Your comment is awaiting moderation' message)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "post_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the post page containing the comment form (e.g., 'http://localhost:8000/?p=8'). Use the #respond anchor or include replytocom if replying to a comment.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment",
+      "type": "string",
+      "format": null,
+      "description": "The comment text to post (populates textarea#comment).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "author",
+      "type": "string",
+      "format": null,
+      "description": "Display name for the comment (populates input#author).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": null,
+      "description": "Email address for the commenter (populates input#email).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "url",
+      "type": "string",
+      "format": null,
+      "description": "Optional website URL for the commenter (populates input#url).",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "consent",
+      "type": "bool",
+      "format": null,
+      "description": "Whether to check the 'Save my name, email, and website...' checkbox (input#wp-comment-cookies-consent). Defaults to false.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

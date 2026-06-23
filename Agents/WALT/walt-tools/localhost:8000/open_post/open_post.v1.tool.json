@@ -1,0 +1,108 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session opens a WordPress post permalink (?p=8), extracts the full post content and metadata, locates comment anchors and comment list (including first comment), finds the post category link, and demonstrates three interactions: open post via title link, jump to comments via the comment-count link, and open the category archive.\n\nTask Definition:\n- Build a deterministic, re-usable tool that, given a base site URL and a post id, will: 1) navigate to the post permalink, 2) extract full post content and metadata (title, permalink, date, author, categories, tags, canonical if present), 3) click the comment-count anchor to reveal/confirm the comments section and extract the first comment metadata and body excerpt, and 4) click the post's category link to open the category archive and extract the listing entries.\n\nAction Plan (ordered steps):\n1) Navigate to {base_url}/?p={post_id} (direct URL navigation is deterministic). 2) Wait briefly for load. 3) Extract full post content & metadata into 'post_data'. 4) Click the post title/permalink anchor (recorded elementHash) to demonstrate opening via title link. 5) Re-extract/confirm metadata into 'post_metadata'. 6) Click the comment-count anchor (recorded elementHash) to jump to comments. 7) Extract the comments list and the first comment metadata into 'comments'. 8) Click the category link (recorded elementHash) to open the category archive. 9) Extract 'category_listing' entries (title, permalink, date, author, comment-count) to confirm navigation.\n\nVariable Identification (inputs):\n- base_url (required): host and scheme for navigation. Derived from the recorded steps: \"http://localhost:8000\".\n- post_id (required): the numeric post id used in permalinks (record shows \"8\"). The tool uses this directly in URL generation and as a scoping value when verifying hrefs.\n\nStep Optimization / Rationale:\n- Prefer direct navigation to the permalink URL ({base_url}/?p={post_id}) rather than chasing multiple in-page links. This reduces brittle sequences and ensures deterministic GET behavior.\n- Use recorded element hashes for deterministic clicks when demonstrating UI interactions: title (elementHash \"11a9a781dd\"), comment-count (\"1c621143bd\"), category link (\"5131454551\"). These were produced by the recorded session and provide stable targets for the click actions.\n- Always re-extract page content after navigation/clicks to confirm the expected state (post metadata, comments, category archive entries).\n- Avoid reliance on global numeric anchor indexes (they were unstable in the recording). Use href-based selectors and article/post-id scoping where the DOM must be queried at runtime; the tool uses recorded elementHash clicks and page extractions to gather stable selectors.\n\nEssential-only steps: navigation, extraction and deterministic clicks that reproduce the demo interactions. No optional filtering/sorting or branching logic is added.\n\nAssumptions and limits:\n- The agent is already authenticated if auth is required (recording showed no login gate). If the page requires login it is out of scope (credentials were available in session but not used here).\n- The recorded elementHashes are expected to remain valid for the target environment; if they are invalid in another run, the extraction steps return the elements' hrefs so a runtime agent can re-target by href (e.g., a[href*='?p={post_id}']).\n- The tool performs deterministic sequential steps and always extracts results into named outputs for downstream consumption.",
+  "name": "open_and_extract_post",
+  "description": "Given a site base URL and a WordPress post id (query param p), navigate to the post permalink, extract full post content and metadata, click the post's comment-count anchor to reveal/scroll to comments and extract the first comment, then click the post's category link and extract the category archive listing. Uses recorded stable element hashes for deterministic clicks.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate directly to the post permalink page for the provided post id.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/?p={post_id}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly for the page to load and the DOM to stabilise.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Capture canonical post information and available anchors before any UI click.",
+      "output": "post_data",
+      "type": "extract_page_content",
+      "goal": "Extract the full post content and metadata: title, permalink, post_id, date (and datetime attr if present), author name and author href, categories and category hrefs, tags and tag hrefs, canonical (if present), excerpt and content snippet, and presence of #comments and #respond anchors."
+    },
+    {
+      "description": "Click the post title/permalink anchor (recorded elementHash) to demonstrate opening the post via its title link.",
+      "output": null,
+      "cssSelector": "div > span > a[href=\"javascript:void(0)\"]",
+      "xpath": "html/body/div/header/div[2]/div/div/div/div[3]/div[2]/span/a",
+      "elementTag": "a",
+      "elementHash": "11a9a781dd",
+      "type": "click"
+    },
+    {
+      "description": "Wait for navigation/DOM update after clicking the title link.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Re-extract metadata to confirm clicking the title led to the expected post page state.",
+      "output": "post_metadata",
+      "type": "extract_page_content",
+      "goal": "After clicking the title link, confirm canonical permalink, title, author, date (datetime), categories, tags and verify comments and comment form anchors are present."
+    },
+    {
+      "description": "Click the comment-count link (recorded elementHash) to jump to the comments section (#comments) for the post.",
+      "output": null,
+      "cssSelector": "div > span > a[href=\"http://localhost:8000/?p=8#comments\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/article/header/div[2]/span[3]/a",
+      "elementTag": "a",
+      "elementHash": "1c621143bd",
+      "type": "click"
+    },
+    {
+      "description": "Allow the page to scroll/jump to the comments section.",
+      "output": null,
+      "type": "wait",
+      "seconds": 0.5
+    },
+    {
+      "description": "Collect the first comment and comment metadata after jumping to comments.",
+      "output": "comments",
+      "type": "extract_page_content",
+      "goal": "Extract comments list: for each comment capture id, anchor permalink, author name and profile link (if any), timestamp text (and datetime when present), content excerpt/body, and reply link (replytocom). Also extract the comment form anchor (#respond) presence."
+    },
+    {
+      "description": "Click the post's category link (recorded elementHash) to open the category archive for the category associated with the post.",
+      "output": null,
+      "cssSelector": "div > span > a[href=\"http://localhost:8000/?cat=16\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/article/header/div/span/a",
+      "elementTag": "a",
+      "elementHash": "5131454551",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the category archive page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Confirm that the post appears in the category listing and capture listing metadata for automation verification.",
+      "output": "category_listing",
+      "type": "extract_page_content",
+      "goal": "On the category archive page, extract the listing entries: for each visible post capture title, permalink, published date (and link), author (name and link), comment-count link/href, excerpt and featured image url."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Site base URL including scheme and host, e.g. \"http://localhost:8000\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "post_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric post id used by the site permalink query parameter (the 'p' value). Example: \"8\" for ?p=8",
+      "required": true,
+      "enum": null
+    }
+  ]
+}

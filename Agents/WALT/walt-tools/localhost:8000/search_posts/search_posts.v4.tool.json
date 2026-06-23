@@ -1,0 +1,88 @@
+{
+  "tool_analysis": null,
+  "name": "search_posts_and_open_result",
+  "description": "Search the WordPress site at http://localhost:8000/ using a query string and open the first matching result or a specified post by ID. Steps: navigate to base search URL, enter query into the search input (input[name='s'] or input[type='search']), submit the search (form[role='search'] [type='submit'] or button[type='submit']), wait for results, optionally click a result link (by post id or by first match). Returns the opened post URL and list of result links.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate directly to the search results URL constructed with the provided query. Using URL navigation avoids relying on UI interactions to perform the search and is deterministic.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}?s={query}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait for the search results page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Collect all candidate post result links from the results page; helpful for returning results and choosing which to open.",
+      "output": "search_results",
+      "type": "extract_page_content",
+      "goal": "Extract list of anchors matching WordPress post links (href contains '?p=') and their visible texts and hrefs"
+    },
+    {
+      "description": "Agentic selection is used because the target element may be in different containers (sidebar, main content).",
+      "output": null,
+      "type": "agent",
+      "task": "Select which result to open: if {post_id} provided, choose the anchor with href containing '?p={post_id}'. Else choose the first anchor from 'search_results'.",
+      "max_steps": 3
+    },
+    {
+      "description": "If post_id provided, click the anchor whose href contains the post_id to open that post (first match).",
+      "output": null,
+      "cssSelector": "a.wp-block-latest-posts__post-title",
+      "xpath": "html/body/div/div/div/div/aside/div/section[2]/div/div/ul/li/a",
+      "elementTag": "a",
+      "elementHash": "1969816212",
+      "type": "click"
+    },
+    {
+      "description": "Click the selected search result to open the post page.",
+      "output": null,
+      "type": "agent",
+      "task": "If post_id not provided, click the first anchor from 'search_results' collected earlier and save its href as opened_post_url.",
+      "max_steps": 3
+    },
+    {
+      "description": "Wait for the post page to navigate and load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Retrieve the title and URL of the opened post to return to caller.",
+      "output": "opened_post",
+      "type": "extract_page_content",
+      "goal": "Extract post page title and URL to confirm the navigation and provide final output"
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "query",
+      "type": "string",
+      "format": null,
+      "description": "Search query string to send to the site's search input (e.g., 'Microsoft Planner tips').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "post_id",
+      "type": "string",
+      "format": null,
+      "description": "Optional post id to open (e.g., '8'). If omitted, the tool will open the first search result link it finds.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base site URL. Defaults to 'http://localhost:8000/'. Use if testing on a different host or port.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

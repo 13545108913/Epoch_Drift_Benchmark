@@ -1,0 +1,127 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigated to a WordPress-style post page (http://localhost:8000/?p=8) and completed a comment submission by filling the comment textarea (id/name 'comment'), name ('author'), email ('email'), optional website ('url'), toggling the cookie-consent checkbox ('wp-comment-cookies-consent'), and clicking the submit button (id/name 'submit'). After submit the page navigated to an anchor for the new comment (e.g., #comment-15) and the posted comment's author, timestamp and content were visible.\n\nTask Definition:\n- Automate posting a comment on a WordPress-style comment form. The tool must navigate to a given post URL, populate required fields (comment, name, email), optionally populate website, ensure the cookie-consent checkbox matches the caller's wishes, submit the form, and extract confirmation data (author, timestamp, content, comment id/link).\n\nAction Plan (detailed steps to implement):\n1. Navigate to the provided post URL.\n2. Populate the comment textarea with the provided comment text using the recorded element hash for reliability.\n3. Populate the name (author) input using the recorded element hash.\n4. Populate the email input using the recorded element hash.\n5. Populate the optional website (url) input using the recorded element hash; send empty string if not provided.\n6. Ensure the cookie-consent checkbox state matches the input boolean. This requires reading current state then toggling only if different \u2014 implemented as an agentic step to keep the tool deterministic and robust.\n7. Click the submit button using the recorded element hash.\n8. Extract the posted comment's author, timestamp, content, and comment id/anchor from the resulting page to confirm submission.\n\nVariable Identification (inputs required):\n- post_url: target page URL (required) \u2014 drives navigation.\n- comment: comment body (required) \u2014 mapped to textarea#comment.\n- author: commenter name (required) \u2014 mapped to input#author.\n- email: commenter email (required) \u2014 mapped to input#email.\n- url: optional website (not required) \u2014 mapped to input#url. Leave empty if not applicable.\n- consent: boolean (optional) \u2014 whether to check the cookie-consent checkbox. Default/omitted treated as false.\n\nStep Optimization and Rationale:\n- Navigation is explicit (step 1) to ensure we are on the correct page before interacting. This avoids fragile click-based navigation.\n- Deterministic interactions use stable elementHash values captured during the recorded session for textarea, name, email, website and submit button (elementHash values: 67f1dce8d0, 085915c9f4, cedb6c9f0b, c682e1f7d4, 777443c52e). Using elementHash provides robust targeting instead of brittle index-based selectors.\n- Checkbox handling is implemented as an agent step because setting it reliably requires reading the current checked state and conditionally toggling. The tool framework's step model does not support conditional branching directly, so an agent step is used to encapsulate that logic while keeping the rest of the sequence deterministic.\n- An extraction step after submission confirms success by scraping the posted comment's author, timestamp, content and comment id, which is essential feedback for the caller.\n\nConstraints and Assumptions:\n- The session recorded indicates the environment uses WordPress core comment markup; selectors and element hashes are based on that. If the target page uses different markup, elementHash targeting may fail and fallbacks (not included to keep the tool single-purpose and deterministic) would be necessary.\n- The agent assumes the caller is already authenticated if the site requires authentication. No login steps are included per the recorded session.\n\nThis tool is intentionally single-purpose (submit a comment and confirm) and parameter-driven. It uses recorded stable element hashes for deterministic UI interactions and an agentic step only where state inspection is required (checkbox).",
+  "name": "submit_comment_on_post",
+  "description": "Automates submitting a comment to a WordPress-style comment form. Navigates to a post URL, fills the comment textarea and identity fields (name, email, website), ensures the cookie-consent checkbox matches the requested state, clicks submit, and extracts the posted comment author, timestamp and content to confirm submission.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the post page that contains the comment form.",
+      "output": null,
+      "type": "navigation",
+      "url": "{post_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Fill the comment textarea (form#commentform textarea#comment). Element hash captured from the recorded session.",
+      "output": null,
+      "cssSelector": "textarea[name=\"comment\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "67f1dce8d0",
+      "type": "input",
+      "value": "{comment}"
+    },
+    {
+      "description": "Fill the commenter name input (form#commentform input#author). Element hash captured from the recorded session.",
+      "output": null,
+      "cssSelector": "input[name=\"author\"][type=\"text\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[3]/input",
+      "elementTag": "input",
+      "elementHash": "085915c9f4",
+      "type": "input",
+      "value": "{author}"
+    },
+    {
+      "description": "Fill the commenter email input (form#commentform input#email). Element hash captured from the recorded session.",
+      "output": null,
+      "cssSelector": "#email",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[4]/input",
+      "elementTag": "input",
+      "elementHash": "cedb6c9f0b",
+      "type": "input",
+      "value": "{email}"
+    },
+    {
+      "description": "Fill the optional website URL input (form#commentform input#url). Provide empty string if not needed.",
+      "output": null,
+      "cssSelector": "#url",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[5]/input",
+      "elementTag": "input",
+      "elementHash": "c682e1f7d4",
+      "type": "input",
+      "value": "{url}"
+    },
+    {
+      "description": "Agentic step to reliably set the 'Save my name, email, and website in this browser' checkbox to the requested state because checkbox state may require reading current state before toggling.",
+      "output": null,
+      "type": "agent",
+      "task": "Ensure the cookie-consent checkbox (elementHash: 42c420143d) is in the state requested by {consent}. If the current state differs, toggle the checkbox once. Use at most 4 steps.",
+      "max_steps": 4
+    },
+    {
+      "description": "Click the submit button (form#commentform input#submit or equivalent) to post the comment. Element hash captured from the recorded session.",
+      "output": null,
+      "cssSelector": "input[name=\"submit\"][type=\"submit\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[7]/input",
+      "elementTag": "input",
+      "elementHash": "777443c52e",
+      "type": "click"
+    },
+    {
+      "description": "Verify the comment was posted by extracting the visible author name, timestamp, comment body, and comment anchor/id from the page.",
+      "output": "posted_comment",
+      "type": "extract_page_content",
+      "goal": "After submission, extract the newly posted comment's author, author_url (website), timestamp (human-readable and ISO if available), content, and comment id (anchor) to confirm successful submission."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "post_url",
+      "type": "string",
+      "format": "url",
+      "description": "Full URL of the post containing the comment form (e.g., \"http://localhost:8000/?p=8\"). The tool will navigate to this page before interacting with the form.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment",
+      "type": "string",
+      "format": null,
+      "description": "Text content to submit as the comment body. Corresponds to the form field with id/name 'comment'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "author",
+      "type": "string",
+      "format": null,
+      "description": "Display name of the commenter. Corresponds to the input with id/name 'author' (Label: 'Name *').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": "user@domain.com",
+      "description": "Commenter's email address. Corresponds to the input with id/name 'email' (Label: 'Email *').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "url",
+      "type": "string",
+      "format": "url",
+      "description": "Optional commenter website URL. Corresponds to the input with id/name 'url' (Label: 'Website'). Leave empty string if not applicable.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "consent",
+      "type": "bool",
+      "format": null,
+      "description": "If true, ensure the 'Save my name, email, and website...' cookie-consent checkbox is checked. If false, ensure it is unchecked. Default behavior if omitted is false.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

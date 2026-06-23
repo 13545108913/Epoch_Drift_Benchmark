@@ -1,0 +1,61 @@
+{
+  "tool_analysis": "Step Analysis:\n- Recorded steps navigated several site pages and repeatedly analysed the WordPress 'Recent Comments' widget to find anchors linking to internal comment fragments (href containing '#comment-...'). The final successful action was clicking the widget anchor for comment-24, which opened the post at http://localhost:8000/?p=8#comment-24.\n\nTask Definition:\n- Create a reusable tool that opens a referenced post/comment thread from a Recent Comments entry. The tool should deterministically navigate to the post+fragment URL (constructed from site base, post id 'p', and comment id) and verify the comment element exists. Avoid brittle sidebar clicks that may follow external author links.\n\nAction Plan:\n1. Accept inputs: site_base_url, p, comment_id, optional widget_selector for diagnostics.\n2. Construct the target URL: \"{site_base_url}/?p={p}#comment-{comment_id}\".\n3. Navigate directly to that URL (deterministic GET). This replaces UI click sequences and is more robust.\n4. Wait briefly for load/scroll.\n5. Verify presence of element with id 'comment-{comment_id}' via page extraction and return a confirmation output.\n\nVariable Identification:\n- site_base_url (string, required): origin to build the URL (e.g., http://localhost:8000)\n- p (string, required): post id (maps to query parameter 'p')\n- comment_id (string, required): numeric portion of the fragment (maps to fragment '#comment-24')\n- widget_selector (string, optional): CSS selector for the Recent Comments widget used only to scope diagnostics if caller prefers\n\nStep Optimization:\n- Replace recorded UI clicks (which risk following external author links) with a single deterministic navigation to the constructed post+fragment URL. This is reliable because fragment navigation is a client-side GET target and avoids ambiguity between commenter links and post links.\n- Added a short wait and verification extraction to confirm the comment element exists after navigation.\n- Kept widget_selector optional rather than required: callers who prefer to click within the widget can still use the selector for diagnostics or additional checks, but the core operation does not rely on fragile in-page clicks.\n\nConstraints/Assumptions:\n- Tool assumes no authentication is required (recorded session was not authenticated prior to clicking). If authentication is needed, it must be performed outside this tool.\n- Tool uses client-side fragment navigation; if server-side redirects change query parameters, callers should pass the effective site_base_url and post id.\n\nEssential-only steps:\n- Only the navigation and verification steps are included. All exploratory extractions and repeated widget analyses from the recording are intentionally omitted from the executable tool since they are not needed for the single purpose of opening the comment thread.\n",
+  "name": "open_recent_comment_thread",
+  "description": "Opens a referenced post/comment thread by navigating to the post URL containing a comment fragment (e.g. /?p=8#comment-24). Optimized to navigate directly to the post+fragment URL rather than performing fragile sidebar clicks. Verifies presence of the comment fragment on the loaded page.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate directly to the post URL with the comment fragment to open the post and jump to the specific comment.",
+      "output": null,
+      "type": "navigation",
+      "url": "{site_base_url}/?p={p}#comment-{comment_id}",
+      "url_operation": null
+    },
+    {
+      "description": "Wait briefly to allow the page to load and the browser to scroll to the fragment.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Check that the target comment anchor '#comment-{comment_id}' exists on the page. This helps confirm navigation success.",
+      "output": "comment_presence",
+      "type": "extract_page_content",
+      "goal": "Verify presence of the comment element with id 'comment-{comment_id}' on the loaded page and extract a short confirmation."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "site_base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base site origin (scheme + host + optional port). Example: \"http://localhost:8000\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "p",
+      "type": "string",
+      "format": null,
+      "description": "Post id (value of the 'p' query parameter). Example: \"8\"",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric comment identifier portion (without the 'comment-' prefix). Example: \"24\" \u2014 will be used to construct fragment '#comment-24'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "widget_selector",
+      "type": "string",
+      "format": null,
+      "description": "Optional CSS selector that scopes the Recent Comments widget (e.g. '.widget_recent_comments' or '#recentcomments'). Used only for verification and diagnostics; not required for navigation.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

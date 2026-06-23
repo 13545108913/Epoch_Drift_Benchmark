@@ -1,0 +1,145 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded steps navigate to a WordPress post, locate the standard comment form, fill fields (comment, author, email, url), optionally toggle the 'save my name/email/website' checkbox, submit, and verify the comment appears (anchored). The run produced element hashes and confirmed standard WP ids: #comment, #author, #email, #url, input#wp-comment-cookies-consent, #submit.\n\nTask Definition:\n- Build a re-usable, deterministic tool to post a comment to a WordPress post URL using provided values for comment, author, email, and optional website, with optional cookie-consent toggling and verification that the comment appears.\n\nAction Plan:\n1. Navigate to provided post_url.\n2. Wait briefly for page/scripts to initialize and confirm the comment form exists.\n3. Fill the comment textarea (#comment) with {comment}.\n4. Fill name (#author), email (#email), and website (#url) fields.\n5. Conditionally toggle cookie-consent checkbox only when {wp_comment_cookies_consent} is true. Use an agent step to perform this conditional action robustly (handles variations in id/name and avoids unconditional clicks).\n6. Click the submit control (prefer #submit or submit control within form#commentform).\n7. Wait for server processing and page reload/anchor, then extract page content to verify that a comment by {author} containing the comment text appears.\n\nVariable Identification:\n- post_url: target page to navigate (required).\n- comment: comment text -> maps to textarea name/id 'comment' (required).\n- author: commenter display name -> maps to input name/id 'author' (required).\n- email: commenter email -> maps to input name/id 'email' (required).\n- url: optional website -> maps to input name/id 'url' (optional).\n- wp_comment_cookies_consent: boolean indicating whether to check cookie-consent checkbox (optional).\n\nStep Optimization & Determinism:\n- Navigation uses direct URL rather than UI clicks (more deterministic).\n- Form inputs use stable WP ids (#comment, #author, #email, #url) with elementHash recorded as a fallback for deterministic targeting.\n- The cookie checkbox is conditional; to avoid non-deterministic unconditional clicks, an agent step is used to inspect the page and perform the toggle only when requested, while using robust selector fallbacks (id, name contains 'cookies', label-relative). This follows the rule to prefer deterministic selectors but use agentic logic for conditional/dynamic interactions.\n- Submission uses the common #submit selector and scoped form submit controls to avoid clicking unrelated submit buttons.\n- Verification uses an extraction step looking for author text and a snippet of the comment to determine success; exact comment id may vary so the verification looks for visible evidence rather than assuming a fixed id.\n\nFailure Modes & Mitigations:\n- If the page returns an error or redirects to a login, the initial extract_page_content will surface that and the tool caller can detect failure via the 'initial_form_check' output.\n- If preferred selectors are missing or duplicated, the agent step and extraction steps will log which selector matched; callers should implement retry/retry-with-snapshot strategies if needed.\n\nNotes:\n- The agent is assumed to already be authenticated if required; no auth steps are included.\n- Required fields match visible form indicators (Comment*, Name*, Email*). 'url' is optional.\n- The tool intentionally avoids branching in the main step list; conditional checkbox handling is delegated to a bounded 'agent' step to adhere to the system's requirement for robust conditional actions.",
+  "name": "tool_post_comment.v3",
+  "description": "Submit a WordPress post comment programmatically. Navigates to a post URL, fills the standard WP comment form (comment, author, email, website), optionally toggles the 'save my name/email/website' checkbox, submits the comment, and verifies the new comment appears on the page.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate directly to the post URL where the comment form is located.",
+      "output": null,
+      "type": "navigation",
+      "url": "{post_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Brief pause to allow page scripts and the comment form to initialize.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture page content and confirm comment form is present. This helps detect redirects or missing form.",
+      "output": "initial_form_check",
+      "type": "extract_page_content",
+      "goal": "Confirm presence of core comment form selectors (#comment, #author, #email, #url or their fallbacks) before filling."
+    },
+    {
+      "description": "Enter the comment text into the textarea (preferred selector: #comment).",
+      "output": null,
+      "cssSelector": "textarea[name=\"comment\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "67f1dce8d0",
+      "type": "input",
+      "value": "{comment}"
+    },
+    {
+      "description": "Enter the commenter display name into the name field (preferred selector: #author).",
+      "output": null,
+      "cssSelector": "input[name=\"author\"][type=\"text\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[3]/input",
+      "elementTag": "input",
+      "elementHash": "085915c9f4",
+      "type": "input",
+      "value": "{author}"
+    },
+    {
+      "description": "Enter the commenter email into the email field (preferred selector: #email).",
+      "output": null,
+      "cssSelector": "#email",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[4]/input",
+      "elementTag": "input",
+      "elementHash": "cedb6c9f0b",
+      "type": "input",
+      "value": "{email}"
+    },
+    {
+      "description": "Enter the optional website/URL into the url field. Pass an empty string to leave blank.",
+      "output": null,
+      "cssSelector": "#url",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[5]/input",
+      "elementTag": "input",
+      "elementHash": "c682e1f7d4",
+      "type": "input",
+      "value": "{url}"
+    },
+    {
+      "description": "Agentic step to conditionally toggle the cookie-consent checkbox. Agent reasoning is used to avoid unconditional clicks and to robustly select the checkbox if the id differs.",
+      "output": "cookie_consent_result",
+      "type": "agent",
+      "task": "If {wp_comment_cookies_consent} is true, locate the cookie consent checkbox (preferred selector: input#wp-comment-cookies-consent or input[type='checkbox'][name*='cookies' i]) and click it once. If false or the selector is not found, do nothing. Log which selector was used or if skipped.",
+      "max_steps": 4
+    },
+    {
+      "description": "Click the comment submit control (preferred selector: #submit or the submit control inside form#commentform).",
+      "output": null,
+      "cssSelector": "input[name=\"submit\"][type=\"submit\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[7]/input",
+      "elementTag": "input",
+      "elementHash": "777443c52e",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the server to process the submission and for the page to reload/anchor to the new comment.",
+      "output": null,
+      "type": "wait",
+      "seconds": 4.0
+    },
+    {
+      "description": "Extract verification evidence (e.g., li#comment-<id>, visible author text, and comment snippet) to confirm successful submission.",
+      "output": "comment_verification",
+      "type": "extract_page_content",
+      "goal": "Verify that the comment by '{author}' with the text starting with the first 40 characters of '{comment}' appears on the page (look for author text and snippet or li#comment-*)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "post_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the post page to comment on (example: 'http://localhost:8000/?p=8'). The tool will navigate to this URL.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment",
+      "type": "string",
+      "format": null,
+      "description": "The comment text to submit. This maps to the WordPress 'comment' textarea (id/name 'comment').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "author",
+      "type": "string",
+      "format": null,
+      "description": "Display name for the comment (maps to input id/name 'author'). Required by most WP installs.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": null,
+      "description": "Email address for the comment (maps to input id/name 'email'). Required by most WP installs.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "url",
+      "type": "string",
+      "format": null,
+      "description": "Optional website/URL for the commenter (maps to input id/name 'url'). Provide full URL e.g. 'https://example.com' or empty string to skip.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "wp_comment_cookies_consent",
+      "type": "bool",
+      "format": null,
+      "description": "If true, the tool will enable the 'Save my name, email, and website in this browser' checkbox (input#wp-comment-cookies-consent). Default false.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

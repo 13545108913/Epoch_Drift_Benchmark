@@ -1,0 +1,82 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session repeatedly navigated category archive pages (e.g. ?cat=16 and ?cat=45), enumerated post title and 'Continue Reading' links, opened posts by title, and attempted to click a 'Continue Reading' link by a numeric index that was out of range (index 11 when the page had 10 links). The key operations required are: 1) navigate to category URL, 2) identify the desired post's Continue link deterministically, 3) click it and confirm navigation to the single-post page.\n\nTask Definition:\n- Purpose: provide a deterministic, reusable tool that loads a category archive and opens a specific post from that listing. The tool must avoid fragile positional indexing and prefer href-based selectors (matching ?p=<id>) to reliably locate the 'Continue Reading' link.\n\nAction Plan (ordered):\n1) Navigate to category listing: http://localhost:8000/?cat={cat}.\n2) Wait briefly for page stability.\n3) Extract page content listing Continue links and titles under #content to validate the target exists.\n4) Click the Continue Reading anchor that contains '?p={post_id}' in its href, scoped under #content for safety.\n5) Wait for navigation.\n6) Extract and confirm the post page loaded; optionally verify the post title if provided.\n\nVariable Identification:\n- cat (string, required): the numeric category id (maps directly to the site's ?cat query parameter).\n- post_id (string, required): the numeric post id (maps to ?p query parameter). Using post_id avoids positional index ambiguity and is deterministic.\n- base_url (string, optional): base host for the site; default is http://localhost:8000 if omitted.\n- verify_title (string, optional): exact visible post title for an additional sanity check after navigation.\n\nStep Optimization and Rationale:\n- Use direct navigation to the category URL rather than clicking a sidebar anchor; this is faster and avoids brittle DOM widget differences.\n- Prefer href-based CSS selectors scoped to #content (e.g. #content a[href*='?p={post_id}']) over numeric 1-based/0-based indexing. The session failures were caused by selecting index 11 when only 10 items existed; matching the post id removes this class of errors.\n- Include short waits to allow dynamic content and scripts to settle before searching/clicking.\n- Verify presence of the target link via an extraction step before clicking to provide a clear failure reason if the post is not on the requested page (and to allow callers to request pagination if needed).\n\nWhat was removed or simplified from the recorded steps:\n- Removed repeated, exploratory analyses and attempts to click by ambiguous UI index. Those were informational but not essential to the single-purpose tool. The tool focuses on deterministic navigation + href-based click.\n\nError handling notes (implementation guidance):\n- If the element '#content a[href*=\"?p={post_id}\"]' is not found on the loaded category page, the tool should fail with a clear message: 'target post id {post_id} not found on category ?cat={cat}; consider paginating (paged=2) or using the post_id directly as a navigation URL.'\n- If clicking fails due to server error or navigation not completing, attempt to navigate directly to 'http://localhost:8000/?p={post_id}' as a fallback (not implemented in the core deterministic sequence to keep steps simple).",
+  "name": "tool_browse_by_category.v4",
+  "description": "Browse a category listing on the site and open a specific post from that listing (by post id). Navigates to the category archive, validates the presence of the requested post's 'Continue Reading' link (preferred by post id), clicks it and confirms the post page loaded. Uses href-based selectors for deterministic behavior and avoids fragile positional indexing.",
+  "version": "v4",
+  "steps": [
+    {
+      "description": "Navigate directly to the category archive page for the requested category id.",
+      "output": null,
+      "type": "navigation",
+      "url": "http://localhost:8000/?cat={cat}",
+      "url_operation": null
+    },
+    {
+      "description": "Brief pause to allow the category page to finish loading and dynamic content to settle.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Collect the list of post titles and Continue Reading hrefs under #content to verify target availability.",
+      "output": "posts_list",
+      "type": "extract_page_content",
+      "goal": "Enumerate posts and 'Continue Reading' anchors on the category page (capture hrefs and titles). This confirms the target post (?p={post_id}) is present before clicking."
+    },
+    {
+      "description": "Click the 'Continue Reading' link that points to the specific post id (?p={post_id}). Uses href match scoped to #content to avoid sidebar/post-meta collisions.",
+      "output": null,
+      "cssSelector": "#content a[href*='?p={post_id}']",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": null,
+      "type": "click"
+    },
+    {
+      "description": "Wait for navigation to the post page to complete after the click.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract page title and canonical/post id to confirm navigation succeeded.",
+      "output": "post_page",
+      "type": "extract_page_content",
+      "goal": "Confirm the post page loaded and (optionally) verify the post title if {verify_title} was supplied."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "cat",
+      "type": "string",
+      "format": null,
+      "description": "Category id as used in the site query string (example: \"16\" for ?cat=16).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "post_id",
+      "type": "string",
+      "format": null,
+      "description": "Post id as used in the site query string (example: \"6\" for ?p=6). The tool uses this to select the exact 'Continue Reading' anchor by href (?p={post_id}).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base site URL (including protocol and host). Default used in examples: \"http://localhost:8000\". If omitted the tool will use http://localhost:8000.",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "verify_title",
+      "type": "string",
+      "format": null,
+      "description": "Optional exact post title to verify the clicked link opens the expected article. If provided the tool will check the opened page contains this title.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

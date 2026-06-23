@@ -195,7 +195,7 @@ async def discovery_main_async(args):
         # Phase 1: Discovery
         console.print("\n[bold cyan]🔍 Phase 1: Discovering candidate tools...[/bold cyan]")
         # tools_json = await propose.discover_candidates(args)
-        # console.print(f"[green]✅ Found {len(tools_json)} candidate tools[/green]")
+        #。console.print(f"[green]✅ Found {len(tools_json)} candidate tools[/green]")
 
         # Phase 2: Generation
         console.print("\n[bold cyan]🚀 Phase 2: Generating tools...[/bold cyan]")

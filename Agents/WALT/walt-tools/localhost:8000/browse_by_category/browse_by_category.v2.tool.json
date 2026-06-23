@@ -1,0 +1,120 @@
+{
+  "tool_analysis": "Step Analysis: The recorded browser session shows repeated analyses of a WordPress category page (http://localhost:8000/?cat=16) and interactions: opening a post via 'Continue Reading' (which navigated to ?p=6), clicking the sidebar 'technology' category link (which points to ?cat=16 but must be scoped to avoid also matching pagination links '?cat=16&paged=2'), and opening a post by clicking its title. The goal of the tool is to reproduce these interactions deterministically.\n\nTask Definition: Build a reusable tool that navigates to a category page at {base_url}/?cat={category_id}, verifies and (optionally) clicks the category link in the sidebar (scoped to aside .widget_categories to avoid pagination collisions), enumerates posts on the category page, and opens a chosen post either by post id (?p=ID) or by zero-based index in the listing.\n\nAction Plan:\n1. Navigate to the category URL directly for determinism.\n2. Verify the sidebar category link is present and unique using the scoped selector aside .widget_categories a[href*='?cat={category_id}']. If duplicates or no matches, use an agent step to find the right widget by heading text and resolve a robust selector.\n3. Click the scoped sidebar category link (or navigate directly) and wait for navigation.\n4. Extract post list on the category page (titles and hrefs) to confirm content and prepare for selecting a post.\n5. Select and open a post using either post id (?p=ID) or by index N (0-based) mapping to nth-of-type(N+1) article container and clicking the title anchor.\n6. After clicking, wait and extract post page title and canonical URL to confirm success.\n\nVariable Identification:\n- base_url (string): e.g., 'http://localhost:8000'.\n- category_id (string): e.g., '16'.\n- post_identifier (string): e.g., '6' or '0' depending on mode.\n- post_selection_mode (string, optional): 'by_id' or 'by_index'. If not provided, treat numeric values as 'by_id' if they correspond to post ids; otherwise use index.\n\nStep Optimization: Replaced repeated UI clicks to reach the category page with direct URL navigation, which is deterministic. Scoped selectors to aside.widget_categories to avoid matching 'Older posts' pagination which contains the same query param. Added agent fallbacks for ambiguous DOM structures and to compute the 1-based index for nth-of-type selection. Ensured steps explicitly verify uniqueness and visibility before clicking. Omitted non-essential exploratory or repeated analyses from the final tool steps. \n\nSelectors used in steps are taken from the recorded interactions (element_hash values included for click steps). The tool intentionally performs pre-checks (extract_page_content) to validate selectors and avoid flaky matches. \n\nInputs: base_url, category_id, post_identifier, post_selection_mode. The tool assumes the session is authenticated if necessary and does not perform login steps.\n\nEdgecases: When the category link points to the current page (click is a no-op), the tool will still validate presence and optionally skip clicking. When selecting by index, the tool computes 1-based nth-of-type index to click the correct article element.\n\nDeterministic Steps: Prefer navigation to {base_url}/?cat={category_id} and explicit href matching for posts (?p=ID). Agent steps are used only when structural ambiguity requires reasoning.\n\nJustification: This tool uses the recorded stable href patterns (?cat=16 and ?p=ID) and recommended scoped selectors from the session analysis to create a robust, repeatable way to browse a category and open a post.\n\n",
+  "name": "tool_browse_by_category.v3",
+  "description": "Browse posts within a specified category on Epoch & Drift Benchmark and open a selected post. Uses scoped selectors to avoid pagination collisions. The tool navigates to the category page (if needed), verifies the category link in the sidebar is unique, clicks it (or navigates directly), then opens a post by its index or post ID (by title). Assumes user is already authenticated if required.",
+  "version": "3",
+  "steps": [
+    {
+      "description": "Navigate directly to the category listing page for the requested category id. Using URL navigation is deterministic and avoids fragile UI clicks.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}/?cat={category_id}",
+      "url_operation": null
+    },
+    {
+      "description": "Verify the scoped selector 'aside .widget_categories a[href*=\"?cat={category_id}\"]' matches exactly one visible element. Capture href and text for later validation.",
+      "output": "category_link_check",
+      "type": "extract_page_content",
+      "goal": "Confirm the presence of sidebar Categories widget and find the category link anchor inside aside.widget_categories (href contains '?cat={category_id}')"
+    },
+    {
+      "description": "Resolve ambiguous or theme-dependent widget structures that require reasoning beyond deterministic selectors.",
+      "output": null,
+      "type": "agent",
+      "task": "If the scoped selector returns multiple matches or none, find the categories widget by heading text 'Categories' then locate the 'technology' link by href or visible text 'technology' and report the reliable selector. Limit to 4 steps.",
+      "max_steps": 4
+    },
+    {
+      "description": "Click the sidebar category link scoped to the categories widget to navigate to the category page. This avoids matching pagination or other anchors that share the same query param.",
+      "output": null,
+      "cssSelector": "ul > li > a[href=\"http://localhost:8000/?cat=16\"]",
+      "xpath": "html/body/div/div/div/div/aside/div/section[5]/div/div/ul/li[8]/a",
+      "elementTag": "a",
+      "elementHash": "338cccda93",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for navigation or page reload to complete.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Extract post titles and hrefs on the category page to prepare for selecting a post.",
+      "output": "category_posts",
+      "type": "extract_page_content",
+      "goal": "After navigation, verify page contains category header or URL contains '?cat={category_id}'. Output the list of first-page post links and titles."
+    },
+    {
+      "description": "Agentic resolution for selecting the correct post when DOM structure varies.",
+      "output": null,
+      "type": "agent",
+      "task": "Resolve the post to open using {post_selection_mode} and {post_identifier}. If 'by_id', find an anchor matching '?p={post_identifier}' and click it. If 'by_index', select the Nth post container under #content and click its title anchor. Limit to 4 steps.",
+      "max_steps": 4
+    },
+    {
+      "description": "Click the post title anchor in the content area by index (1-based). Element index will be computed by the agent step and passed as {post_index_plus1}.",
+      "output": null,
+      "cssSelector": "header > h2 > a[href=\"http://localhost:8000/?p=6\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/article/div[2]/header/h2/a",
+      "elementTag": "a",
+      "elementHash": "9feda3665f",
+      "type": "click"
+    },
+    {
+      "description": "Click the post link by exact post id href. Used when selecting by id.",
+      "output": null,
+      "cssSelector": "a.np-button",
+      "xpath": "html/body/div/div/div/div/div/div/main/article/div[2]/div/span/a",
+      "elementTag": "a",
+      "elementHash": "910bb6d488",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the post page to load.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Capture the final post title and URL for verification.",
+      "output": "post_page_data",
+      "type": "extract_page_content",
+      "goal": "Extract the post page title and canonical href to confirm the post opened and return the post metadata."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base site URL including protocol and host, e.g., 'http://localhost:8000'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "category_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric category id used in query parameter (e.g., '16' for technology). Use raw id as appears in '?cat=16'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "post_identifier",
+      "type": "string",
+      "format": null,
+      "description": "Identifier of the post to open. Provide either the post id as string (e.g., '6') which will open '?p=6', or the zero-based index of the post on the category page (e.g., '0' for first post). If both forms are ambiguous, post id is preferred.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "post_selection_mode",
+      "type": "string",
+      "format": null,
+      "description": "How to resolve the target post; allowed values: 'by_id' or 'by_index'. If omitted, tool will treat post_identifier as 'by_id' when it contains non-numeric characters? (Prefer specifying explicitly).",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

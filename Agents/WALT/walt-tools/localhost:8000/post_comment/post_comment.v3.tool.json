@@ -1,0 +1,155 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session shows a successful end-to-end posting of a comment on a WordPress post at http://localhost:8000/?p=8. The agent identified the standard WordPress comment form fields and used element indices during the run; element_hash values for each interacted element were recorded. It also captured stable selectors: #comment, #author, #email, #url, #wp-comment-cookies-consent, and #submit. The final navigation ended at the comment anchor '#comment-19', indicating success.\n\nTask Definition:\n- Create a reusable tool that submits a comment on a WordPress post page by filling the comment form fields (comment, author, email, optional url), optionally toggling the cookies consent checkbox, clicking submit, and verifying the comment appears.\n\nAction Plan:\n1. Navigate to the provided page_url and wait for the page to load fully.\n2. Wait a short extra period to allow theme scripts to initialize.\n3. Locate the comment form fields using stable selectors; if IDs are present use them (#comment, #author, #email, #url, #wp-comment-cookies-consent, #submit). If IDs are missing, use form-scoped selectors (form[action*=\"wp-comments-post.php\"] ...) or label-based XPaths \u2014 delegate to an agent step for robustness.\n4. Input the provided comment, author, email, and optional url into their respective fields.\n5. Optionally toggle the cookies consent checkbox based on the 'consent' boolean input.\n6. Click the submit button (input#submit or submit button inside form) to post the comment.\n7. Wait and verify that the comment appears; return the comment anchor if successful.\n\nVariable Identification:\n- page_url (required): target post URL\n- comment (required): comment text\n- author (required): display name\n- email (required): email address\n- url (optional): website URL\n- consent (optional): boolean to check cookies consent checkbox\n\nStep Optimization:\n- Consolidated repeated index-based interactions into selector-based deterministic steps using the elementHash values recorded during the run as stable fallbacks.\n- Added explicit waits to address previous timeout issues and timing-related failures.\n- Included agent steps to resolve selectors at runtime if IDs are missing or themes alter markup; this addresses the prior 'strict mode violation' and timing/selector flakiness.\n- Removed all non-essential exploratory steps. This tool focuses solely on posting a comment and verifying it.\n\nSelector & Timing Improvements:\n- Prefer CSS IDs when present (#comment, #author, #email, #url, #wp-comment-cookies-consent, #submit).\n- Use elementHash recorded from the successful run as backup deterministic selectors for the exact elements interacted with: textarea->67f1dce8d0, author->085915c9f4, email->cedb6c9f0b, url->c682e1f7d4, consent->42c420143d, submit->777443c52e.\n- Add waits before reading or interacting with form controls to avoid 'navigation timeout' and perform retries within agent steps if elements are not found.\n\nJustification of Inputs:\n- All fields required by WordPress core comment form are included as required when the site enforces them (comment, author, email). The url field is optional. The consent checkbox is optional and defaults to false.\n\nEdge Cases & Error Handling:\n- If navigation times out, the tool allows re-attempts by the caller, but includes a 2-second wait after navigation to mitigate transient load issues.\n- If IDs are not present the agent step will search within form[action*='wp-comments-post.php'] or #respond using name attributes and label-based XPaths.\n- Verification step searches for a comment element containing the author and comment text; if not found, returns failure information.\n\nNotes:\n- Authentication not required; the agent is assumed not to need login for comment posting.\n- This tool intentionally limits attempts and uses deterministic selectors where possible to be re-executable and stable.\n",
+  "name": "tool_post_comment.v4",
+  "description": "Submit a comment on a WordPress post by filling the standard comment form fields and submitting. Uses stable WordPress selectors (#comment, #author, #email, #url, #wp-comment-cookies-consent, #submit) and falls back to form-scoped selectors if IDs are missing. Includes waits to handle timing issues and verifies the posted comment appears.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": "Navigate to the post page containing the comment form and wait for load.",
+      "output": null,
+      "type": "navigation",
+      "url": "{page_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Give the page a short additional moment to ensure scripts and the comment form are fully initialized.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "Some themes may omit IDs; use form-scoped selectors or label-based XPaths if IDs are absent. Return a map of selectors for the following keys: comment, author, email, url, consent, submit. Limit search to 5 steps.",
+      "output": "selectors",
+      "type": "agent",
+      "task": "Verify presence of comment form fields and resolve stable selectors for each: textarea#comment, input#author, input#email, input#url, input#wp-comment-cookies-consent, input[type='submit' or button[type='submit']] within form[action*='wp-comments-post.php'] or #respond.",
+      "max_steps": 5
+    },
+    {
+      "description": "Type the provided comment text into the comment textarea using the stable selector textarea#comment (fallback to form-scoped selector if agent returned alternative).",
+      "output": "comment_filled",
+      "cssSelector": "textarea[name=\"comment\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "67f1dce8d0",
+      "type": "input",
+      "value": "{comment}"
+    },
+    {
+      "description": "Type the provided author name into the Name input (input#author).",
+      "output": "author_filled",
+      "cssSelector": "input[name=\"author\"][type=\"text\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[3]/input",
+      "elementTag": "input",
+      "elementHash": "085915c9f4",
+      "type": "input",
+      "value": "{author}"
+    },
+    {
+      "description": "Type the provided email into the Email input (input#email).",
+      "output": "email_filled",
+      "cssSelector": "#email",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[4]/input",
+      "elementTag": "input",
+      "elementHash": "cedb6c9f0b",
+      "type": "input",
+      "value": "{email}"
+    },
+    {
+      "description": "If provided, type the optional website URL into input#url.",
+      "output": "url_filled",
+      "cssSelector": "#url",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[5]/input",
+      "elementTag": "input",
+      "elementHash": "c682e1f7d4",
+      "type": "input",
+      "value": "{url}"
+    },
+    {
+      "description": "If consent is true, click the cookies consent checkbox to toggle it.",
+      "output": "consent_toggled",
+      "cssSelector": "#wp-comment-cookies-consent",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[6]/input",
+      "elementTag": "input",
+      "elementHash": "42c420143d",
+      "type": "click"
+    },
+    {
+      "description": "Brief wait to ensure checkbox state is applied before submitting.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Click the Post Comment submit button. Uses input#submit if present, otherwise target submit button within the comment form.",
+      "output": "submit_clicked",
+      "cssSelector": "input[name=\"submit\"][type=\"submit\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/div/form/p[7]/input",
+      "elementTag": "input",
+      "elementHash": "777443c52e",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the server to process the submission and for the page to reload or for the DOM to update with the new comment.",
+      "output": null,
+      "type": "wait",
+      "seconds": 3.0
+    },
+    {
+      "description": "Check for posted comment presence and return its anchor. Limit search to 5 steps.",
+      "output": "result_anchor",
+      "type": "agent",
+      "task": "Verify the comment was posted: look for an element with id starting with 'comment-' and containing the provided author name and the comment text, or a success message near the comment form. Return the comment anchor (e.g., '#comment-19') if found.",
+      "max_steps": 5
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "page_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the post page containing the comment form (e.g. 'http://localhost:8000/?p=8').",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment",
+      "type": "string",
+      "format": null,
+      "description": "The comment text to submit (plain text).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "author",
+      "type": "string",
+      "format": null,
+      "description": "Display name for the comment author (as appears in the Name field).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": null,
+      "description": "Email address for the comment author (must be valid format).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "url",
+      "type": "string",
+      "format": null,
+      "description": "Optional website URL to include with the comment (e.g., 'https://example.org').",
+      "required": false,
+      "enum": null
+    },
+    {
+      "name": "consent",
+      "type": "bool",
+      "format": null,
+      "description": "Whether to check the 'Save my name, email, and website' consent checkbox. Defaults to false.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}

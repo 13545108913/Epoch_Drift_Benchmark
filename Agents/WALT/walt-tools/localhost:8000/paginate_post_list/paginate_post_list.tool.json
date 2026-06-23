@@ -1,0 +1,89 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded session navigated a month-based archive (http://localhost:8000/?m=202512&paged=2) and repeatedly followed the 'Older posts' link to advance the 'paged' query parameter, later using 'Newer posts' to go back. It also extracted post entries and recommended stable selectors (nav.posts-navigation .nav-previous a / .nav-next a and XPath fallbacks).\n\nTask Definition:\n- Create a reusable tool that opens a starting archive page, collects pagination info, then deterministically moves to a specified older page and then to a specified newer page, confirming page loads and extracting pagination/post metadata on each page. The tool must be parameterized by URL components used in the session (base_url, m, paged values).\n\nAction Plan (step-by-step):\n1) Navigate to the starting archive URL formed from base_url, m and start_paged.\n2) Extract page content to identify pagination links, post permalinks and recommended selectors (store as start_page_data).\n3) Navigate directly (HTTP GET) to the older_target_paged URL (base_url + ?m={m}&paged={older_target_paged}). This replaces repeated UI clicks with deterministic navigation to the same href (recommended by the session logs).\n4) Extract page content on the older page and record pagination and post list (older_page_data).\n5) Navigate directly to the newer_target_paged URL (base_url + ?m={m}&paged={newer_target_paged}) to simulate clicking 'Newer posts'.\n6) Extract page content on the newer page and record final pagination state (newer_page_data).\n\nVariable Identification (inputs required):\n- base_url (string): site host + scheme (used to build full archive URLs).\n- m (string YYYYMM): archive month parameter (maps to 'm' query param).\n- start_paged (number): initial paged value to open.\n- older_target_paged (number): target paged to reach by following 'Older posts' (must be > start_paged in typical usage).\n- newer_target_paged (number): target paged to reach after older target (typically < older_target_paged).\n\nStep Optimization (why and how):\n- The recorded session repeatedly clicked pagination anchors. Those anchors contained deterministic hrefs like '?m=202512&paged=3'. Following the href via direct navigation is more robust and deterministic than clicking UI elements which may be subject to JS interception, overlays, or timing issues. Therefore PASS 2 optimization replaces UI click sequences with direct navigation to URLs computed from the given inputs.\n- The tool still extracts page content before and after navigation to mimic the session's data capture (pagination links, post lists, and recommended stable selectors). This preserves the important observational behavior while making the navigation deterministic and re-executable.\n\nDeterminism & Selector Guidance:\n- Where possible, prefer href-based selectors (a[href*='paged='] and a[href*='m=YYYYMM']) or structural selectors scope to nav.posts-navigation .nav-previous a and .nav-next a. The tool returns extracted data including recommended selectors so downstream automation can choose to click UI elements if desired.\n\nAssumptions & Constraints:\n- The agent is already authenticated if the site requires authentication; this tool does not handle login.\n- The site uses month-based query parameter 'm' and 'paged' for pagination (as observed), and direct GET to constructed URLs returns the expected pages.\n- No conditional branches are included; the tool always performs the three navigations (start -> older_target -> newer_target). The inputs must therefore be provided to define those target pages.\n\nWhy no click steps:\n- The recorded steps suggested hrefs were present and clickable; following hrefs directly is recommended in the recordings and is deterministic (less flaky). If UI clicks are specifically required for a site that relies on JS, the returned selector recommendations can be used to build a click-based variant later.\n",
+  "name": "archive_pagination_navigator",
+  "description": "Navigate a month-based archive (WordPress-style) by opening a starting archive page, extracting pagination info, then moving to a specified older page and back to a specified newer page using deterministic URL navigation. Returns page extraction outputs for each visited page. Optimized to use direct URL navigation (stable, deterministic) rather than fragile UI clicks; outputs also include recommended stable selectors for automation.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the starting archive page for month {m} at paged={start_paged}.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}?m={m}&paged={start_paged}",
+      "url_operation": null
+    },
+    {
+      "description": "Capture pagination state and recommended selectors on the starting page before navigation.",
+      "output": "start_page_data",
+      "type": "extract_page_content",
+      "goal": "Extract pagination links (Older posts/Newer posts), post permalinks, sidebar archive/category links, and recommend stable selectors (CSS/XPath) for pagination on the current page."
+    },
+    {
+      "description": "Navigate directly to the Older target page (simulates following 'Older posts' until paged={older_target_paged}). Prefer direct GET to href for deterministic behaviour.",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}?m={m}&paged={older_target_paged}",
+      "url_operation": null
+    },
+    {
+      "description": "Verify navigation succeeded and record pagination links and posts on the older target page.",
+      "output": "older_page_data",
+      "type": "extract_page_content",
+      "goal": "Confirm the page loaded for paged={older_target_paged} and extract pagination links, posts list and stable selectors."
+    },
+    {
+      "description": "Navigate to the Newer target page (simulates clicking 'Newer posts' to reach paged={newer_target_paged}).",
+      "output": null,
+      "type": "navigation",
+      "url": "{base_url}?m={m}&paged={newer_target_paged}",
+      "url_operation": null
+    },
+    {
+      "description": "Verify return navigation succeeded and capture final pagination information.",
+      "output": "newer_page_data",
+      "type": "extract_page_content",
+      "goal": "Confirm the page loaded for paged={newer_target_paged} and extract final pagination state and recommended selectors."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "base_url",
+      "type": "string",
+      "format": null,
+      "description": "Base site URL including scheme and host, e.g. 'http://localhost:8000' (no trailing slash required but accepted).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "m",
+      "type": "string",
+      "format": null,
+      "description": "Archive month parameter in YYYYMM format used by the site, e.g. '202512'. This maps directly to the 'm' query parameter in archive URLs.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "start_paged",
+      "type": "number",
+      "format": null,
+      "description": "Initial paged value to open (integer). This maps to the 'paged' query parameter (e.g. 2).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "older_target_paged",
+      "type": "number",
+      "format": null,
+      "description": "Target paged value to reach by following 'Older posts' (integer greater than start_paged). The tool will navigate to this paged value (simulating repeated 'Older posts' clicks).",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "newer_target_paged",
+      "type": "number",
+      "format": null,
+      "description": "Target paged value to reach by following 'Newer posts' from the older target (typically less than older_target_paged). The tool will navigate to this paged value after reaching older_target_paged (simulating a 'Newer posts' click).",
+      "required": true,
+      "enum": null
+    }
+  ]
+}

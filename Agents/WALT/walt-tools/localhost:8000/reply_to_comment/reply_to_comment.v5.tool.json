@@ -1,0 +1,148 @@
+{
+  "tool_analysis": "Step Analysis:\n- The recorded browser session navigated to a WordPress post page, located a specific comment (Jane Doe, comment_id 15), clicked its Reply link, filled the comment form fields (textarea#comment, input#author, input#email), and submitted the form. The page returned to a new comment anchor (#comment-24), indicating success.\n\nTask Definition:\n- Build a reusable tool that automates replying to a specific comment on a WordPress post. The tool should: 1) navigate to the post URL, 2) click the reply link for the specified comment id (using robust selectors), 3) wait for the reply form to activate under '#respond', 4) fill the comment, name, email (and optionally website), and 5) submit the form via its submit input/button. It should verify the reply context by checking input#comment_parent or cancel link.\n\nAction Plan:\n1. navigation: open {post_url}\n2. click: click the reply link using cssSelector \"li#comment-{target_comment_id} .comment-reply-link\" first; fallback to \"a[href*='replytocom={target_comment_id}'][href*='#respond']\".\n3. wait: short wait (1s) for DOM relocation/JS to run after clicking reply.\n4. verify: ensure the '#respond' container is present and input#comment_parent value equals '{target_comment_id}' or cancel link visible.\n5. input: fill textarea#comment with {comment_text}\n6. input: fill input#author with {author_name}\n7. input: fill input#email with {author_email}\n8. optional input: fill input#url with {author_website} if provided\n9. click: click input#submit[type='submit'] within '#respond' scoped form\n10. wait: short wait (2s) for post-back / anchor navigation\n11. extract: capture current URL and fragment to confirm anchor contains '#comment-' indicating a posted comment.\n\nVariable Identification:\n- post_url (string): the post page where comment exists\n- target_comment_id (string): numeric comment id to reply to\n- comment_text (string): body of the reply\n- author_name (string): comment author name\n- author_email (string): author email\n- author_website (string, optional): website field\n\nStep Optimization:\n- Use direct navigation to {post_url} rather than piecemeal clicks through the site.\n- Use robust, deterministic CSS selectors that target unique ids (li#comment-{id} .comment-reply-link and element ids in the comment form). These were present and stable in the recording.\n- Add explicit waits after clicking reply and after submitting to allow JS and post submission to complete.\n- Avoid agentic steps; all interactions are deterministic.\n- Do not include login steps; session assumes already authenticated.\n\nNotes on required fields:\n- Name and Email are required by the WP form labels; therefore mark required true. Website is optional.\n\nEdge cases and fallbacks:\n- If form uses button[type=submit] instead of input#submit, the click step targets 'form#commentform button[type=\"submit\"]' as alternate.\n- If ids are missing, selectors fallback to name attributes scoped to '#respond'.\n\nJustification for inputs:\n- All dynamic values in the original run were parameterized. The submit action is deterministic (clicking the submit input) and verification uses the URL anchor returned by the server.\n",
+  "name": "reply_to_comment",
+  "description": "Replies to an existing comment on a WordPress post. Clicks the target comment's 'Reply' link to set reply context, fills the comment textarea, name, and email fields, and submits the form. Assumes the agent is already authenticated if required. Uses robust selectors (ids and href matching) and scopes form operations under '#respond'.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Open the WordPress post page where the target comment appears.",
+      "output": null,
+      "type": "navigation",
+      "url": "{post_url}",
+      "url_operation": null
+    },
+    {
+      "description": "Click the 'Reply' link for the comment with id {target_comment_id} to set the reply context. This is the preferred selector; falls back to matching href if not present.",
+      "output": null,
+      "cssSelector": "a[aria-label=\"Reply to Jane Doe\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/ol/li[2]/article/div[2]/a",
+      "elementTag": "a",
+      "elementHash": "86400ee99a",
+      "type": "click"
+    },
+    {
+      "description": "Wait briefly for JavaScript to move the comment form under the replied comment and set hidden inputs.",
+      "output": null,
+      "type": "wait",
+      "seconds": 1.0
+    },
+    {
+      "description": "Ensure the form is in reply mode (dynamic DOM changes occur when clicking Reply).",
+      "output": null,
+      "type": "agent",
+      "task": "Verify '#respond' is present and that input#comment_parent has value '{target_comment_id}', or that the cancel reply link is visible. If not found, re-query the page up to 3 times.",
+      "max_steps": 3
+    },
+    {
+      "description": "Fill the comment textarea inside the '#respond' form with the reply text.",
+      "output": null,
+      "cssSelector": "textarea[name=\"comment\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/ol/li[2]/div/form/p[2]/textarea",
+      "elementTag": "textarea",
+      "elementHash": "67f1dce8d0",
+      "type": "input",
+      "value": "{comment_text}"
+    },
+    {
+      "description": "Fill the 'Name' field for the comment.",
+      "output": null,
+      "cssSelector": "input[name=\"author\"][type=\"text\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/ol/li[2]/div/form/p[3]/input",
+      "elementTag": "input",
+      "elementHash": "085915c9f4",
+      "type": "input",
+      "value": "{author_name}"
+    },
+    {
+      "description": "Fill the 'Email' field for the comment.",
+      "output": null,
+      "cssSelector": "#email",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/ol/li[2]/div/form/p[4]/input",
+      "elementTag": "input",
+      "elementHash": "cedb6c9f0b",
+      "type": "input",
+      "value": "{author_email}"
+    },
+    {
+      "description": "(Optional) Fill the 'Website' field if {author_website} is provided.",
+      "output": null,
+      "cssSelector": "input#url",
+      "xpath": null,
+      "elementTag": null,
+      "elementHash": "",
+      "type": "input",
+      "value": "{author_website}"
+    },
+    {
+      "description": "Click the 'Post Comment' submit input within the '#respond' area to submit the reply.",
+      "output": null,
+      "cssSelector": "input[name=\"submit\"][type=\"submit\"]",
+      "xpath": "html/body/div/div/div/div/div/div/main/div[2]/ol/li[2]/div/form/p[7]/input",
+      "elementTag": "input",
+      "elementHash": "777443c52e",
+      "type": "click"
+    },
+    {
+      "description": "Wait for the page to reload and navigate to the comment anchor after submission.",
+      "output": null,
+      "type": "wait",
+      "seconds": 2.0
+    },
+    {
+      "description": "After submission, extract the URL and page anchor to confirm the new comment appeared.",
+      "output": "submission_result",
+      "type": "extract_page_content",
+      "goal": "Capture the current page URL and fragment to confirm the reply was posted (look for '#comment-' in the URL)."
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "post_url",
+      "type": "string",
+      "format": null,
+      "description": "Full URL of the post page (e.g. 'http://localhost:8000/?p=8') where the comment to reply to exists. Must include scheme.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "target_comment_id",
+      "type": "string",
+      "format": null,
+      "description": "Numeric comment ID to reply to (e.g. '15'). This will be used to find the 'Reply' link via href containing 'replytocom={target_comment_id}' or the comment list item with id 'comment-{target_comment_id}'.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "comment_text",
+      "type": "string",
+      "format": null,
+      "description": "Text to submit as the reply comment. Place any content to be posted here.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "author_name",
+      "type": "string",
+      "format": null,
+      "description": "Name to put into the comment 'Name' field (input[name='author']). Marked required because WordPress comment forms typically require a name.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "author_email",
+      "type": "string",
+      "format": null,
+      "description": "Email to put into the comment 'Email' field (input[name='email']). Marked required because WordPress comment forms typically require an email address.",
+      "required": true,
+      "enum": null
+    },
+    {
+      "name": "author_website",
+      "type": "string",
+      "format": null,
+      "description": "Optional website/URL to include in the comment form (input[name='url']). Leave empty or omit to skip.",
+      "required": false,
+      "enum": null
+    }
+  ]
+}
